@@ -26,3 +26,5 @@ alias gsts='git stash'
 alias gstp='git stash pop'
 alias grs='git reset'
 alias gcl='git clean'
+
+alias glog='git log --pretty=format:"%h %ad | %s%d [%an]" --graph --date=short'
