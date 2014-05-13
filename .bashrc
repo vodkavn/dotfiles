@@ -10,7 +10,8 @@ source ~/.bash/git-prompt.sh
 bash_prompt() {
   case $TERM in
     xterm*|rxvt*)
-      local TITLEBAR='\[\033]0;\u:${NEW_PWD}\007\]'
+      # local TITLEBAR='\[\033]0;\u:${NEW_PWD}\007\]'
+      local TITLEBAR='\[\033]0;\h:${NEW_PWD}\007\]'
       ;;
     *)
       local TITLEBAR=""
@@ -54,7 +55,9 @@ bash_prompt() {
   # PS1="$TITLEBAR ${EMK}[${UC}\u${EMK}@${UC}\h ${EMB}\${NEW_PWD}${EMK}]${UC}\\$ ${NONE}"
   # PS1="\[$GREEN\]\t\[$RED\]-\[$BLUE\]\u\[$YELLOW\]\[$YELLOW\]\w\[\033[m\]\[$MAGENTA\]\$(__git_ps1)\[$WHITE\]\$ "
   # PS1="$TITLEBAR\[$R\][\[$C\]\t\[$R\]]\[$UC\]\u\[$Y\]\[$R\]\w\[\033[m\]\[$EMW\]\$(__git_ps1)\[$EMG\]\\$ "
-  PS1="$TITLEBAR${R}[${C}\t${R}]${UC}\u${Y}${W}\w\[\033[m\]${EMB}\$(__git_ps1)${EMG}\\$ "
+  # PS1="$TITLEBAR${R}[${C}\t${R}]${UC}\u${Y}${W}\w\[\033[m\]${EMB}\$(__git_ps1)${EMG}\\$ "
+  PS1="$TITLEBAR${R}[${C}\t${R}]${UC}\u${EMR}@${EMY}\H${W}\w\[\033[m\]${EMB}\$(__git_ps1)${EMG}\\$ "
+  # PS1="$TITLEBAR\[$(tput bold)\]\[$(tput setaf 6)\]\t \[$(tput setaf 2)\][\[$(tput setaf 3)\]\u\[$(tput setaf 1)\]@\[$(tput setaf 3)\]\h \[$(tput setaf 6)\]\W\[$(tput setaf 2)\]]\[$(tput setaf 4)\]\\$ \[$(tput sgr0)\]"
   # without colors: PS1="[\u@\h \${NEW_PWD}]\\$ "
   # PS1="[\u@\h \${NEW_PWD}]\\$ "
   # extra backslash in front of \$ to make bash colorize the prompt
