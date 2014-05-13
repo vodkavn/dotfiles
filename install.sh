@@ -1,6 +1,7 @@
 #!/bin/sh
 if [ ! -d "$HOME/linux_workspace" ]; then
   echo "Cloning from GitHub"
+  cd "$HOME"
   git clone https://github.com/vodkavn/linux_workspace.git
 fi
 
