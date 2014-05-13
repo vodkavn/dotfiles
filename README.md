@@ -6,8 +6,17 @@ My vimrc, bashrc, git... config for linux workspace
 
 GUIDE:
 =====
-* git clone https://github.com/vodkavn/linux_workspace.git
-* cp -r linux_workspace/[file_name] ~/
+```bash
+git clone https://github.com/vodkavn/linux_workspace.git
+cp -r linux_workspace/[file_name] ~/
+or
+sh install.sh
+```
+or just
+```bash
+sh -c "`curl -fsSL https://raw.githubusercontent.com/vodkavn/linux_workspace/master/install.sh`"
+```
+
 
 
 Vim using guide
