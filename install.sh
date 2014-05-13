@@ -20,3 +20,4 @@ echo "Configuring git setting..."
 cp -f .gitconfig ~/
 
 echo "DONE!"
+echo "Please restart your terminal!"
