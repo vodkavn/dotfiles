@@ -11,6 +11,8 @@ rpm -ihv rpmforge-release*.rf.x86_64.rpm
 
 yum repolist
 
+###################
+ln -sf /usr/share/zoneinfo/Asia/Ho_Chi_Minh /etc/localtime
 
 ###################
 yum -y install yum-plugin-replace
