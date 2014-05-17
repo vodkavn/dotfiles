@@ -8,6 +8,7 @@ rpm -Uvh http://mirror.webtatic.com/yum/el6/latest.rpm
 rpm -Uvh http://mirror.webtatic.com/yum/el5/latest.rpm
 wget http://packages.sw.be/rpmforge-release/rpmforge-release-0.5.2-2.el6.rf.x86_64.rpm
 rpm -ihv rpmforge-release*.rf.x86_64.rpm
+rpm -Uvh http://download1.rpmfusion.org/free/el/updates/6/i386/rpmfusion-free-release-6-1.noarch.rpm
 
 yum repolist
 
