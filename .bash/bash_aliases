@@ -1,6 +1,7 @@
 # Common command
 alias ls='ls --color'
 alias lsa='ls --all --color'
+alias ll='ls -l'
 alias v='vim'
 alias vi='vim'
 alias sv='sudo vim'
