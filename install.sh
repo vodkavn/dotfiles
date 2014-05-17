@@ -3,6 +3,10 @@ if [ ! -d "$HOME/linux_workspace" ]; then
   echo "Cloning from GitHub"
   cd "$HOME"
   git clone https://github.com/vodkavn/linux_workspace.git
+else
+  echo "Updating from GitHub"
+  cd "$HOME/linux_workspace"
+  git pull -f origin master
 fi
 
 cd "$HOME/linux_workspace"
