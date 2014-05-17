@@ -8,7 +8,7 @@ rpm -Uvh http://mirror.webtatic.com/yum/el6/latest.rpm
 rpm --import http://apt.sw.be/RPM-GPG-KEY.dag.txt
 rpm -Uvh http://pkgs.repoforge.org/rpmforge-release/rpmforge-release-0.5.3-1.el6.rf.x86_64.rpm
 rpm -Uvh http://download1.rpmfusion.org/free/el/updates/6/i386/rpmfusion-free-release-6-1.noarch.rpm
-
+rpm -Uvh http://download1.rpmfusion.org/nonfree/el/updates/6/i386/rpmfusion-nonfree-release-6-1.noarch.rpm
 
 yum repolist
 
@@ -40,4 +40,5 @@ yum -y install mysql55w mysql55w-server
 chkconfig --levels 235 mysqld on
 /etc/init.d/mysqld start
 mysql_secure_installation
+#ssh-keygen -t rsa -C "hoangxuanthanh1986@gmail.com"
 ###################
