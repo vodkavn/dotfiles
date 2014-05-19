@@ -2,10 +2,11 @@
 alias ls='ls --color'
 alias lsa='ls --all --color'
 alias ll='ls -l'
-alias lla='ll --all --color'
+alias lla='ls -l --all --color'
 alias v='vim'
 alias vi='vim'
 alias sv='sudo vim'
+
 # Common setting for Git
 alias gf='git fetch'
 alias gco='git checkout'
