@@ -23,6 +23,10 @@ colorscheme koehler
 " set cc=81
 hi ColorColumn guibg=#2d2d2d ctermbg=246
 filetype plugin indent on
+
+"---------------------------------------------------------------------------
+" Format coding:
+"
 " Pass arguments to phpcs binary
 let g:phpqa_codesniffer_args = "--standard=Zend"
 " Another example
@@ -37,21 +41,24 @@ let g:phpqa_messdetector_cmd='/path/to/phpmd'
 " Run mess detector on save (default = 1)
 let g:phpqa_messdetector_autorun = 0
 
-""""""""""""""""""""""""""""""""
-"
-" Load external config
-"
-function! s:source_rc(path)
-  execute 'source' fnameescape(expand('~/.vim/rc/' . a:path))
-endfunction
 
-call s:source_rc('encoding.rc.vim')
-call s:source_rc('edit.rc.vim')
-call s:source_rc('search.rc.vim')
-call s:source_rc('filetype.rc.vim')
-
-""""""""""""""""""""""""""""""""
+"---------------------------------------------------------------------------
+" Search:
 "
+" Ignore the case of normal letters.
+set ignorecase
+" If the search pattern contains upper case characters, override ignorecase option.
+set smartcase
+
+" Enable incremental search.
+set incsearch
+" Don't highlight search result.
+set nohlsearch
+
+" Searches wrap around the end of the file.
+set wrapscan
+
+"---------------------------------------------------------------------------
 " Load plugin by pathogen
 "
 execute pathogen#infect()
@@ -63,5 +70,5 @@ map <C-n> :NERDTreeToggle<CR>
 set background=dark
 let g:solarized_termcolors=256
 colorscheme solarized
-""""""""""""""""""""""""""""""""
+"---------------------------------------------------------------------------
 
