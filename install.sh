@@ -9,7 +9,6 @@ else
     git pull -f origin master
 fi
 
-cd "$HOME"
 
 ########################
 echo "Back-up old config files..."
@@ -36,7 +35,9 @@ if [ -f "$HOME/.gitconfig" ]; then
 fi
 
 
+########################
 echo "Installing..."
+cd "$HOME"
 ln -sf $HOME/linux_workspace/vimrc .vimrc
 ln -sf $HOME/linux_workspace/vim .vim
 ln -sf $HOME/linux_workspace/bash_profile .bash_profile
@@ -46,5 +47,6 @@ ln -sf $HOME/linux_workspace/bash .bash
 ln -sf $HOME/linux_workspace/gitconfig .gitconfig
 
 
+########################
 echo "DONE!"
 echo "Please restart your terminal!"
