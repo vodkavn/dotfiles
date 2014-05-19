@@ -61,11 +61,6 @@ yum -y install mysql55w mysql55w-server
 chkconfig --levels 235 mysqld on
 /etc/init.d/mysqld start
 
-mysql_secure_installation
-
-# generate ssh-key
-#ssh-keygen -t rsa -C "hoangxuanthanh1986@gmail.com"
-
 # Install wget
 yum install -y wget
 
@@ -74,5 +69,14 @@ yum install -y curl
 
 # Nodejs
 yum -y install nodejs npm --enablerepo=epel
+
+# Manual
+yum install -y man
+
+# Config mysql
+mysql_secure_installation
+
+# generate ssh-key
+#ssh-keygen -t rsa -C "hoangxuanthanh1986@gmail.com"
 
 #######END############
