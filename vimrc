@@ -37,7 +37,23 @@ let g:phpqa_messdetector_cmd='/path/to/phpmd'
 " Run mess detector on save (default = 1)
 let g:phpqa_messdetector_autorun = 0
 
+""""""""""""""""""""""""""""""""
+"
+" Load external config
+"
+function! s:source_rc(path)
+  execute 'source' fnameescape(expand('~/.vim/rc/' . a:path))
+endfunction
 
+call s:source_rc('encoding.rc.vim')
+call s:source_rc('edit.rc.vim')
+call s:source_rc('search.rc.vim')
+call s:source_rc('filetype.rc.vim')
+
+""""""""""""""""""""""""""""""""
+"
+" Load plugin by pathogen
+"
 execute pathogen#infect()
 filetype plugin indent on
 autocmd vimenter * NERDTree
@@ -47,5 +63,5 @@ map <C-n> :NERDTreeToggle<CR>
 set background=dark
 let g:solarized_termcolors=256
 colorscheme solarized
-
+""""""""""""""""""""""""""""""""
 
