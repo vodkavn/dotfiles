@@ -10,6 +10,7 @@ else
     echo "Updating from GitHub"
     cd "$HOME/linux_workspace"
     git pull -f origin master
+    git submodule update --init
     git submodule foreach git pull -f origin master
 fi
 
@@ -24,7 +25,7 @@ Dir_bak=$HOME/.setting_backup_$timestamp
 #
 # Setting file list
 #
-file_list=(vim vimrc bash bashrc bash_profile bash_logout gitconfig)
+file_list=(vim vimrc bash bashrc bash_profile bash_logout)
 
 #
 # Start
