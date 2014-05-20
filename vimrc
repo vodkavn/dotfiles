@@ -3,10 +3,9 @@ autocmd!
 autocmd VimEnter,WinEnter,ColorScheme * highlight TrailingSpaces term=underline guibg=Red ctermbg=Red
 autocmd VimEnter,WinEnter * match TrailingSpaces /\s\+$/
 augroup END
+filetype plugin indent on
 syntax on
 set t_Co=256
-filetype on
-filetype plugin indent on
 set tabstop=4
 set shiftwidth=4
 set softtabstop=4
@@ -19,7 +18,7 @@ set number
 set ruler
 set backspace=2
 set fileencodings=ucs-bom,korea,utf-8,sjis,default
-colorscheme koehler
+" colorscheme koehler
 " set cc=81
 hi ColorColumn guibg=#2d2d2d ctermbg=246
 filetype plugin indent on
