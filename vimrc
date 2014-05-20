@@ -9,7 +9,7 @@ augroup END
 set nocompatible
 filetype off
 
-if !isdirectory("~/.vim/bundle/Vundle.vim")
+if isdirectory($HOME."/.vim/bundle/Vundle.vim")
     set rtp+=~/.vim/bundle/Vundle.vim
     call vundle#begin()
 
@@ -94,7 +94,7 @@ filetype plugin indent on
 "---------------------------------------------------------------------------
 " Config NERDTree
 "
-if !isdirectory("~/.vim/bundle/nerdtree")
+if isdirectory($HOME."/.vim/bundle/nerdtree")
     autocmd vimenter * NERDTree
     autocmd vimenter * if !argc() | NERDTree | endif
     autocmd bufenter * if (winnr("$") == 1 && exists("b:NERDTreeType") && b:NERDTreeType == "primary") | q | endif
@@ -104,7 +104,7 @@ endif
 "---------------------------------------------------------------------------
 " Config Color theme
 "
-if !isdirectory("~/.vim/bundle/vim-colors-solarized")
+if isdirectory($HOME."/.vim/bundle/vim-colors-solarized")
     set background=dark
     let g:solarized_termcolors=256
     colorscheme solarized
