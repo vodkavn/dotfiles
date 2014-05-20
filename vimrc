@@ -9,24 +9,24 @@ augroup END
 set nocompatible
 filetype off
 
-set rtp+=~/.vim/bundle/vundle/
-call vundle#rc()
+set rtp+=~/.vim/bundle/Vundle.vim
+call vundle#begin()
 
-Bundle 'gmarik/vundle'
+Plugin 'gmarik/Vundle.vim'
 
-" Bundle 'joonty/vim-phpqa'
-" Bundle 'altercation/solarized'
-Bundle 'altercation/vim-colors-solarized'
-Bundle 'chrisbra/csv.vim'
-Bundle 'scrooloose/nerdtree'
+" Plugin 'joonty/vim-phpqa'
+" Plugin 'altercation/solarized'
+Plugin 'altercation/vim-colors-solarized'
+Plugin 'chrisbra/csv.vim'
+Plugin 'scrooloose/nerdtree'
 
 
-
+call vundle#end()
+filetype plugin indent on
 " End Vundle setting
 "--------------------------------
 " Other setting:
 "
-filetype plugin indent on
 syntax on
 set t_Co=256
 set tabstop=4

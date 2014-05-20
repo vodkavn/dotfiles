@@ -49,6 +49,11 @@ done
 
 #
 ########################
+# Install Vim plugins using Vundle
+echo "Install Vim plugins using Vundle..."
+vim +PluginInstall +qall
+#
+########################
 #
 echo "DONE!"
 echo "Please restart your terminal!"
