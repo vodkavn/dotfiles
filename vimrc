@@ -14,7 +14,7 @@ call vundle#rc()
 
 Bundle 'gmarik/vundle'
 
-Bundle 'joonty/vim-phpqa'
+" Bundle 'joonty/vim-phpqa'
 " Bundle 'altercation/solarized'
 Bundle 'altercation/vim-colors-solarized'
 Bundle 'chrisbra/csv.vim'
@@ -40,6 +40,8 @@ set smartindent
 set number
 set ruler
 set backspace=2
+set encoding=utf-8
+set fileencoding=utf-8
 set fileencodings=ucs-bom,korea,utf-8,sjis,default
 " colorscheme koehler
 " set cc=81
