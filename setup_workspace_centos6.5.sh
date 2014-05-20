@@ -37,6 +37,7 @@ yum -y install htop
 
 # vim
 yum -y install vim
+yum -y install ctags
 
 # git
 yum -y install git
