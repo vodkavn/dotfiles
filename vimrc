@@ -3,6 +3,29 @@ autocmd!
 autocmd VimEnter,WinEnter,ColorScheme * highlight TrailingSpaces term=underline guibg=Red ctermbg=Red
 autocmd VimEnter,WinEnter * match TrailingSpaces /\s\+$/
 augroup END
+
+"--------------------------------
+" Vundle setting
+set nocompatible
+filetype off
+
+set rtp+=~/.vim/bundle/vundle/
+call vundle#rc()
+
+Bundle 'gmarik/vundle'
+
+Bundle 'joonty/vim-phpqa'
+" Bundle 'altercation/solarized'
+Bundle 'altercation/vim-colors-solarized'
+Bundle 'chrisbra/csv.vim'
+Bundle 'scrooloose/nerdtree'
+
+
+
+" End Vundle setting
+"--------------------------------
+" Other setting:
+"
 filetype plugin indent on
 syntax on
 set t_Co=256
@@ -62,10 +85,18 @@ set wrapscan
 "
 execute pathogen#infect()
 filetype plugin indent on
+
+"---------------------------------------------------------------------------
+" Config NERDTree
+"
 autocmd vimenter * NERDTree
 autocmd vimenter * if !argc() | NERDTree | endif
 autocmd bufenter * if (winnr("$") == 1 && exists("b:NERDTreeType") && b:NERDTreeType == "primary") | q | endif
-map <C-n> :NERDTreeToggle<CR>
+map <C-n> :NERDTreeToggle<CR>i
+
+"---------------------------------------------------------------------------
+" Config Color theme
+"
 set background=dark
 let g:solarized_termcolors=256
 colorscheme solarized
