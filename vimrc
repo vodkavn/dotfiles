@@ -1,7 +1,7 @@
 augroup HighlightTrailingSpaces
-autocmd!
-autocmd VimEnter,WinEnter,ColorScheme * highlight TrailingSpaces term=underline guibg=Red ctermbg=Red
-autocmd VimEnter,WinEnter * match TrailingSpaces /\s\+$/
+    autocmd!
+    autocmd VimEnter,WinEnter,ColorScheme * highlight TrailingSpaces term=underline guibg=Red ctermbg=Red
+    autocmd VimEnter,WinEnter * match TrailingSpaces /\s\+$/
 augroup END
 
 "--------------------------------
@@ -9,19 +9,22 @@ augroup END
 set nocompatible
 filetype off
 
-set rtp+=~/.vim/bundle/Vundle.vim
-call vundle#begin()
+if !isdirectory("~/.vim/bundle/Vundle.vim")
+    set rtp+=~/.vim/bundle/Vundle.vim
+    call vundle#begin()
 
-Plugin 'gmarik/Vundle.vim'
+    Plugin 'gmarik/Vundle.vim'
 
-" Plugin 'joonty/vim-phpqa'
-" Plugin 'altercation/solarized'
-Plugin 'altercation/vim-colors-solarized'
-Plugin 'chrisbra/csv.vim'
-Plugin 'scrooloose/nerdtree'
+    " Plugin 'joonty/vim-phpqa'
+    " Plugin 'altercation/solarized'
+    Plugin 'altercation/vim-colors-solarized'
+    Plugin 'chrisbra/csv.vim'
+    Plugin 'scrooloose/nerdtree'
 
 
-call vundle#end()
+    call vundle#end()
+endif
+
 filetype plugin indent on
 " End Vundle setting
 "--------------------------------
@@ -91,16 +94,20 @@ filetype plugin indent on
 "---------------------------------------------------------------------------
 " Config NERDTree
 "
-autocmd vimenter * NERDTree
-autocmd vimenter * if !argc() | NERDTree | endif
-autocmd bufenter * if (winnr("$") == 1 && exists("b:NERDTreeType") && b:NERDTreeType == "primary") | q | endif
-map <C-n> :NERDTreeToggle<CR>i
+if !isdirectory("~/.vim/bundle/nerdtree")
+    autocmd vimenter * NERDTree
+    autocmd vimenter * if !argc() | NERDTree | endif
+    autocmd bufenter * if (winnr("$") == 1 && exists("b:NERDTreeType") && b:NERDTreeType == "primary") | q | endif
+    map <C-n> :NERDTreeToggle<CR>i
+endif
 
 "---------------------------------------------------------------------------
 " Config Color theme
 "
-set background=dark
-let g:solarized_termcolors=256
-colorscheme solarized
+if !isdirectory("~/.vim/bundle/vim-colors-solarized")
+    set background=dark
+    let g:solarized_termcolors=256
+    colorscheme solarized
+endif
 "---------------------------------------------------------------------------
 
