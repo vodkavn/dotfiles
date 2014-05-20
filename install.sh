@@ -5,11 +5,13 @@
 if [ ! -d "$HOME/linux_workspace" ]; then
     echo "Cloning from GitHub"
     cd "$HOME"
-    git clone https://github.com/vodkavn/linux_workspace.git --recurse-submodules
+    git clone https://github.com/vodkavn/linux_workspace.git
+    git submodule foreach git pull origin master
 else
     echo "Updating from GitHub"
     cd "$HOME/linux_workspace"
-    git pull -f origin master --recurse-submodules
+    git pull -f origin master
+    git submodule foreach git pull origin master
 fi
 
 
