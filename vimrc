@@ -24,6 +24,12 @@ if isdirectory($HOME."/.vim/bundle/Vundle.vim")
     Plugin 'chrisbra/csv.vim'
     Plugin 'scrooloose/nerdtree'
 
+    Plugin 'kien/ctrlp.vim'
+    Plugin 'tpope/vim-surround'
+    Plugin 'scrooloose/nerdcommenter'
+    Plugin 'Shougo/neocomplcache.vim'
+    Plugin 'tpope/vim-fugitive'
+    Plugin 'majutsushi/tagbar'
 
     call vundle#end()
 endif
@@ -101,7 +107,7 @@ if isdirectory($HOME."/.vim/bundle/nerdtree")
     autocmd vimenter * NERDTree
     autocmd vimenter * if !argc() | NERDTree | endif
     autocmd bufenter * if (winnr("$") == 1 && exists("b:NERDTreeType") && b:NERDTreeType == "primary") | q | endif
-    map <C-n> :NERDTreeToggle<CR>i
+    map <C-n> :NERDTreeToggle<CR>
 endif
 
 "---------------------------------------------------------------------------
