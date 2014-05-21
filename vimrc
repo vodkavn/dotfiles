@@ -4,6 +4,9 @@ augroup HighlightTrailingSpaces
     autocmd VimEnter,WinEnter * match TrailingSpaces /\s\+$/
 augroup END
 
+" Auto delete vim/.netrwhist
+au VimLeave * if filereadable($HOME."/.vim/.netrwhist")|call delete($HOME."/.vim/.netrwhist")|endif
+
 "--------------------------------
 " Vundle setting
 set nocompatible
