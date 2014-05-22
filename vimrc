@@ -33,7 +33,6 @@ if isdirectory($HOME."/.vim/bundle/Vundle.vim")
 
     call vundle#end()
 endif
-
 filetype plugin indent on
 " End Vundle setting
 "--------------------------------
@@ -77,6 +76,12 @@ set fileencodings=ucs-bom,iso-2022-jp-3,iso-2022-jp,eucjp-ms,euc-jisx0213,euc-jp
 " set cc=81
 hi ColorColumn guibg=#2d2d2d ctermbg=246
 filetype plugin indent on
+
+"---------------------------------------------------------------------------
+" Config for tab
+"
+map <F3> :tabn<CR>
+map <F4> :tabN<CR>
 
 "---------------------------------------------------------------------------
 " Config for python
@@ -148,6 +153,7 @@ if isdirectory($HOME."/.vim/bundle/nerdtree")
     autocmd vimenter * if !argc() | NERDTree | endif
     autocmd bufenter * if (winnr("$") == 1 && exists("b:NERDTreeType") && b:NERDTreeType == "primary") | q | endif
     map <C-n> :NERDTreeToggle<CR>
+    map <F5> :NERDTreeToggle<CR>
 endif
 
 "---------------------------------------------------------------------------
@@ -255,5 +261,19 @@ if isdirectory($HOME."/.vim/bundle/neocomplcache.vim")
     " For perlomni.vim setting.
     " https://github.com/c9s/perlomni.vim
     let g:neocomplcache_omni_patterns.perl = '\h\w*->\h\w*\|\h\w*::'
+endif
+"---------------------------------------------------------------------------
+" Config Tagbar
+"
+if isdirectory($HOME."/.vim/bundle/tagbar")
+    " Toggle Tagbar
+    map <C-t> :TagbarToggle<CR>
+    map <F6> :TagbarToggle<CR>
+endif
+"---------------------------------------------------------------------------
+" Config CtrlP
+"
+if isdirectory($HOME."/.vim/bundle/ctrlp.vim")
+    map <F2> :CtrlP<CR>
 endif
 "---------------------------------------------------------------------------
