@@ -50,7 +50,7 @@ set softtabstop=4
 set expandtab                   " Use spaces instead of tabs
 set smarttab                    " Be smart when using tabs ;)
 set wildmenu                    " show list instead of just completing
-set spell                       " spell checking on
+" set spell                       " spell checking on
 set ffs=unix,dos,mac            " Use Unix as the standard file type
 " set showcmd                     " show (partial) commands
 set autoread                    " Set to auto read when a file is changed from the outside
