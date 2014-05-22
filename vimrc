@@ -47,7 +47,8 @@ set fileformat=unix
 set tabstop=4
 set shiftwidth=4
 set softtabstop=4
-set expandtab                   " Use spaces instead of tabs
+" Comment out expandtab for python :D
+" set expandtab                   " Use spaces instead of tabs
 set smarttab                    " Be smart when using tabs ;)
 set wildmenu                    " show list instead of just completing
 " set spell                       " spell checking on
@@ -66,9 +67,9 @@ set ruler
 set backspace=indent,eol,start
 set laststatus=2
 
-"Old encode setting
-" set encoding=utf-8
-" set fileencoding=utf-8
+" Encode setting
+set encoding=utf-8
+set fileencoding=utf-8
 " set fileencodings=ucs-bom,korea,utf-8,sjis,default
 set fileencodings=ucs-bom,utf-8,sjis,default
 set fileencodings=ucs-bom,iso-2022-jp-3,iso-2022-jp,eucjp-ms,euc-jisx0213,euc-jp,sjis,cp932,utf-8
