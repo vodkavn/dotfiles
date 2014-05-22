@@ -40,6 +40,7 @@ filetype plugin indent on
 " Other setting:
 "
 syntax on
+" set mouse=a                     " Enable mouse
 set t_Co=256
 set clipboard=unnamed
 set noswapfile
@@ -169,6 +170,9 @@ if isdirectory($HOME."/.vim/bundle/neocomplcache.vim")
     let g:neocomplcache_enable_at_startup = 1
     " Use smartcase.
     let g:neocomplcache_enable_smart_case = 1
+    " Waiting for input before using autocomplete. This prevents unwanted
+    " autocomplete while scrolling
+    let g:neocomplcache_enable_insert_char_pre = 1
     " Set minimum syntax keyword length.
     let g:neocomplcache_min_syntax_length = 3
     let g:neocomplcache_lock_buffer_name_pattern = '\*ku\*'
