@@ -41,20 +41,38 @@ filetype plugin indent on
 "
 syntax on
 set t_Co=256
+set clipboard=unnamed
+set noswapfile
+set fileformat=unix
 set tabstop=4
 set shiftwidth=4
 set softtabstop=4
-set expandtab
-set smarttab
+set expandtab                   " Use spaces instead of tabs
+set smarttab                    " Be smart when using tabs ;)
+set wildmenu                    " show list instead of just completing
+set spell                       " spell checking on
+set ffs=unix,dos,mac            " Use Unix as the standard file type
+" set showcmd                     " show (partial) commands
+set autoread                    " Set to auto read when a file is changed from the outside
+set wildignore=*.o,*~,*.pyc     " Ignore compiled files
+set whichwrap+=<,>,h,l
+autocmd FileType php set noro
+let g:reload_on_write = 0
 set shiftround
 set autoindent
 set smartindent
 set number
 set ruler
-set backspace=2
-set encoding=utf-8
-set fileencoding=utf-8
-set fileencodings=ucs-bom,korea,utf-8,sjis,default
+set backspace=indent,eol,start
+set laststatus=2
+
+"Old encode setting
+" set encoding=utf-8
+" set fileencoding=utf-8
+" set fileencodings=ucs-bom,korea,utf-8,sjis,default
+set fileencodings=ucs-bom,utf-8,sjis,default
+set fileencodings=ucs-bom,iso-2022-jp-3,iso-2022-jp,eucjp-ms,euc-jisx0213,euc-jp,sjis,cp932,utf-8
+
 " colorscheme koehler
 " set cc=81
 hi ColorColumn guibg=#2d2d2d ctermbg=246
