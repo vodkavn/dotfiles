@@ -9,6 +9,7 @@ if [ ! -d "$HOME/linux_workspace" ]; then
 else
     echo "Updating from GitHub"
     cd "$HOME/linux_workspace"
+    git reset --hard
     git pull -f origin master
     git submodule update --init
     git submodule foreach git pull -f origin master
