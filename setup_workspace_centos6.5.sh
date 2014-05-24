@@ -27,6 +27,7 @@ rpm -Uvh http://www.elrepo.org/elrepo-release-6-6.el6.elrepo.noarch.rpm
 yum repolist
 
 ###### Set timezone
+rm -f /etc/localtime
 ln -sf /usr/share/zoneinfo/Asia/Ho_Chi_Minh /etc/localtime
 
 ###### Install package
