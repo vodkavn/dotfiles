@@ -1,4 +1,4 @@
-#!/bin/shi
+#!/bin/bash
 #
 # Clone from GitHub
 #
