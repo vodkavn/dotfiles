@@ -171,9 +171,9 @@ endif
 if isdirectory($HOME."/.vim/bundle/neocomplcache.vim")
     "Note: This option must set it in .vimrc(_vimrc).  NOT IN .gvimrc(_gvimrc)!
     " Disable AutoComplPop.
-    let g:acp_enableAtStartup = 0
+    let g:acp_enableAtStartup = 1
     " Use neocomplcache.
-    let g:neocomplcache_enable_at_startup = 1
+    let g:neocomplcache_enable_at_startup = 0
     " Use smartcase.
     let g:neocomplcache_enable_smart_case = 1
     " Waiting for input before using autocomplete. This prevents unwanted
