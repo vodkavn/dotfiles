@@ -80,8 +80,8 @@ filetype plugin indent on
 "---------------------------------------------------------------------------
 " Config for tab
 "
-map <F3> :tabn<CR>
-map <F4> :tabN<CR>
+map <F3> :tabN<CR>
+map <F4> :tabn<CR>
 
 "---------------------------------------------------------------------------
 " Config for python
