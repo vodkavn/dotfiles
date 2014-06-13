@@ -18,7 +18,7 @@ if isdirectory($HOME."/.vim/bundle/Vundle.vim")
 
     Plugin 'gmarik/Vundle.vim'
 
-    " Plugin 'joonty/vim-phpqa'
+    Plugin 'joonty/vim-phpqa'
     " Plugin 'altercation/solarized'
     Plugin 'altercation/vim-colors-solarized'
     Plugin 'chrisbra/csv.vim'
