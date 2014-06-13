@@ -33,7 +33,6 @@ if isdirectory($HOME."/.vim/bundle/Vundle.vim")
 
     call vundle#end()
 endif
-filetype plugin indent on
 " End Vundle setting
 "--------------------------------
 " Other setting:
@@ -65,6 +64,9 @@ set ruler
 set backspace=indent,eol,start
 set laststatus=2
 
+
+set fileformats=dos
+set ffs=unix,dos,mac            " Use Unix as the standard file type
 " Encode setting
 set encoding=utf-8
 set fileencoding=utf-8
@@ -76,6 +78,8 @@ set fileencodings=ucs-bom,iso-2022-jp-3,iso-2022-jp,eucjp-ms,euc-jisx0213,euc-jp
 " set cc=81
 hi ColorColumn guibg=#2d2d2d ctermbg=246
 filetype plugin indent on
+filetype on
+filetype plugin on
 
 "---------------------------------------------------------------------------
 " Config for tab
@@ -101,6 +105,7 @@ autocmd BufWritePre *.py normal m`:%s/\s\+$//e``
 " Config for php
 "
 autocmd FileType php set noro
+autocmd FileType html set noro
 
 
 
