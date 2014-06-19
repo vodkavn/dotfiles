@@ -37,7 +37,6 @@ endif
 "--------------------------------
 " Other setting:
 "
-syntax on
 " set mouse=a                     " Enable mouse
 set t_Co=256
 set clipboard=unnamed
@@ -73,13 +72,14 @@ set fileencoding=utf-8
 " set fileencodings=ucs-bom,korea,utf-8,sjis,default
 set fileencodings=ucs-bom,utf-8,sjis,default
 set fileencodings=ucs-bom,iso-2022-jp-3,iso-2022-jp,eucjp-ms,euc-jisx0213,euc-jp,sjis,cp932,utf-8
-
+set fenc=utf-8                  " fix unicode error while saving file
 " colorscheme koehler
 " set cc=81
 hi ColorColumn guibg=#2d2d2d ctermbg=246
 filetype plugin indent on
 filetype on
 filetype plugin on
+syntax on
 
 "---------------------------------------------------------------------------
 " Config for tab
