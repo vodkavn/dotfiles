@@ -75,3 +75,6 @@ bash -c "`curl -fsSL https://raw.githubusercontent.com/vodkavn/linux_workspace/m
 * <b>n</b>    next search result
 * <b>:s/text1/text2</b>    replaces the first instance of text1 with text2
 * <b>:%s/text1/text2</b>    replaces all instances of text1 with text2
+
+### other
+* <b>gg=G </b>   format all file
