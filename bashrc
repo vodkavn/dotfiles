@@ -12,7 +12,7 @@ fi
 
 # Load in the git branch prompt script.
 source ~/.bash/git-prompt.sh
-source ~/.bash/git-completion.sh
+source ~/.bash/git-completion.bash
 bash_prompt() {
     case $TERM in
         xterm*|rxvt*)
