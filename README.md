@@ -1,21 +1,15 @@
-linux_workspace
-===============
-
 My vimrc, bashrc, git... config for linux workspace
 
 
-GUIDE:
-=====
+# Installation
 ```bash
 bash -c "`curl -fsSL https://raw.githubusercontent.com/vodkavn/linux_workspace/master/install.sh`"
 ```
 
 
+# Vim using guide
 
-Vim using guide
-=====
-
-# Movement (in command mode only)
+## Movement (in command mode only)
 
 * <b>h</b>    move left 1 char (can be multipled)
 * <b>j</b>    move down 1 line (can be multipled)
@@ -35,9 +29,9 @@ Vim using guide
 * <b>G </b>   same as :$
 * <b>4G</b>    go to line number 4
 
-# Command
+## Command
 
-## in general
+### in general
 * <b>i   </b> change to insert mode
 * <b>a   </b> append - change to insert mode from the next column
 * <b>o   </b> append a new line below current line and change to insert mode
@@ -47,7 +41,7 @@ Vim using guide
 * <b>Ctrl+r</b>    redo
 * <b>:!terminal_command</b>    execute terminal_command in console (ex. :!pwd)
 
-## with file and windows
+### with file and windows
 * <b>:q  </b>  quit current file
 * <b>:w  </b>  save current file
 * <b>:q! </b>   quit current file without saving
@@ -61,7 +55,7 @@ Vim using guide
 * <b>:vs path_to_file_without_braces</b>    vertical split windows to edit this file
 * <b>Ctrl+w h/j/k/l/movement_keys   </b> move cursor between windows
 
-## text and blocks editing
+### text and blocks editing
 
 * <b>x </b>   cut char (can be multipled)
 * <b>c </b>   change char
