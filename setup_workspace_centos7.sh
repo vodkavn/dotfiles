@@ -72,7 +72,7 @@ yum install -y curl
 yum install -y man
 
 # Config mysql
-mysql_secure_installation
+#mysql_secure_installation
 
 # generate ssh-key
 #ssh-keygen -t rsa -C "hoangxuanthanh1986@gmail.com"
