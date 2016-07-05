@@ -3,7 +3,7 @@
 
 ###### Add repo
 # EPEL
-rpm -Uvh http://dl.fedoraproject.org/pub/epel/7/x86_64/e/epel-release-7-5.noarch.rpm
+rpm -Uvh https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
 
 # REMI
 rpm -Uvh http://rpms.famillecollet.com/enterprise/remi-release-7.rpm
@@ -18,7 +18,7 @@ rpm -Uvh http://pkgs.repoforge.org/rpmforge-release/rpmforge-release-0.5.3-1.el7
 rpm -Uvh http://dl.atrpms.net/all/atrpms-repo-7-7.el7.x86_64.rpm
 
 # WEBTATIC
-rpm -Uvh http://repo.webtatic.com/yum/el7/webtatic-release.rpm
+rpm -Uvh https://mirror.webtatic.com/yum/el7/webtatic-release.rpm
 
 yum repolist
 
