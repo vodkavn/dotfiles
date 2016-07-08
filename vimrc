@@ -103,12 +103,6 @@ filetype plugin on
 syntax on
 
 "---------------------------------------------------------------------------
-" Config for tab
-"
-map <F3> :tabN<CR>
-map <F4> :tabn<CR>
-
-"---------------------------------------------------------------------------
 " Config for python
 "
 autocmd BufRead *.py set smartindent cinwords=if,elif,else,for,while,try,except,finally,def,class
@@ -297,22 +291,40 @@ if isdirectory($HOME."/.vim/bundle/tagbar")
     map <F6> :TagbarToggle<CR>
 endif
 "---------------------------------------------------------------------------
+" Config for tab
+"
+"map <F3> :tabN<CR>
+"map <F4> :tabn<CR>
+"---------------------------------------------------------------------------
+" Config Grep plugin
+"
+nnoremap <silent> <F2> :Grep <cword><cr><cr>
+nnoremap <silent> <F3> :Grep \(function\\\|class\)\ <cword><cr><cr>
+nnoremap <silent> <F4> /function\ <C-R>=expand('<cword>')<cr><cr>
+"---------------------------------------------------------------------------
 " Config CtrlP
 "
 if isdirectory($HOME."/.vim/bundle/ctrlp.vim")
-    map <F2> :CtrlP<CR>
+    let g:ctrlp_show_hidden = 1
+    let g:ctrlp_working_path_mode = 0
+    let g:ctrlp_prompt_mappings = {
+                \ 'AcceptSelection("e")': ['<c-t>'],
+                \ 'AcceptSelection("t")': ['<cr>', '<2-LeftMouse>']
+                \ }
 endif
 "---------------------------------------------------------------------------
 " Config vim-airline
 "
-let g:airline#extensions#tabline#enabled = 1
-let g:airline#extensions#tabline#tab_nr_type = 1
-let g:airline#extensions#tabline#buffer_idx_mode = 1
-let g:airline#extensions#tabline#fnamemod = ':t:.'
-let g:airline#extensions#tabline#show_tab_type = 0
-let g:airline#extensions#tabline#show_splits = 0
-" let g:airline_section_warning = '%{airline#util#wrap(airline#extensions#whitespace#check(),0)}'
-" let g:airline_section_error = %{airline#util#wrap(airline#extensions#syntastic#get_warnings(),0)}'
-let g:airline_section_warning = ''
-let g:airline_section_error = ''
+if isdirectory($HOME."/.vim/bundle/vim-airline")
+    let g:airline#extensions#tabline#enabled = 1
+    let g:airline#extensions#tabline#tab_nr_type = 1
+    let g:airline#extensions#tabline#buffer_idx_mode = 1
+    let g:airline#extensions#tabline#fnamemod = ':t:.'
+    let g:airline#extensions#tabline#show_tab_type = 0
+    let g:airline#extensions#tabline#show_splits = 0
+    " let g:airline_section_warning = '%{airline#util#wrap(airline#extensions#whitespace#check(),0)}'
+    " let g:airline_section_error = %{airline#util#wrap(airline#extensions#syntastic#get_warnings(),0)}'
+    let g:airline_section_warning = ''
+    let g:airline_section_error = ''
+endif
 "---------------------------------------------------------------------------
