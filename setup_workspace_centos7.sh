@@ -48,16 +48,17 @@ yum -y install monit
 #yum -y install php54w
 
 # apache2 and enable on startup
-#yum -y install httpd
-#chkconfig --levels 235 httpd on
-#/etc/init.d/httpd start
+yum -y install httpd
+chkconfig --levels 235 httpd on
+/etc/init.d/httpd start
 
 # mysql and enable on startup
-#yum -y replace mysql-libs --replace-with mysql55w-libs #fix some error
-
-#yum -y install mysql55w mysql55w-server
-#chkconfig --levels 235 mysqld on
-#/etc/init.d/mysqld start
+#yum -y install mysql
+#chkconfig mysqld on
+#/sbin/service mysqld start
+yum -y install mariadb-server mariadb
+systemctl enable mariadb.service
+systemctl start mariadb.service
 
 # Install wget
 yum install -y wget
