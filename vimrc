@@ -21,7 +21,7 @@ if isdirectory($HOME."/.vim/bundle/Vundle.vim")
 
     " find files
     Plugin 'kien/ctrlp.vim'
-    " solarized dark theme
+    " solarized-dark color scheme
     Plugin 'altercation/vim-colors-solarized'
     " csv display
     Plugin 'chrisbra/csv.vim'
@@ -45,6 +45,8 @@ if isdirectory($HOME."/.vim/bundle/Vundle.vim")
     Plugin 'tpope/vim-fugitive'
     " tag bar
     Plugin 'majutsushi/tagbar'
+    " custom statusline, tabline
+    Plugin 'vim-airline/vim-airline'
     
     Plugin 'scrooloose/nerdcommenter'
 
@@ -298,4 +300,17 @@ endif
 if isdirectory($HOME."/.vim/bundle/ctrlp.vim")
     map <F2> :CtrlP<CR>
 endif
+"---------------------------------------------------------------------------
+" Config vim-airline
+"
+let g:airline#extensions#tabline#enabled = 1
+let g:airline#extensions#tabline#tab_nr_type = 1
+let g:airline#extensions#tabline#buffer_idx_mode = 1
+let g:airline#extensions#tabline#fnamemod = ':t:.'
+let g:airline#extensions#tabline#show_tab_type = 0
+let g:airline#extensions#tabline#show_splits = 0
+" let g:airline_section_warning = '%{airline#util#wrap(airline#extensions#whitespace#check(),0)}'
+" let g:airline_section_error = %{airline#util#wrap(airline#extensions#syntastic#get_warnings(),0)}'
+let g:airline_section_warning = ''
+let g:airline_section_error = ''
 "---------------------------------------------------------------------------
