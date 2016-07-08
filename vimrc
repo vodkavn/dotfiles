@@ -21,7 +21,9 @@ if isdirectory($HOME."/.vim/bundle/Vundle.vim")
 
     " find files
     Plugin 'kien/ctrlp.vim'
-    " solarized-dark color scheme
+    " colorschemes
+    Plugin 'flazz/vim-colorschemes'
+    " solarized-dark colorscheme
     Plugin 'altercation/vim-colors-solarized'
     " csv display
     Plugin 'chrisbra/csv.vim'
