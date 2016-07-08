@@ -15,7 +15,7 @@ filetype off
 if isdirectory($HOME."/.vim/bundle/Vundle.vim")
     set rtp+=~/.vim/bundle/Vundle.vim
     call vundle#begin()
-    
+
     " vundle itself
     Plugin 'gmarik/Vundle.vim'
 
@@ -31,7 +31,7 @@ if isdirectory($HOME."/.vim/bundle/Vundle.vim")
     Plugin 'docunext/closetag.vim'
     " autoclose braces
     Plugin 'Raimondi/delimitMate'
-    " auto complete 
+    " auto complete
     Plugin 'Shougo/neocomplcache.vim'
     " indent for html
     Bundle 'captbaritone/better-indent-support-for-php-with-html'
@@ -47,7 +47,7 @@ if isdirectory($HOME."/.vim/bundle/Vundle.vim")
     Plugin 'majutsushi/tagbar'
     " custom statusline, tabline
     Plugin 'vim-airline/vim-airline'
-    
+
     Plugin 'scrooloose/nerdcommenter'
 
     call vundle#end()
