@@ -15,21 +15,38 @@ filetype off
 if isdirectory($HOME."/.vim/bundle/Vundle.vim")
     set rtp+=~/.vim/bundle/Vundle.vim
     call vundle#begin()
-
+    
+    " vundle itself
     Plugin 'gmarik/Vundle.vim'
 
-    Plugin 'joonty/vim-phpqa'
-    " Plugin 'altercation/solarized'
-    Plugin 'altercation/vim-colors-solarized'
-    Plugin 'chrisbra/csv.vim'
-    Plugin 'scrooloose/nerdtree'
-
+    " find files
     Plugin 'kien/ctrlp.vim'
-    Plugin 'tpope/vim-surround'
-    Plugin 'scrooloose/nerdcommenter'
+    " solarized dark theme
+    Plugin 'altercation/vim-colors-solarized'
+    " csv display
+    Plugin 'chrisbra/csv.vim'
+    " nerdtree
+    Plugin 'scrooloose/nerdtree'
+    " html close tag
+    Plugin 'docunext/closetag.vim'
+    " autoclose braces
+    Plugin 'Raimondi/delimitMate'
+    " auto complete 
     Plugin 'Shougo/neocomplcache.vim'
+    " indent for html
+    Bundle 'captbaritone/better-indent-support-for-php-with-html'
+    " qa for php code
+    Plugin 'joonty/vim-phpqa'
+    " grep plugin
+    Bundle 'yegappan/grep'
+    " surroundings
+    Plugin 'tpope/vim-surround'
+    " Git wrapper
     Plugin 'tpope/vim-fugitive'
+    " tag bar
     Plugin 'majutsushi/tagbar'
+    
+    Plugin 'scrooloose/nerdcommenter'
 
     call vundle#end()
 endif
