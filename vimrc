@@ -74,7 +74,6 @@ set ffs=unix,dos,mac            " Use Unix as the standard file type
 " set showcmd                     " show (partial) commands
 set autoread                    " Set to auto read when a file is changed from the outside
 set wildignore=*.o,*~,*.pyc     " Ignore compiled files
-set whichwrap+=<,>,h,l
 let g:reload_on_write = 0
 set shiftround
 set autoindent
@@ -83,6 +82,22 @@ set number
 set ruler
 set backspace=indent,eol,start
 set laststatus=2
+
+set backspace=indent,eol,start  " Backspace for dummies
+set linespace=0                 " No extra spaces between rows
+set showmatch                   " Show matching brackets/parenthesis
+set winminheight=0              " Windows can be 0 line high
+set ignorecase                  " Case insensitive search
+set smartcase                   " Case sensitive when uc present
+set wildmenu                    " Show list instead of just completing
+set wildmode=list:longest,full  " Command <Tab> completion, list matches, then longest common part, then all.
+set omnifunc=syntaxcomplete#Complete
+set whichwrap=b,s,h,l,<,>,[,]   " Backspace and cursor keys wrap too
+set scrolljump=5                " Lines to scroll when cursor leaves screen
+set scrolloff=3                 " Minimum lines to keep above and below cursor
+let g:DisableAutoPHPFolding = 1 " Disable autofold
+set list listchars=tab:\¦\ ,trail:•,extends:#,nbsp:. " Highlight problematic whitespace
+set list
 
 
 set fileformats=dos
@@ -115,14 +130,11 @@ autocmd BufRead *.py set autoindent
 autocmd BufRead *.py if &modifiable | retab | endif
 autocmd BufWritePre *.py normal m`:%s/\s\+$//e``
 
-
 "---------------------------------------------------------------------------
 " Config for php
 "
 autocmd FileType php set noro
 autocmd FileType html set noro
-
-
 
 "---------------------------------------------------------------------------
 " Format coding:
@@ -154,6 +166,7 @@ set smartcase
 set incsearch
 " Don't highlight search result.
 set nohlsearch
+"set hlsearch 
 
 " Searches wrap around the end of the file.
 set wrapscan
@@ -282,6 +295,7 @@ if isdirectory($HOME."/.vim/bundle/neocomplcache.vim")
     " https://github.com/c9s/perlomni.vim
     let g:neocomplcache_omni_patterns.perl = '\h\w*->\h\w*\|\h\w*::'
 endif
+
 "---------------------------------------------------------------------------
 " Config Tagbar
 "
@@ -290,17 +304,20 @@ if isdirectory($HOME."/.vim/bundle/tagbar")
     map <C-t> :TagbarToggle<CR>
     map <F6> :TagbarToggle<CR>
 endif
+
 "---------------------------------------------------------------------------
 " Config for tab
 "
 "map <F3> :tabN<CR>
 "map <F4> :tabn<CR>
+
 "---------------------------------------------------------------------------
 " Config Grep plugin
 "
 nnoremap <silent> <F2> :Grep <cword><cr><cr>
 nnoremap <silent> <F3> :Grep \(function\\\|class\)\ <cword><cr><cr>
 nnoremap <silent> <F4> /function\ <C-R>=expand('<cword>')<cr><cr>
+
 "---------------------------------------------------------------------------
 " Config CtrlP
 "
@@ -312,6 +329,7 @@ if isdirectory($HOME."/.vim/bundle/ctrlp.vim")
                 \ 'AcceptSelection("t")': ['<cr>', '<2-LeftMouse>']
                 \ }
 endif
+
 "---------------------------------------------------------------------------
 " Config vim-airline
 "
@@ -327,4 +345,5 @@ if isdirectory($HOME."/.vim/bundle/vim-airline")
     let g:airline_section_warning = ''
     let g:airline_section_error = ''
 endif
+
 "---------------------------------------------------------------------------
