@@ -78,3 +78,13 @@ bash -c "`curl -fsSL https://raw.githubusercontent.com/vodkavn/linux_workspace/m
 
 ### other
 * <b>gg=G </b>   format all file
+
+## NerdTree
+* <b>o</b>  open in prev window
+* <b>go</b>  preview
+* <b>t</b>  open in new tab
+* <b>T</b>  open in new tab silently
+* <b>i</b>  open split
+* <b>gi</b>  preview split
+* <b>s</b>  open vsplit
+* <b>gs</b>  preview vsplit
