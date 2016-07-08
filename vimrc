@@ -308,15 +308,17 @@ endif
 "---------------------------------------------------------------------------
 " Config for tab
 "
-"map <F3> :tabN<CR>
-"map <F4> :tabn<CR>
+map <F7> :tabN<CR>
+map <F8> :tabn<CR>
 
 "---------------------------------------------------------------------------
 " Config Grep plugin
 "
-nnoremap <silent> <F2> :Grep <cword><cr><cr>
-nnoremap <silent> <F3> :Grep \(function\\\|class\)\ <cword><cr><cr>
-nnoremap <silent> <F4> /function\ <C-R>=expand('<cword>')<cr><cr>
+if isdirectory($HOME."/.vim/bundle/grep")
+    nnoremap <silent> <F2> :Rgrep <cword><cr><cr>
+    nnoremap <silent> <F3> :Rgrep \(function\\\|class\)\ <cword><cr><cr>
+    nnoremap <silent> <F4> /function\ <C-R>=expand('<cword>')<cr><cr>
+endif
 
 "---------------------------------------------------------------------------
 " Config CtrlP
