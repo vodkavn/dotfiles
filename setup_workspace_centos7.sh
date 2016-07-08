@@ -14,9 +14,6 @@ rpm -Uvh http://pkgs.repoforge.org/rpmforge-release/rpmforge-release-0.5.3-1.el7
 # RPMFUSION
 # no repo for rhel 7
 
-# ATRPMS
-rpm -Uvh http://dl.atrpms.net/all/atrpms-repo-7-7.el7.x86_64.rpm
-
 # WEBTATIC
 rpm -Uvh https://mirror.webtatic.com/yum/el7/webtatic-release.rpm
 
