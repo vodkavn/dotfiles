@@ -110,6 +110,7 @@ set fileencodings=ucs-bom,utf-8,sjis,default
 set fileencodings=ucs-bom,iso-2022-jp-3,iso-2022-jp,eucjp-ms,euc-jisx0213,euc-jp,sjis,cp932,utf-8
 set fenc=utf-8                  " fix unicode error while saving file
 " colorscheme koehler
+colorscheme molokai
 " set cc=81
 hi ColorColumn guibg=#2d2d2d ctermbg=246
 filetype plugin indent on
@@ -192,11 +193,11 @@ endif
 "---------------------------------------------------------------------------
 " Config Color theme
 "
-if isdirectory($HOME."/.vim/bundle/vim-colors-solarized")
-    set background=dark
-    let g:solarized_termcolors=256
-    colorscheme solarized
-endif
+"if isdirectory($HOME."/.vim/bundle/vim-colors-solarized")
+"    set background=dark
+"    let g:solarized_termcolors=256
+"    colorscheme solarized
+"endif
 
 "---------------------------------------------------------------------------
 " Config neocomplcache
