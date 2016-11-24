@@ -1,6 +1,6 @@
-[user]
-  name = Hoang Xuan Thanh
-  email = hoangxuanthanh1986@gmail.com
+#[user]
+#  name = Hoang Xuan Thanh
+#  email = hoangxuanthanh1986@gmail.com
 [core]
   editor = vim
 [color]
