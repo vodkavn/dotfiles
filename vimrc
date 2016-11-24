@@ -347,6 +347,9 @@ if isdirectory($HOME."/.vim/bundle/vim-airline")
     " let g:airline_section_error = %{airline#util#wrap(airline#extensions#syntastic#get_warnings(),0)}'
     let g:airline_section_warning = ''
     let g:airline_section_error = ''
+    " let g:airline_powerline_fonts = 1
+    map <F9> :bp<CR>
+    map <F10> :bn<CR>
 endif
 
 "---------------------------------------------------------------------------
