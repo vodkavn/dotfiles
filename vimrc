@@ -2,6 +2,8 @@ augroup HighlightTrailingSpaces
     autocmd!
     autocmd VimEnter,WinEnter,ColorScheme * highlight TrailingSpaces term=underline guibg=Red ctermbg=Red
     autocmd VimEnter,WinEnter * match TrailingSpaces /\s\+$/
+    " Auto remove trailing whitespace in specific file type
+    autocmd FileType c,cpp,java,php,ctp,html,css autocmd BufWritePre <buffer> %s/\s\+$//e
 augroup END
 
 " Auto delete vim/.netrwhist
