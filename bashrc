@@ -13,6 +13,7 @@ fi
 # Load in the git branch prompt script.
 source ~/.bash/git-prompt.sh
 source ~/.bash/git-completion.bash
+GIT_PS1_SHOWDIRTYSTATE=true
 bash_prompt() {
     case $TERM in
         xterm*|rxvt*)
