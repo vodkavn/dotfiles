@@ -2,13 +2,13 @@
 #
 # Clone from GitHub
 #
-if [ ! -d "$HOME/linux_workspace" ]; then
+if [ ! -d "$HOME/.linux_workspace" ]; then
     echo "Cloning from GitHub"
     cd "$HOME"
-    git clone --recursive https://github.com/vodkavn/linux_workspace.git
+    git clone --recursive https://github.com/vodkavn/linux_workspace.git .linux_workspace
 else
     echo "Updating from GitHub"
-    cd "$HOME/linux_workspace"
+    cd "$HOME/.linux_workspace"
     git reset --hard
     git pull -f origin master
     git submodule update --init
@@ -47,7 +47,7 @@ do
     fi
     # Create link to config file
     echo "--> Installing .$file..."
-    ln -sf $HOME/linux_workspace/$file $HOME/.$file
+    ln -sf $HOME/.linux_workspace/$file $HOME/.$file
 done
 
 #
