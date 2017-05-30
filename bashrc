@@ -1,4 +1,7 @@
-[[ -s "$HOME/.rvm/scripts/rvm" ]] && source "$HOME/.rvm/scripts/rvm" # Load RVM into a shell session *as a function*
+# Fix scp
+[ -z "$PS1" ] && return
+# Load RVM into a shell session *as a function*
+[[ -s "$HOME/.rvm/scripts/rvm" ]] && source "$HOME/.rvm/scripts/rvm"
 
 # Load .bash_aliases
 if [ -f ~/.bash/bash_aliases ]; then
