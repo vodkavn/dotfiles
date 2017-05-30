@@ -13,7 +13,7 @@ else
     # git pull -f origin master
     git pull -s recursive -X theirs
     git submodule update --init
-    git submodule foreach git pull -f origin #master
+    git submodule foreach git pull -f origin master
 fi
 
 
