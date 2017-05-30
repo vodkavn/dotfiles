@@ -65,9 +65,9 @@ set t_Co=256
 set clipboard=unnamed
 set noswapfile
 set fileformat=unix
-set tabstop=4
-set shiftwidth=4
-set softtabstop=4
+set tabstop=2
+set shiftwidth=2
+set softtabstop=2
 set expandtab                   " Use spaces instead of tabs
 set smarttab                    " Be smart when using tabs ;)
 set wildmenu                    " show list instead of just completing
