@@ -17,6 +17,15 @@ fi
 source ~/.bash/git-prompt.sh
 source ~/.bash/git-completion.bash
 GIT_PS1_SHOWDIRTYSTATE=true
+
+# Show ruby version
+function prompt_rvm {
+    rbv=`rvm-prompt`
+    #rbv=${rbv#ruby-}
+    [[ $rbv == *"@"* ]] || rbv="${rbv}@default"
+    echo "["$rbv"]"
+}
+
 bash_prompt() {
     case $TERM in
         xterm*|rxvt*)
@@ -79,5 +88,7 @@ unset bash_prompt
 # Color scheme for grep and ls
 export CLICOLOR=1
 export LSCOLORS=GxFxCxDxBxegedabagaced
-export GREP_OPTIONS='--color=auto'
 export GREP_COLOR='1;35;40'
+
+# Add RVM to PATH for scripting. Make sure this is the last PATH variable change.
+export PATH="$PATH:$HOME/.rvm/bin"

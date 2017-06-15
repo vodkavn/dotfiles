@@ -5,13 +5,7 @@ if [ -f ~/.bashrc ]; then
 	. ~/.bashrc
 fi
 
-# Show ruby version
-function prompt_rvm {
-    rbv=`rvm-prompt`
-    #rbv=${rbv#ruby-}
-    [[ $rbv == *"@"* ]] || rbv="${rbv}@default"
-    echo "["$rbv"]"
-}
+
 
 # User specific environment and startup programs
 
