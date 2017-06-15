@@ -8,6 +8,11 @@ alias v='vim'
 alias vi='vim'
 alias sv='sudo vim'
 
+# Grep command
+alias grep="grep --color=auto"
+alias fgrep="fgrep --color=auto"
+alias egrep="egrep --color=auto"
+
 # Common setting for Git
 alias gf='git fetch'
 alias gco='git checkout'
