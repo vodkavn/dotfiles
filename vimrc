@@ -106,10 +106,8 @@ set fileformats=dos
 set ffs=unix,dos,mac            " Use Unix as the standard file type
 " Encode setting
 set encoding=utf-8
-set fileencoding=utf-8
 " set fileencodings=ucs-bom,korea,utf-8,sjis,default
-set fileencodings=ucs-bom,utf-8,sjis,default
-set fileencodings=ucs-bom,iso-2022-jp-3,iso-2022-jp,eucjp-ms,euc-jisx0213,euc-jp,sjis,cp932,utf-8
+set fileencodings=ucs-bom,iso-2022-jp-3,iso-2022-jp,eucjp-ms,euc-jisx0213,euc-jp,sjis,cp932,utf-8,sjis,default
 set fenc=utf-8                  " fix unicode error while saving file
 " colorscheme koehler
 colorscheme molokai
