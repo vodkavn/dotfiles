@@ -20,7 +20,8 @@ GIT_PS1_SHOWDIRTYSTATE=true
 
 # Show ruby version
 function prompt_rvm {
-    rbv=`rvm-prompt`
+    #rbv=`rvm-prompt`
+    rbv=`rbenv version-name`
     #rbv=${rbv#ruby-}
     [[ $rbv == *"@"* ]] || rbv="${rbv}@default"
     echo "["$rbv"]"
