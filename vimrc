@@ -27,6 +27,8 @@ if isdirectory($HOME."/.vim/bundle/Vundle.vim")
     Plugin 'flazz/vim-colorschemes'
     " solarized-dark colorscheme
     Plugin 'altercation/vim-colors-solarized'
+    " molokai colorscheme
+    Plugin 'tomasr/molokai'
     " csv display
     Plugin 'chrisbra/csv.vim'
     " nerdtree
@@ -51,6 +53,10 @@ if isdirectory($HOME."/.vim/bundle/Vundle.vim")
     Plugin 'majutsushi/tagbar'
     " custom statusline, tabline
     Plugin 'vim-airline/vim-airline'
+    " rails
+    Plugin 'tpope/vim-rails'
+    " ruby
+    Plugin 'vim-ruby/vim-ruby'
 
     Plugin 'scrooloose/nerdcommenter'
 
@@ -65,9 +71,9 @@ set t_Co=256
 set clipboard=unnamed
 set noswapfile
 set fileformat=unix
-set tabstop=2
-set shiftwidth=2
-set softtabstop=2
+set tabstop=4
+set shiftwidth=4
+set softtabstop=4
 set expandtab                   " Use spaces instead of tabs
 set smarttab                    " Be smart when using tabs ;)
 set wildmenu                    " show list instead of just completing
@@ -109,8 +115,6 @@ set encoding=utf-8
 " set fileencodings=ucs-bom,korea,utf-8,sjis,default
 set fileencodings=ucs-bom,iso-2022-jp-3,iso-2022-jp,eucjp-ms,euc-jisx0213,euc-jp,sjis,cp932,utf-8,sjis,default
 set fenc=utf-8                  " fix unicode error while saving file
-" colorscheme koehler
-colorscheme molokai
 " set cc=81
 hi ColorColumn guibg=#2d2d2d ctermbg=246
 filetype plugin indent on
@@ -136,6 +140,11 @@ autocmd BufWritePre *.py normal m`:%s/\s\+$//e``
 "
 autocmd FileType php set noro
 autocmd FileType html set noro
+
+"---------------------------------------------------------------------------
+" Config for ruby
+"
+autocmd FileType ruby,eruby,yaml,markdown set ai sw=2 sts=2 et
 
 "---------------------------------------------------------------------------
 " Format coding:
@@ -198,6 +207,11 @@ endif
 "    let g:solarized_termcolors=256
 "    colorscheme solarized
 "endif
+" Configs to make Molokai look great
+set background=dark
+let g:molokai_original=1
+let g:rehash256=1
+colorscheme molokai
 
 "---------------------------------------------------------------------------
 " Config neocomplcache
