@@ -19,13 +19,27 @@ source ~/.bash/git-completion.bash
 source ~/.bash/tmuxinator.bash
 GIT_PS1_SHOWDIRTYSTATE=true
 
+# Check command exists
+function command_exists() {
+    type "$1" &> /dev/null ;
+}
+
 # Show ruby version
 function prompt_rvm {
-    rbv=`rvm-prompt`
-    #rbv=`rbenv version-name`
-    #rbv=${rbv#ruby-}
-    [[ $rbv == *"@"* ]] || rbv="${rbv}@default"
-    echo "["$rbv"]"
+    if command_exists rvm-prompt; then
+        rbv=`rvm-prompt`
+    fi
+    if command_exists rbenv; then
+        eval "$(rbenv init -)"
+        rbv=`rbenv version-name`
+    fi
+    if [[ -n "${rbv/[ ]*\n/}" ]]; then
+      #rbv=${rbv#ruby-}
+      [[ $rbv == *"@"* ]] || rbv="${rbv}@default"
+      echo "["$rbv"]"
+    else
+      echo ""
+    fi
 }
 
 bash_prompt() {
@@ -96,6 +110,5 @@ export GREP_COLOR='1;35;40'
 export EDITOR='vim'
 
 # Add RVM to PATH for scripting. Make sure this is the last PATH variable change.
-export PATH="$PATH:$HOME/.rvm/bin:$HOME/.bin"
-#export PATH="$HOME/.rbenv/bin:$PATH:$HOME/.bin"
-#eval "$(rbenv init -)"
+export PATH="$PATH:$HOME/.rvm/bin:$HOME/.rbenv/bin:$HOME/.bin"
+
