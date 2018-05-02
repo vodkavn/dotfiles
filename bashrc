@@ -16,6 +16,7 @@ fi
 # Load in the git branch prompt script.
 source ~/.bash/git-prompt.sh
 source ~/.bash/git-completion.bash
+source ~/.bash/tmuxinator.bash
 GIT_PS1_SHOWDIRTYSTATE=true
 
 # Show ruby version
@@ -91,7 +92,10 @@ export CLICOLOR=1
 export LSCOLORS=GxFxCxDxBxegedabagaced
 export GREP_COLOR='1;35;40'
 
+# Default editor
+export EDITOR='vim'
+
 # Add RVM to PATH for scripting. Make sure this is the last PATH variable change.
-export PATH="$PATH:$HOME/.rvm/bin"
-#export PATH="$HOME/.rbenv/bin:$PATH"
+export PATH="$PATH:$HOME/.rvm/bin:$HOME/.bin"
+#export PATH="$HOME/.rbenv/bin:$PATH:$HOME/.bin"
 #eval "$(rbenv init -)"
