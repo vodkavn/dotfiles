@@ -16,7 +16,32 @@ fi
 # Load in the git branch prompt script.
 source ~/.bash/git-prompt.sh
 source ~/.bash/git-completion.bash
+source ~/.bash/tmuxinator.bash
 GIT_PS1_SHOWDIRTYSTATE=true
+
+# Check command exists
+function command_exists() {
+    type "$1" &> /dev/null ;
+}
+
+# Show ruby version
+function prompt_rvm {
+    if command_exists rvm-prompt; then
+        rbv=`rvm-prompt`
+    fi
+    if command_exists rbenv; then
+        eval "$(rbenv init -)"
+        rbv=`rbenv version-name`
+    fi
+    if [[ -n "${rbv/[ ]*\n/}" ]]; then
+      #rbv=${rbv#ruby-}
+      [[ $rbv == *"@"* ]] || rbv="${rbv}@default"
+      echo "["$rbv"]"
+    else
+      echo ""
+    fi
+}
+
 bash_prompt() {
     case $TERM in
         xterm*|rxvt*)
@@ -66,7 +91,7 @@ bash_prompt() {
     # PS1="\[$GREEN\]\t\[$RED\]-\[$BLUE\]\u\[$YELLOW\]\[$YELLOW\]\w\[\033[m\]\[$MAGENTA\]\$(__git_ps1)\[$WHITE\]\$ "
     # PS1="$TITLEBAR\[$R\][\[$C\]\t\[$R\]]\[$UC\]\u\[$Y\]\[$R\]\w\[\033[m\]\[$EMW\]\$(__git_ps1)\[$EMG\]\\$ "
     # PS1="$TITLEBAR${R}[${C}\t${R}]${UC}\u${Y}${W}\w\[\033[m\]${EMB}\$(__git_ps1)${EMG}\\$ "
-    PS1="$TITLEBAR${R}[${C}\t${R}]${UC}\u${EMR}@${EMY}\H${W}\w\[\033[m\]${EMB}\$(__git_ps1)${EMG}\\$ "
+    PS1="$TITLEBAR${R}[${C}\t${R}]${UC}\u${EMR}@${EMY}\H${W}\w\[\033[m\]\$(prompt_rvm)${EMB}\$(__git_ps1)${EMG}\\$ "
     # PS1="$TITLEBAR\[$(tput bold)\]\[$(tput setaf 6)\]\t \[$(tput setaf 2)\][\[$(tput setaf 3)\]\u\[$(tput setaf 1)\]@\[$(tput setaf 3)\]\h \[$(tput setaf 6)\]\W\[$(tput setaf 2)\]]\[$(tput setaf 4)\]\\$ \[$(tput sgr0)\]"
     # without colors: PS1="[\u@\h \${NEW_PWD}]\\$ "
     # PS1="[\u@\h \${NEW_PWD}]\\$ "
@@ -79,5 +104,11 @@ unset bash_prompt
 # Color scheme for grep and ls
 export CLICOLOR=1
 export LSCOLORS=GxFxCxDxBxegedabagaced
-export GREP_OPTIONS='--color=auto'
 export GREP_COLOR='1;35;40'
+
+# Default editor
+export EDITOR='vim'
+
+# Add RVM to PATH for scripting. Make sure this is the last PATH variable change.
+export PATH="$PATH:$HOME/.rvm/bin:$HOME/.rbenv/bin:$HOME/.bin"
+
