@@ -1,3 +1,6 @@
+cite 'about-alias'
+about-alias 'personal custom aliases'
+
 # Common command
 alias ls='ls --color'
 alias lsa='ls --all --color'
@@ -9,9 +12,9 @@ alias vi='vim'
 alias sv='sudo vim'
 
 # Grep command
-alias grep="grep --color=auto"
-alias fgrep="fgrep --color=auto"
-alias egrep="egrep --color=auto"
+alias grep='grep --color=auto'
+alias fgrep='fgrep --color=auto'
+alias egrep='egrep --color=auto'
 
 # Common setting for Git
 alias gf='git fetch'

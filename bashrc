@@ -3,44 +3,30 @@
 # Load RVM into a shell session *as a function*
 [[ -s "$HOME/.rvm/scripts/rvm" ]] && source "$HOME/.rvm/scripts/rvm"
 
-# Load .bash_aliases
-if [ -f ~/.bash/bash_aliases ]; then
-    . ~/.bash/bash_aliases
+# Load .bash_functions
+if [ -f $HOME/.bash/bash_functions ]; then
+    . $HOME/.bash/bash_functions
 fi
 
-# Load .bash_functions
-if [ -f ~/.bash/bash_functions ]; then
-    . ~/.bash/bash_functions
-fi
+# Load composure first, so we support function metadata
+source $HOME/.bash/lib/composure.bash
 
 # Load in the git branch prompt script.
-source ~/.bash/git-prompt.sh
-source ~/.bash/git-completion.bash
-source ~/.bash/tmuxinator.bash
-GIT_PS1_SHOWDIRTYSTATE=true
+source $HOME/.bash/git-prompt.sh
 
-# Check command exists
-function command_exists() {
-    type "$1" &> /dev/null ;
-}
+# Load enabled aliases, completion, plugins
+for file_type in "aliases" "plugins" "completion"
+do
+    load_bash_files $file_type
+done
 
-# Show ruby version
-function prompt_rvm {
-    if command_exists rvm-prompt; then
-        rbv=`rvm-prompt`
+# Load custom aliases, completion, plugins
+for file_type in "aliases" "plugins" "completion"
+do
+    if [ -e "$HOME/.bash/${file_type}/custom.${file_type}.bash" ]; then
+        source "$HOME/.bash/${file_type}/custom.${file_type}.bash"
     fi
-    if command_exists rbenv; then
-        eval "$(rbenv init -)"
-        rbv=`rbenv version-name`
-    fi
-    if [[ -n "${rbv/[ ]*\n/}" ]]; then
-      #rbv=${rbv#ruby-}
-      [[ $rbv == *"@"* ]] || rbv="${rbv}@default"
-      echo "["$rbv"]"
-    else
-      echo ""
-    fi
-}
+done
 
 bash_prompt() {
     case $TERM in
@@ -97,6 +83,9 @@ bash_prompt() {
     # PS1="[\u@\h \${NEW_PWD}]\\$ "
     # extra backslash in front of \$ to make bash colorize the prompt
 }
+
+# Git show dirty state
+export GIT_PS1_SHOWDIRTYSTATE=true
 
 bash_prompt
 unset bash_prompt

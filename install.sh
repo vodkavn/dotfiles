@@ -60,5 +60,5 @@ vim +PluginInstall +qall
 ########################
 #
 echo "DONE!"
-echo "Please restart your terminal!"
+source $HOME/.bashrc
 ########################

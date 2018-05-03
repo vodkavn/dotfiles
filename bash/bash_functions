@@ -24,7 +24,6 @@ extract()
             fi
 }
 
-
 localnet ()
 {
     /sbin/ifconfig | awk /'inet addr/ {print $2}' 
@@ -32,15 +31,54 @@ localnet ()
         /sbin/ifconfig | awk /'Bcast/ {print $3}' 
         echo ""
 }
+
 myip ()
 {
     lynx -dump -hiddenlinks=ignore -nolist [url]http://checkip.dyndns.org:8245/[/url] | grep "Current IP Address" | cut -d":" -f2 | cut -d" " -f2
 }
+
 upinfo ()
 {
     echo -ne "${green}$HOSTNAME ${red}uptime is ${cyan} \t ";uptime | awk /'up/ {print $3,$4,$5,$6,$7,$8,$9,$10}'
 }
 
+# Check command exists
+function command_exists() {
+    type "$1" &> /dev/null ;
+}
+
+# Show ruby version
+function prompt_rvm {
+    if command_exists rvm-prompt; then
+        rbv=`rvm-prompt`
+    fi
+    if command_exists rbenv; then
+        eval "$(rbenv init -)"
+        rbv=`rbenv version-name`
+    fi
+    if [[ -n "${rbv/[ ]*\n/}" ]]; then
+        #rbv=${rbv#ruby-}
+        [[ $rbv == *"@"* ]] || rbv="${rbv}@default"
+        echo "["$rbv"]"
+    else
+        echo ""
+    fi
+}
+
+# Helper function loading various enable-able files
+function load_bash_files() {
+    subdirectory="$1"
+    if [ -d "$HOME/.bash/${subdirectory}/enabled" ]
+    then
+        FILES="$HOME/.bash/${subdirectory}/enabled/*.bash"
+        for config_file in $FILES
+        do
+            if [ -e "${config_file}" ]; then
+                source $config_file
+            fi
+        done
+    fi
+}
 
 #------------------------------------------////
 # System Information:
