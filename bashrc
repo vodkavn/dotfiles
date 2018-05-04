@@ -96,7 +96,9 @@ export LSCOLORS=GxFxCxDxBxegedabagaced
 export GREP_COLOR='1;35;40'
 
 # Default editor
-export EDITOR='vim'
+export EDITOR=vim
+
+export TERM=xterm
 
 # Add RVM to PATH for scripting. Make sure this is the last PATH variable change.
 export PATH="$PATH:$HOME/.rvm/bin:$HOME/.rbenv/bin:$HOME/.bin"
