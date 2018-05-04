@@ -26,9 +26,9 @@ extract()
 
 localnet ()
 {
-    /sbin/ifconfig | awk /'inet addr/ {print $2}' 
+    /sbin/ifconfig | awk /'inet addr/ {print $2}'
         echo ""
-        /sbin/ifconfig | awk /'Bcast/ {print $3}' 
+        /sbin/ifconfig | awk /'Bcast/ {print $3}'
         echo ""
 }
 
@@ -43,16 +43,16 @@ upinfo ()
 }
 
 # Check command exists
-function command_exists() {
+function _command_exists() {
     type "$1" &> /dev/null ;
 }
 
 # Show ruby version
 function prompt_rvm {
-    if command_exists rvm-prompt; then
+    if _command_exists rvm-prompt; then
         rbv=`rvm-prompt`
     fi
-    if command_exists rbenv; then
+    if _command_exists rbenv; then
         eval "$(rbenv init -)"
         rbv=`rbenv version-name`
     fi
@@ -68,9 +68,9 @@ function prompt_rvm {
 # Helper function loading various enable-able files
 function load_bash_files() {
     subdirectory="$1"
-    if [ -d "$HOME/.bash/${subdirectory}/enabled" ]
+    if [ -d "$HOME/.bash/${subdirectory}/enable" ]
     then
-        FILES="$HOME/.bash/${subdirectory}/enabled/*.bash"
+        FILES="$HOME/.bash/${subdirectory}/enable/*.bash"
         for config_file in $FILES
         do
             if [ -e "${config_file}" ]; then
@@ -79,6 +79,24 @@ function load_bash_files() {
         done
     fi
 }
+
+if ! type pathmunge > /dev/null 2>&1
+then
+    function pathmunge () {
+        about 'prevent duplicate directories in you PATH variable'
+        group 'helpers'
+        example 'pathmunge /path/to/dir is equivalent to PATH=/path/to/dir:$PATH'
+        example 'pathmunge /path/to/dir after is equivalent to PATH=$PATH:/path/to/dir'
+
+        if ! [[ $PATH =~ (^|:)$1($|:) ]] ; then
+            if [ "$2" = "after" ] ; then
+                export PATH=$PATH:$1
+            else
+                export PATH=$1:$PATH
+            fi
+        fi
+    }
+fi
 
 #------------------------------------------////
 # System Information:
