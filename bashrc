@@ -4,8 +4,8 @@
 [[ -s "$HOME/.rvm/scripts/rvm" ]] && source "$HOME/.rvm/scripts/rvm"
 
 # Load .bash_functions
-if [ -f $HOME/.bash/bash_functions ]; then
-    . $HOME/.bash/bash_functions
+if [ -f $HOME/.bash/bash_functions.bash ]; then
+    . $HOME/.bash/bash_functions.bash
 fi
 
 # Load composure first, so we support function metadata
@@ -15,13 +15,13 @@ source $HOME/.bash/lib/composure.bash
 source $HOME/.bash/git-prompt.sh
 
 # Load enabled aliases, completion, plugins
-for file_type in "aliases" "plugins" "completion"
+for file_type in "aliases" "completion" "plugins"
 do
     load_bash_files $file_type
 done
 
 # Load custom aliases, completion, plugins
-for file_type in "aliases" "plugins" "completion"
+for file_type in "aliases" "completion" "plugins"
 do
     if [ -e "$HOME/.bash/${file_type}/custom.${file_type}.bash" ]; then
         source "$HOME/.bash/${file_type}/custom.${file_type}.bash"
