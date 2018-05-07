@@ -68,13 +68,6 @@ function passgen ()
     echo "Without (use this as the password): $(echo $pass | tr -d ' ')"
 }
 
-# Create alias pass to passgen when pass isn't installed or
-# BASH_IT_LEGACY_PASS is true.
-if ! command -v pass &>/dev/null || [ "$BASH_IT_LEGACY_PASS" = true ]
-then
-  alias pass=passgen
-fi
-
 function pmdown ()
 {
     about 'preview markdown file in a browser'
@@ -144,21 +137,6 @@ function usage ()
         fi
     fi
 }
-
-if [ ! -e "${BASH_IT}/plugins/enabled/todo.plugin.bash" ] && [ ! -e "${BASH_IT}/plugins/enabled/*${BASH_IT_LOAD_PRIORITY_SEPARATOR}todo.plugin.bash" ]; then
-# if user has installed todo plugin, skip this...
-    function t ()
-    {
-        about 'one thing todo'
-        param 'if not set, display todo item'
-        param '1: todo text'
-        if [[ "$*" == "" ]] ; then
-            cat ~/.t
-        else
-            echo "$*" > ~/.t
-        fi
-    }
-fi
 
 function command_exists ()
 {
