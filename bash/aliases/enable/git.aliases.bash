@@ -1,6 +1,10 @@
 cite 'about-alias'
 about-alias 'common git abbreviations'
 
+# Common typo
+alias gut='git'
+alias got='git'
+
 # Aliases
 alias gcl='git clone'
 alias ga='git add'
