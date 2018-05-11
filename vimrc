@@ -57,6 +57,8 @@ if isdirectory($HOME."/.vim/bundle/Vundle.vim")
     Plugin 'tpope/vim-rails'
     " ruby
     Plugin 'vim-ruby/vim-ruby'
+    " vue
+    Plugin 'posva/vim-vue'
 
     Plugin 'scrooloose/nerdcommenter'
 
