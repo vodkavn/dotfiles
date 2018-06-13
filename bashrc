@@ -91,6 +91,9 @@ export CLICOLOR=1
 export LSCOLORS=GxFxCxDxBxegedabagaced
 export GREP_COLOR='1;35;40'
 
+# History datetime format
+export HISTTIMEFORMAT="%Y/%m/%d %T "
+
 # Default editor
 export EDITOR=vim
 
