@@ -3,5 +3,11 @@
 #  email = hoangxuanthanh1986@gmail.com
 [core]
   editor = vim
+  autocrlf = input
 [color]
   ui = true
+[push]
+  default = simple
+[credential]
+  helper = store
+#  helper = manager
