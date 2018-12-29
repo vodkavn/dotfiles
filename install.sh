@@ -27,7 +27,8 @@ Dir_bak=$HOME/.setting_backup_$timestamp
 #
 # Setting file list
 #
-file_list=(vim vimrc bash bashrc bash_profile bash_logout gitconfig)
+file_list=(vim vimrc bash bashrc bash_profile bash_logout)
+cp_file_list=(gitconfig tmux.conf)
 
 #
 # Start
@@ -49,6 +50,25 @@ do
     # Create link to config file
     echo "--> Installing .$file..."
     ln -sf $HOME/.linux_workspace/$file $HOME/.$file
+done
+
+for file in ${cp_file_list[*]}
+do
+    echo "Editing .$file..."
+    Dir=$HOME/.$file
+    # Check if file or directory exist?
+    if [[ -d $Dir || -f $Dir ]]; then
+        echo "--> Backing up .$file to $Dir_bak"
+        # Check and create backup folder
+        if [ ! -d $Dir_bak ]; then
+            mkdir $Dir_bak
+        fi
+        # Move file or directory to backup folder
+        mv -f $Dir $Dir_bak/
+    fi
+    # Create link to config file
+    echo "--> Installing .$file..."
+    cp -f $HOME/.linux_workspace/$file $HOME/.$file
 done
 
 #
