@@ -58,17 +58,13 @@ do
     Dir=$HOME/.$file
     # Check if file or directory exist?
     if [[ -d $Dir || -f $Dir ]]; then
-        echo "--> Backing up .$file to $Dir_bak"
-        # Check and create backup folder
-        if [ ! -d $Dir_bak ]; then
-            mkdir $Dir_bak
-        fi
-        # Move file or directory to backup folder
-        mv -f $Dir $Dir_bak/
+        # Do nothing
+        echo "--> Skipping existed config file: .$file"
+    else
+        # Copy config file instead of liking
+        echo "--> Installing .$file..."
+        cp -f $HOME/.linux_workspace/$file $HOME/.$file
     fi
-    # Create link to config file
-    echo "--> Installing .$file..."
-    cp -f $HOME/.linux_workspace/$file $HOME/.$file
 done
 
 #
