@@ -99,6 +99,8 @@ export EDITOR=vim
 
 export TERM=xterm
 
-# Add RVM to PATH for scripting. Make sure this is the last PATH variable change.
-export PATH="$PATH:$HOME/.rvm/bin:$HOME/.rbenv/bin:$HOME/.bin"
-
+# User specific environment and startup programs
+PATH=$HOME/usr/bin:$HOME/bin:$PATH
+PATH=/usr/local/heroku/bin:$PATH
+PATH="$PATH:$HOME/.rvm/bin:$HOME/.rbenv/bin:$HOME/.bin"
+export PATH
