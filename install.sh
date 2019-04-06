@@ -35,31 +35,39 @@ cp_file_list=(gitconfig tmux.conf)
 #
 for file in ${file_list[*]}
 do
-    echo "Editing .$file..."
+    echo "Checking .$file..."
     Dir=$HOME/.$file
     # Check if file or directory exist?
     if [[ -d $Dir || -f $Dir ]]; then
-        echo "--> Backing up .$file to $Dir_bak"
-        # Check and create backup folder
-        if [ ! -d $Dir_bak ]; then
-            mkdir $Dir_bak
+        if cmp -s "$Dir" "$HOME/.linux_workspace/$file"; then
+            echo "--> File unchanged"
+        else
+            echo "--> Backing up .$file to $Dir_bak"
+            # Check and create backup folder
+            if [ ! -d $Dir_bak ]; then
+                mkdir $Dir_bak
+            fi
+            # Move file or directory to backup folder
+            mv -f $Dir $Dir_bak/
+            # Create link to config file
+            echo "--> Installing .$file..."
+            ln -sf $HOME/.linux_workspace/$file $HOME/.$file
         fi
-        # Move file or directory to backup folder
-        mv -f $Dir $Dir_bak/
+    else
+        # Create link to config file
+        echo "--> Installing .$file..."
+        ln -sf $HOME/.linux_workspace/$file $HOME/.$file
     fi
-    # Create link to config file
-    echo "--> Installing .$file..."
-    ln -sf $HOME/.linux_workspace/$file $HOME/.$file
 done
 
 for file in ${cp_file_list[*]}
 do
-    echo "Editing .$file..."
+    echo "Checking .$file..."
     Dir=$HOME/.$file
     # Check if file or directory exist?
     if [[ -d $Dir || -f $Dir ]]; then
         # Do nothing
-        echo "--> Skipping existed config file: .$file"
+        echo "--> Skipping existed config file"
     else
         # Copy config file instead of liking
         echo "--> Installing .$file..."
