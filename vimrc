@@ -23,12 +23,6 @@ if isdirectory($HOME."/.vim/bundle/Vundle.vim")
 
     " find files
     Plugin 'kien/ctrlp.vim'
-    " colorschemes
-    Plugin 'flazz/vim-colorschemes'
-    " solarized-dark colorscheme
-    Plugin 'altercation/vim-colors-solarized'
-    " molokai colorscheme
-    Plugin 'tomasr/molokai'
     " csv display
     Plugin 'chrisbra/csv.vim'
     " nerdtree
@@ -204,16 +198,8 @@ endif
 "---------------------------------------------------------------------------
 " Config Color theme
 "
-"if isdirectory($HOME."/.vim/bundle/vim-colors-solarized")
-"    set background=dark
-"    let g:solarized_termcolors=256
-"    colorscheme solarized
-"endif
-" Configs to make Molokai look great
-set background=dark
-let g:molokai_original=1
-let g:rehash256=1
-colorscheme molokai
+"color molokai
+color dracula
 
 "---------------------------------------------------------------------------
 " Config neocomplcache
