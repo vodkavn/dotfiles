@@ -77,7 +77,7 @@ bash_prompt() {
     # single line
     # PS1="$TITLEBAR${R}[${C}\t${R}]${UC}\u${EMR}@${EMY}\H${W}\w\[\033[m\]\$(prompt_rvm)${EMB}\$(__git_ps1)${EMG}\\$ "
     # new line
-    PS1="$TITLEBAR${R}[${C}\t${R}]${UC}\u${EMR}@${EMY}\H${W}\w\[\033[m\]\$(prompt_rvm)${EMB}\$(__git_ps1)${R}\n└${EMG}\\$ "
+    PS1="$TITLEBAR${R}[${C}\t${R}]${UC}\u${EMR}@${EMY}\H${W}\w\[\033[m\]\$(prompt_rvm)${EMB}\$(__git_ps1 ' (%s)')${R}\n└${EMG}\\$ "
 }
 
 bash_prompt

@@ -1,13 +1,5 @@
 ### FUNCTIONS
 
-localnet ()
-{
-    /sbin/ifconfig | awk /'inet addr/ {print $2}'
-        echo ""
-        /sbin/ifconfig | awk /'Bcast/ {print $3}'
-        echo ""
-}
-
 upinfo ()
 {
     echo -ne "${green}$HOSTNAME ${red}uptime is ${cyan} \t ";uptime | awk /'up/ {print $3,$4,$5,$6,$7,$8,$9,$10}'
