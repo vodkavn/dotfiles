@@ -77,6 +77,23 @@ done
 
 #
 ########################
+# Install Powerline Font
+echo "Install Powerline Font..."
+font_dir="$HOME/.local/share/fonts"
+font_config_dir="$HOME/.config/fontconfig/conf.d"
+mkdir -p $font_dir
+mkdir -p $font_config_dir
+
+echo "Copying fonts..."
+cp -f $HOME/.linux_workspace/font/*.otf $font_dir/
+if which fc-cache >/dev/null 2>&1 ; then
+    echo "Resetting font cache, this may take a moment..."
+    fc-cache -vf "$font_dir"
+fi
+cp -f $HOME/.linux_workspace/font/*.conf $font_config_dir/
+
+#
+########################
 # Install Vim plugins using Vundle
 echo "Install Vim plugins using Vundle..."
 vim +PluginInstall +qall
