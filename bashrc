@@ -80,9 +80,6 @@ bash_prompt() {
     PS1="$TITLEBAR${R}[${C}\t${R}]${UC}\u${EMR}@${EMY}\H${W}\w\[\033[m\]\$(prompt_rvm)${EMB}\$(__git_ps1)${R}\n└${EMG}\\$ "
 }
 
-# Git show dirty state
-export GIT_PS1_SHOWDIRTYSTATE=true
-
 bash_prompt
 unset bash_prompt
 
