@@ -199,8 +199,8 @@ if isdirectory($HOME."/.vim/bundle/neocomplete.vim")
     " Define dictionary.
     let g:neocomplete#sources#dictionary#dictionaries = {
         \ 'default' : '',
-        \ 'vimshell' : $HOME.'/.vimshell_hist',
-        \ 'scheme' : $HOME.'/.gosh_completions'
+        \ 'ruby' : $HOME.'/.linux_workspace/dict/ruby.dict',
+        \ 'jquery' : $HOME.'/.linux_workspace/dict/jquery.dict'
             \ }
 
     " Define keyword.
