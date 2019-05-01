@@ -167,7 +167,7 @@ filetype plugin indent on
 if isdirectory($HOME."/.vim/bundle/nerdtree")
     " Always display NERDTree on vim enter
     " autocmd vimenter * NERDTree
-    autocmd vimenter * if !argc() | NERDTree | endif
+    " autocmd vimenter * if !argc() | NERDTree | endif
     autocmd bufenter * if (winnr("$") == 1 && exists("b:NERDTreeType") && b:NERDTreeType == "primary") | q | endif
     map <C-n> :NERDTreeToggle<CR>
     map <F5> :NERDTreeToggle<CR>
