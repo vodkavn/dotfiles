@@ -18,12 +18,13 @@ bash -c "`curl -fsSL https://raw.githubusercontent.com/vodkavn/linux_workspace/m
   - `.bash_profile`
   - `.bash_logout`
 
-  into `.setting_backup_{timestamp}` folder, and add create symlinks to the new confif files/folders
+  into `.setting_backup_{timestamp}` folder, and add create symlinks to the new config files/folders
 
 - These files below will be skipped if existed
   - `.gitconfig`
   - `.tmux.conf`
 
 ## Cheatsheet
+
 - [Vim](doc/vim.md)
 - [Tmux](doc/tmux.md)
