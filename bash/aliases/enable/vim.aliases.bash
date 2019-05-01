@@ -9,6 +9,8 @@ if [[ -n $VIM ]]; then
   alias v=$VIM
   alias vi=$VIM
   alias sv="sudo $VIM"
+  alias svi="sudo $VIM"
+  alias svim="sudo $VIM"
 fi
 
 # open vim in new tab is taken from
