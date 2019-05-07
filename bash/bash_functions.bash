@@ -114,22 +114,23 @@ bash_prompt() {
 }
 
 bash_prompt_powerline() {
-    local TIME_COLOR="215m"
-    local INFO_COLOR="228m"
-    local DIRECTORY_COLOR="141m"
+    local TIME_COLOR="141m"
+    local INFO_COLOR="61m"
+    local DIRECTORY_COLOR="59m"
     local GIT_COLOR="117m"
     local LOCK_COLOR="203m"
-    local TEXT_COLOR="84m"
+    local PROMPT_COLOR="84m"
+    local TEXT_COLOR="231m"
     local FOREGROUND_COLOR="231m"
     local BACKGROUND_COLOR="17m"
 
     local TIME_START="\[\e[48;5;$TIME_COLOR\]\[\e[38;5;$BACKGROUND_COLOR\]"
     local TIME_END="\[\e[48;5;$INFO_COLOR\]\[\e[38;5;$TIME_COLOR\]"
 
-    local INFO_START="\[\e[48;5;$INFO_COLOR\]\[\e[38;5;$BACKGROUND_COLOR\]"
+    local INFO_START="\[\e[48;5;$INFO_COLOR\]\[\e[38;5;$FOREGROUND_COLOR\]"
     local INFO_END="\[\e[48;5;$DIRECTORY_COLOR\]\[\e[38;5;$INFO_COLOR\]"
 
-    local DIRECTORY_START="\[\e[48;5;$DIRECTORY_COLOR\]\[\e[38;5;$BACKGROUND_COLOR\]"
+    local DIRECTORY_START="\[\e[48;5;$DIRECTORY_COLOR\]\[\e[38;5;$FOREGROUND_COLOR\]"
     local DIRECTORY_END="\[\e[0m\]\[\e[38;5;$DIRECTORY_COLOR\]"            # when next segment is none
 
     local GIT_TEXT="\[\e[38;5;$GIT_COLOR\]"
@@ -140,7 +141,7 @@ bash_prompt_powerline() {
         DIRECTORY_END="\[\e[48;5;$LOCK_COLOR\]\[\e[38;5;$DIRECTORY_COLOR\]\[\e[38;5;$FOREGROUND_COLOR\]  $NONE\[\e[38;5;$LOCK_COLOR\]"
     fi
 
-    PS1="$TIME_START \t $TIME_END$INFO_START \u@\h $INFO_END$DIRECTORY_START \w $DIRECTORY_END $GIT_TEXT\$(__git_ps1 ' (%s)')\n$NORMAL_TEXT\\$ "
+    PS1="$TIME_START \t $TIME_END$INFO_START \u@\h $INFO_END$DIRECTORY_START \w $DIRECTORY_END $GIT_TEXT\$(__git_ps1 ' (%s)')\n\[\e[38;5;$PROMPT_COLOR\]\\$ $NORMAL_TEXT"
 }
 
 #------------------------------------------////
