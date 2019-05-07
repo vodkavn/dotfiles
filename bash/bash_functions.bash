@@ -61,7 +61,7 @@ then
     }
 fi
 
-bash_prompt() {
+function bash_prompt() {
     case $TERM in
         xterm*|rxvt*)
             # local TITLEBAR='\[\033]0;\u:${NEW_PWD}\007\]'
@@ -113,7 +113,7 @@ bash_prompt() {
     PS1="$TITLEBAR${R}[${C}\t${R}]${UC}\u${EMR}@${EMY}\H${W}\w\[\033[m\]\$(prompt_rvm)${EMB}\$(__git_ps1 ' (%s)')${R}\n└${EMG}\\$ "
 }
 
-bash_prompt_powerline() {
+function bash_prompt_powerline() {
     local TIME_COLOR="141m"
     local INFO_COLOR="61m"
     local DIRECTORY_COLOR="59m"
@@ -124,6 +124,10 @@ bash_prompt_powerline() {
     local FOREGROUND_COLOR="231m"
     local BACKGROUND_COLOR="17m"
 
+    local NONE="\[\e[0m\]"
+    local GIT_TEXT="\[\e[38;5;$GIT_COLOR\]"
+    local NORMAL_TEXT="\[\e[38;5;$TEXT_COLOR\]"
+
     local TIME_START="\[\e[48;5;$TIME_COLOR\]\[\e[38;5;$BACKGROUND_COLOR\]"
     local TIME_END="\[\e[48;5;$INFO_COLOR\]\[\e[38;5;$TIME_COLOR\]"
 
@@ -131,17 +135,22 @@ bash_prompt_powerline() {
     local INFO_END="\[\e[48;5;$DIRECTORY_COLOR\]\[\e[38;5;$INFO_COLOR\]"
 
     local DIRECTORY_START="\[\e[48;5;$DIRECTORY_COLOR\]\[\e[38;5;$FOREGROUND_COLOR\]"
-    local DIRECTORY_END="\[\e[0m\]\[\e[38;5;$DIRECTORY_COLOR\]"            # when next segment is none
-
-    local GIT_TEXT="\[\e[38;5;$GIT_COLOR\]"
-    local NORMAL_TEXT="\[\e[38;5;$TEXT_COLOR\]"
+    local DIRECTORY_END="$NONE\[\e[38;5;$DIRECTORY_COLOR\]"            # when next segment is none
 
     if [ ! -w "$PWD" ]; then
         # Current directory is not writable
         DIRECTORY_END="\[\e[48;5;$LOCK_COLOR\]\[\e[38;5;$DIRECTORY_COLOR\]\[\e[38;5;$FOREGROUND_COLOR\]  $NONE\[\e[38;5;$LOCK_COLOR\]"
     fi
 
-    PS1="$TIME_START \t $TIME_END$INFO_START \u@\h $INFO_END$DIRECTORY_START \w $DIRECTORY_END $GIT_TEXT\$(__git_ps1 ' (%s)')\n\[\e[38;5;$PROMPT_COLOR\]\\$ $NORMAL_TEXT"
+    if [[ `tput cols` -lt 50 ]]; then
+        PS1="\e[38;5;$PROMPT_COLOR\\$ $NORMAL_TEXT"
+    elif [[ `tput cols` -lt 75 ]]; then
+        PS1="$GIT_TEXT\$(__git_ps1 '(%s) ')\e[38;5;$PROMPT_COLOR\\$ $NORMAL_TEXT"
+    elif [[ `tput cols` -lt 100 ]]; then
+        PS1="$DIRECTORY_START\W$DIRECTORY_END $GIT_TEXT\$(__git_ps1 ' (%s) ')\e[38;5;$PROMPT_COLOR\\$ $NORMAL_TEXT"
+    else
+        PS1="$TIME_START \t $TIME_END$INFO_START \u@\h $INFO_END$DIRECTORY_START \w $DIRECTORY_END $GIT_TEXT\$(__git_ps1 ' (%s)')\n\[\e[38;5;$PROMPT_COLOR\]\\$ $NORMAL_TEXT"
+    fi
 }
 
 #------------------------------------------////

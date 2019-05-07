@@ -28,8 +28,9 @@ do
     fi
 done
 
-bash_prompt_powerline
-unset bash_prompt_powerline
+# bash_prompt_powerline
+# unset bash_prompt_powerline
+export PROMPT_COMMAND=bash_prompt_powerline
 
 # Color scheme for grep and ls
 export CLICOLOR=1
@@ -42,7 +43,7 @@ export HISTTIMEFORMAT="%Y/%m/%d %T "
 # Default editor
 export EDITOR=vim
 
-export TERM=xterm
+export TERM=xterm-256color
 
 # User specific environment and startup programs
 PATH=$HOME/usr/bin:$HOME/bin:$PATH
