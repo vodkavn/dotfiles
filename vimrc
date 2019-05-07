@@ -45,6 +45,7 @@ if isdirectory($HOME."/.vim/bundle/Vundle.vim")
     Plugin 'majutsushi/tagbar'
     " custom statusline, tabline
     Plugin 'vim-airline/vim-airline'
+    Plugin 'vim-airline/vim-airline-themes'
     " rails
     Plugin 'tpope/vim-rails'
     " ruby
@@ -311,6 +312,7 @@ if isdirectory($HOME."/.vim/bundle/vim-airline")
     let g:airline_section_warning = ''
     let g:airline_section_error = ''
     let g:airline_powerline_fonts = 1
+    let g:airline_theme = 'dracula'
     map <F9> :bp<CR>
     map <F10> :bn<CR>
 endif
