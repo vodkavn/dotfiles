@@ -113,6 +113,34 @@ bash_prompt() {
     PS1="$TITLEBAR${R}[${C}\t${R}]${UC}\u${EMR}@${EMY}\H${W}\w\[\033[m\]\$(prompt_rvm)${EMB}\$(__git_ps1 ' (%s)')${R}\n└${EMG}\\$ "
 }
 
+bash_prompt_powerline() {
+    local GREY="\[\e[48;5;240m\]\[\e[38;5;250m\]"
+    local GREY_END="\[\e[48;5;2m\]\[\e[38;5;240m\]"
+
+    local GREEN="\[\e[48;5;2m\]\[\e[38;5;255m\]"
+    local GREEN_END="\[\e[48;5;27m\]\[\e[38;5;2m\]"
+
+    local ORANGE="\[\e[48;5;208m\]\[\e[38;5;255m\]"
+    local ORANGE_END="\[\e[48;5;236m\]\[\e[38;5;208m\]"
+
+    local BLUE="\[\e[48;5;27m\]\[\e[38;5;255m\]"
+    local BLUE_END="\[\e[48;5;208m\]\[\e[38;5;27m\]"           # when next segment is git
+    local BLUE_END_EMPTY="\[\e[0m\]\[\e[38;5;27m\]"            # when next segment is none
+
+    local PROMPT="\[\e[48;5;236m\]\[\e[38;5;255m\]"
+    local PROMPT_END="\[\e[0m\]\[\e[38;5;236m\]\[\e[0m\] "
+
+    local ORANGE_TEXT="\[\e[38;5;208m\]"
+    local NONE="\[\e[0m\]"
+
+    if [ ! -w "$PWD" ]; then
+        # Current directory is not writable
+        BLUE_END="\[\e[48;5;160m\]\[\e[38;5;27m\]\[\e[38;5;255m\]  \[\e[48;5;208m\]\[\e[38;5;160m\]"
+    fi
+
+    PS1="$GREY \t $GREY_END$GREEN \u@\h $GREEN_END$BLUE \w $BLUE_END_EMPTY $ORANGE_TEXT\$(__git_ps1 ' (%s)')\n$NONE\\$ "
+}
+
 #------------------------------------------////
 # System Information:
 #------------------------------------------////
