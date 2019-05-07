@@ -114,31 +114,33 @@ bash_prompt() {
 }
 
 bash_prompt_powerline() {
-    local GREY="\[\e[48;5;240m\]\[\e[38;5;250m\]"
-    local GREY_END="\[\e[48;5;2m\]\[\e[38;5;240m\]"
+    local TIME_COLOR="215m"
+    local INFO_COLOR="228m"
+    local DIRECTORY_COLOR="141m"
+    local GIT_COLOR="117m"
+    local LOCK_COLOR="203m"
+    local TEXT_COLOR="84m"
+    local FOREGROUND_COLOR="231m"
+    local BACKGROUND_COLOR="17m"
 
-    local GREEN="\[\e[48;5;2m\]\[\e[38;5;255m\]"
-    local GREEN_END="\[\e[48;5;27m\]\[\e[38;5;2m\]"
+    local TIME_START="\[\e[48;5;$TIME_COLOR\]\[\e[38;5;$BACKGROUND_COLOR\]"
+    local TIME_END="\[\e[48;5;$INFO_COLOR\]\[\e[38;5;$TIME_COLOR\]"
 
-    local ORANGE="\[\e[48;5;208m\]\[\e[38;5;255m\]"
-    local ORANGE_END="\[\e[48;5;236m\]\[\e[38;5;208m\]"
+    local INFO_START="\[\e[48;5;$INFO_COLOR\]\[\e[38;5;$BACKGROUND_COLOR\]"
+    local INFO_END="\[\e[48;5;$DIRECTORY_COLOR\]\[\e[38;5;$INFO_COLOR\]"
 
-    local BLUE="\[\e[48;5;27m\]\[\e[38;5;255m\]"
-    local BLUE_END="\[\e[48;5;208m\]\[\e[38;5;27m\]"           # when next segment is git
-    local BLUE_END_EMPTY="\[\e[0m\]\[\e[38;5;27m\]"            # when next segment is none
+    local DIRECTORY_START="\[\e[48;5;$DIRECTORY_COLOR\]\[\e[38;5;$BACKGROUND_COLOR\]"
+    local DIRECTORY_END="\[\e[0m\]\[\e[38;5;$DIRECTORY_COLOR\]"            # when next segment is none
 
-    local PROMPT="\[\e[48;5;236m\]\[\e[38;5;255m\]"
-    local PROMPT_END="\[\e[0m\]\[\e[38;5;236m\]\[\e[0m\] "
-
-    local ORANGE_TEXT="\[\e[38;5;208m\]"
-    local NONE="\[\e[0m\]"
+    local GIT_TEXT="\[\e[38;5;$GIT_COLOR\]"
+    local NORMAL_TEXT="\[\e[38;5;$TEXT_COLOR\]"
 
     if [ ! -w "$PWD" ]; then
         # Current directory is not writable
-        BLUE_END="\[\e[48;5;160m\]\[\e[38;5;27m\]\[\e[38;5;255m\]  \[\e[48;5;208m\]\[\e[38;5;160m\]"
+        DIRECTORY_END="\[\e[48;5;$LOCK_COLOR\]\[\e[38;5;$DIRECTORY_COLOR\]\[\e[38;5;$FOREGROUND_COLOR\]  $NONE\[\e[38;5;$LOCK_COLOR\]"
     fi
 
-    PS1="$GREY \t $GREY_END$GREEN \u@\h $GREEN_END$BLUE \w $BLUE_END_EMPTY $ORANGE_TEXT\$(__git_ps1 ' (%s)')\n$NONE\\$ "
+    PS1="$TIME_START \t $TIME_END$INFO_START \u@\h $INFO_END$DIRECTORY_START \w $DIRECTORY_END $GIT_TEXT\$(__git_ps1 ' (%s)')\n$NORMAL_TEXT\\$ "
 }
 
 #------------------------------------------////

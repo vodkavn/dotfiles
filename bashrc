@@ -33,7 +33,7 @@ unset bash_prompt_powerline
 
 # Color scheme for grep and ls
 export CLICOLOR=1
-export LSCOLORS=GxFxCxDxBxegedabagaced
+export LSCOLORS=ExFxBxDxCxegedabagacad
 export GREP_COLOR='1;35;40'
 
 # History datetime format
