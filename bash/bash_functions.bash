@@ -64,8 +64,7 @@ fi
 function bash_prompt() {
     case $TERM in
         xterm*|rxvt*)
-            # local TITLEBAR='\[\033]0;\u:${NEW_PWD}\007\]'
-            local TITLEBAR='\[\033]0;\h:${NEW_PWD}\007\]'
+            local TITLEBAR='\[\033]0;\h:$PWD\007\]'
             ;;
         *)
             local TITLEBAR=""
@@ -114,6 +113,15 @@ function bash_prompt() {
 }
 
 function bash_prompt_powerline() {
+    case $TERM in
+        xterm*|rxvt*)
+            local TITLEBAR='\[\033]0;\h:$PWD\007\]'
+            ;;
+        *)
+            local TITLEBAR=""
+            ;;
+    esac
+
     local TIME_COLOR="141m"
     local INFO_COLOR="61m"
     local DIRECTORY_COLOR="59m"
@@ -143,13 +151,13 @@ function bash_prompt_powerline() {
     fi
 
     if [[ `tput cols` -lt 50 ]]; then
-        PS1="\e[38;5;$PROMPT_COLOR\\$ $NORMAL_TEXT"
+        PS1="$TITLEBAR\e[38;5;$PROMPT_COLOR\\$ $NORMAL_TEXT"
     elif [[ `tput cols` -lt 75 ]]; then
-        PS1="$GIT_TEXT\$(__git_ps1 '(%s) ')\e[38;5;$PROMPT_COLOR\\$ $NORMAL_TEXT"
+        PS1="$TITLEBAR$GIT_TEXT\$(__git_ps1 '(%s) ')\e[38;5;$PROMPT_COLOR\\$ $NORMAL_TEXT"
     elif [[ `tput cols` -lt 100 ]]; then
-        PS1="$DIRECTORY_START\W$DIRECTORY_END $GIT_TEXT\$(__git_ps1 ' (%s) ')\e[38;5;$PROMPT_COLOR\\$ $NORMAL_TEXT"
+        PS1="$TITLEBAR$DIRECTORY_START\W$DIRECTORY_END $GIT_TEXT\$(__git_ps1 ' (%s) ')\e[38;5;$PROMPT_COLOR\\$ $NORMAL_TEXT"
     else
-        PS1="$TIME_START \t $TIME_END$INFO_START \u@\h $INFO_END$DIRECTORY_START \w $DIRECTORY_END $GIT_TEXT\$(__git_ps1 ' (%s)')\n\[\e[38;5;$PROMPT_COLOR\]\\$ $NORMAL_TEXT"
+        PS1="$TITLEBAR$TIME_START \t $TIME_END$INFO_START \u@\h $INFO_END$DIRECTORY_START \w $DIRECTORY_END $GIT_TEXT\$(__git_ps1 ' (%s)')\n\[\e[38;5;$PROMPT_COLOR\]\\$ $NORMAL_TEXT"
     fi
 }
 
