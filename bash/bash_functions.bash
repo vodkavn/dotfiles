@@ -181,9 +181,9 @@ function bash_prompt_powerline() {
 
     PS1="$GIT_TEXT\$(__git_ps1 ' (%s)')\n\[\e[38;5;$PROMPT_COLOR\]\$ $NORMAL_TEXT"
     if [[ `tput cols` -lt 50 ]]; then
-        PS1="$DIRECTORY_START\W$DIRECTORY_END $PS1"
+        PS1="$DIRECTORY_START \W $DIRECTORY_END $PS1"
     else
-        PS1="$DIRECTORY_START\w$DIRECTORY_END $PS1"
+        PS1="$DIRECTORY_START \w $DIRECTORY_END $PS1"
         if [[ `tput cols` -lt 80 ]]; then
             PS1="$TIME_START \t $TIME_END_DIRECTORY$PS1"
         else

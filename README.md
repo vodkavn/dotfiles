@@ -28,6 +28,7 @@ bash -c "`curl -fsSL https://raw.githubusercontent.com/vodkavn/linux_workspace/m
 
 - [Vim](doc/vim.md)
 - [Tmux](doc/tmux.md)
+- [Dracula Theme](doc/dracula.md)
 
 ## Screenshots
 
