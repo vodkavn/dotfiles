@@ -137,7 +137,7 @@ function bash_prompt() {
     # single line
     # PS1="$TITLEBAR${R}[${C}\t${R}]${UC}\u${EMR}@${EMY}\H${W}\w\[\033[m\]\$(prompt_rvm)${EMB}\$(__git_ps1)${EMG}\\$ "
     # new line
-    PS1="$TITLEBAR${R}[${C}\t${R}]${UC}\u${EMR}@${EMY}\H${W}\w\[\033[m\]\$(prompt_rvm)${EMB}\$(__git_ps1 ' (%s)')\n${EMG}\\$ "
+    PS1="$TITLEBAR${R}[${C}\t${R}]${UC}\u${EMR}@${EMY}\H${W}\w\[\033[m\]\$(prompt_rvm)${EMB}\$(__git_ps1 ' (%s)')\n${EMG}\$ "
 }
 
 function bash_prompt_powerline() {
@@ -179,7 +179,7 @@ function bash_prompt_powerline() {
         DIRECTORY_END="\[\e[48;5;$LOCK_COLOR\]\[\e[38;5;$DIRECTORY_COLOR\]\[\e[38;5;$FOREGROUND_COLOR\]  $NONE\[\e[38;5;$LOCK_COLOR\]"
     fi
 
-    PS1="$GIT_TEXT\$(__git_ps1 ' (%s)')\n\e[38;5;$PROMPT_COLOR\\$ $NORMAL_TEXT"
+    PS1="$GIT_TEXT\$(__git_ps1 ' (%s)')\n\[\e[38;5;$PROMPT_COLOR\]\$ $NORMAL_TEXT"
     if [[ `tput cols` -lt 50 ]]; then
         PS1="$DIRECTORY_START\W$DIRECTORY_END $PS1"
     else
