@@ -28,8 +28,6 @@ do
     fi
 done
 
-# bash_prompt_powerline
-# unset bash_prompt_powerline
 export PROMPT_COMMAND=bash_prompt_powerline
 
 # Color scheme for grep and ls
