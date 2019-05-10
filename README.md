@@ -8,6 +8,10 @@ My vimrc, bashrc, git, tmux... config for linux workspace
 bash -c "`curl -fsSL https://raw.githubusercontent.com/vodkavn/linux_workspace/master/install.sh`"
 ```
 
+### Post-installation
+
+- Install `xclip` to use system clipboard in `tmux`
+
 ### What will this command do?
 
 - The script above will backup any existing config files/folders
@@ -38,7 +42,7 @@ bash -c "`curl -fsSL https://raw.githubusercontent.com/vodkavn/linux_workspace/m
 
 ### Tmux
 
-![tmux](https://user-images.githubusercontent.com/26565145/57319233-16baed80-7137-11e9-891e-c0323e7b8837.png)
+![tmux](https://user-images.githubusercontent.com/26565145/57541596-59283880-738a-11e9-8579-6f5520cf98fb.png)
 
 ### Vim
 
