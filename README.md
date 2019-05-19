@@ -30,6 +30,7 @@ bash -c "`curl -fsSL https://raw.githubusercontent.com/vodkavn/linux_workspace/m
 
 ## Cheatsheet
 
+- [Common Settings](doc/common.md)
 - [Vim](doc/vim.md)
 - [Tmux](doc/tmux.md)
 - [Dracula Theme](doc/dracula.md)
