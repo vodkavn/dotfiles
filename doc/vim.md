@@ -1,4 +1,4 @@
-# Vim using guide
+# vim cheatsheet
 
 ## Movement (in command mode only)
 
@@ -23,6 +23,7 @@
 ## Command
 
 ### in general
+
 * <b>i   </b> change to insert mode
 * <b>a   </b> append - change to insert mode from the next column
 * <b>o   </b> append a new line below current line and change to insert mode
@@ -33,6 +34,7 @@
 * <b>:!terminal_command</b>    execute terminal_command in console (ex. :!pwd)
 
 ### with file and windows
+
 * <b>:q  </b>  quit current file
 * <b>:w  </b>  save current file
 * <b>:q! </b>   quit current file without saving
@@ -68,9 +70,11 @@
 * <b>:%s/text1/text2</b>    replaces all instances of text1 with text2
 
 ### other
+
 * <b>gg=G </b>   format all file
 
 ## NerdTree
+
 * <b>o</b>  open in prev window
 * <b>go</b>  preview
 * <b>t</b>  open in new tab
