@@ -11,7 +11,7 @@
 
 ## Quick, oft-used shortcuts (defined in ~/.tmux.conf)
 
-    ctrl-arrow  -> toggle window in arrow direction
+    ctrl-arrow   -> toggle window in arrow direction
     alt-arrow    -> toggle pane in arrow direction
 
 ## Tmux command mode - in tmux, type the prefix (default is `ctrl+b`, I use `ctrl+a`) and then
@@ -35,24 +35,15 @@
 
 ### Panes (splits)
 
-    -          -> horizontal split (defined in ~/.tmux.conf)
-    |          -> vertical split (defined in ~/.tmux.conf)
-    Ctrl-q     -> quick swap (defined in ~/.tmux.conf)
+    "          -> horizontal split
+    %          -> vertical split
     o          -> swap panes
     q          -> show pane numbers
     x          -> kill pane
     !          -> kill all panes except current
     ⍽          -> space - toggle between layouts
-
-### Window/pane surgery
-
-  (following 4 commands specified in ~/.tmux.conf)
-    h                 -> stretch/shrink left side of pane
-    j                 -> stretch/shrink bottom of pane
-    k                 -> stretch/shrink top of pane
-    l                 -> stretch/shrink right side of pane
-    :joinp -s :2<CR>  -> move window 2 into a new pane in the current window
-    :joinp -t :1<CR>  -> move the current pane into a new pane in window 1
+    +          -> break pane into window (e.g. to select text by mouse to copy)
+    -          -> restore pane from window
 
 ### Misc
 
