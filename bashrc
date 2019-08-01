@@ -44,7 +44,7 @@ export EDITOR=vim
 export TERM=xterm-256color
 
 # User specific environment and startup programs
-PATH=$HOME/usr/bin:$HOME/bin:$PATH
+PATH=$HOME/usr/bin:$HOME/bin:$HOME/.local/bin:$PATH
 PATH=/usr/local/heroku/bin:$PATH
-PATH="$PATH:$HOME/.rvm/bin:$HOME/.rbenv/bin:$HOME/.bin"
+PATH=$HOME/.rvm/bin:$HOME/.rbenv/bin:$HOME/.bin:$PATH
 export PATH
