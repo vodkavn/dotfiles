@@ -43,6 +43,9 @@ export EDITOR=vim
 
 export TERM=xterm-256color
 
+# Git in WSL
+export GIT_DISCOVERY_ACROSS_FILESYSTEM=1
+
 # User specific environment and startup programs
 PATH=$HOME/usr/bin:$HOME/bin:$HOME/.local/bin:$PATH
 PATH=/usr/local/heroku/bin:$PATH
