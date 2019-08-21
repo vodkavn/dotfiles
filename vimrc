@@ -31,8 +31,6 @@ if isdirectory($HOME."/.vim/bundle/Vundle.vim")
     Plugin 'Raimondi/delimitMate'
     " auto complete
     Plugin 'Shougo/neocomplete.vim'
-    " indent for html
-    Plugin 'captbaritone/better-indent-support-for-php-with-html'
     " grep plugin
     Plugin 'yegappan/grep'
     " surroundings

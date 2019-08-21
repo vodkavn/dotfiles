@@ -96,7 +96,7 @@ cp -f $HOME/.dotfiles/font/*.conf $font_config_dir/
 ########################
 # Install Vim plugins using Vundle
 echo "Install Vim plugins using Vundle..."
-vim +PluginInstall +qall
+vim +PluginInstall +PluginClean! +qall
 #
 ########################
 #
