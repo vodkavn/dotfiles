@@ -27,8 +27,6 @@ if isdirectory($HOME."/.vim/bundle/Vundle.vim")
     Plugin 'chrisbra/csv.vim'
     " nerdtree
     Plugin 'scrooloose/nerdtree'
-    " html close tag
-    Plugin 'docunext/closetag.vim'
     " autoclose braces
     Plugin 'Raimondi/delimitMate'
     " auto complete
