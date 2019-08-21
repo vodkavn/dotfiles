@@ -34,9 +34,9 @@ if isdirectory($HOME."/.vim/bundle/Vundle.vim")
     " auto complete
     Plugin 'Shougo/neocomplete.vim'
     " indent for html
-    Bundle 'captbaritone/better-indent-support-for-php-with-html'
+    Plugin 'captbaritone/better-indent-support-for-php-with-html'
     " grep plugin
-    Bundle 'yegappan/grep'
+    Plugin 'yegappan/grep'
     " surroundings
     Plugin 'tpope/vim-surround'
     " git wrapper
