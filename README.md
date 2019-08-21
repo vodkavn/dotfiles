@@ -5,7 +5,7 @@ My vimrc, bashrc, git, tmux... config for linux workspace
 ## Installation
 
 ```bash
-bash -c "`curl -fsSL https://raw.githubusercontent.com/vodkavn/linux_workspace/master/install.sh`"
+bash -c "`curl -fsSL https://raw.githubusercontent.com/vodkavn/dotfiles/master/install.sh`"
 ```
 
 ### Post-installation

@@ -200,8 +200,8 @@ if isdirectory($HOME."/.vim/bundle/neocomplete.vim")
     " Define dictionary.
     let g:neocomplete#sources#dictionary#dictionaries = {
         \ 'default' : '',
-        \ 'ruby' : $HOME.'/.linux_workspace/dict/ruby.dict',
-        \ 'jquery' : $HOME.'/.linux_workspace/dict/jquery.dict'
+        \ 'ruby' : $HOME.'/.dotfiles/dict/ruby.dict',
+        \ 'jquery' : $HOME.'/.dotfiles/dict/jquery.dict'
             \ }
 
     " Define keyword.
