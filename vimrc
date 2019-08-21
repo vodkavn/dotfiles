@@ -279,8 +279,8 @@ map <F8> :tabn<CR>
 "
 if isdirectory($HOME."/.vim/bundle/grep")
     nnoremap <silent> <F2> :Rgrep <cword><cr><cr>
-    nnoremap <silent> <F3> :Rgrep \(function\\\|class\)\ <cword><cr><cr>
-    nnoremap <silent> <F4> /function\ <C-R>=expand('<cword>')<cr><cr>
+    nnoremap <silent> <F3> :Rgrep \(function\\\|func\\\|class\\\|def\\\|const\)\ <cword><cr><cr>
+    nnoremap <silent> <F4> /<C-R>=expand('<cword>')<cr><cr>
 endif
 
 "---------------------------------------------------------------------------
