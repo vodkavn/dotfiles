@@ -49,9 +49,10 @@ if isdirectory($HOME."/.vim/bundle/Vundle.vim")
     " vue
     Plugin 'posva/vim-vue'
 
-    Plugin 'scrooloose/nerdcommenter'
+    Plugin 'tomtom/tcomment_vim'
 
     call vundle#end()
+    set rtp+=~/.vim
 endif
 " End Vundle setting
 "--------------------------------
@@ -108,9 +109,8 @@ set fileencodings=ucs-bom,iso-2022-jp-3,iso-2022-jp,eucjp-ms,euc-jisx0213,euc-jp
 set fenc=utf-8                  " fix unicode error while saving file
 " set cc=81
 hi ColorColumn guibg=#2d2d2d ctermbg=246
-filetype plugin indent on
-filetype on
 filetype plugin on
+filetype indent on
 syntax on
 
 "---------------------------------------------------------------------------
