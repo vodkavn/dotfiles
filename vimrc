@@ -22,7 +22,7 @@ if isdirectory($HOME."/.vim/bundle/Vundle.vim")
     Plugin 'gmarik/Vundle.vim'
 
     " find files
-    Plugin 'kien/ctrlp.vim'
+    Plugin 'ctrlpvim/ctrlp.vim'
     " csv display
     Plugin 'chrisbra/csv.vim'
     " nerdtree
@@ -287,12 +287,18 @@ endif
 " Config CtrlP
 "
 if isdirectory($HOME."/.vim/bundle/ctrlp.vim")
-    let g:ctrlp_show_hidden = 1
+    let g:ctrlp_show_hidden = 0
     let g:ctrlp_working_path_mode = 0
     let g:ctrlp_prompt_mappings = {
                 \ 'AcceptSelection("e")': ['<c-t>'],
                 \ 'AcceptSelection("t")': ['<cr>', '<2-LeftMouse>']
                 \ }
+    let g:ctrlp_custom_ignore = {
+                \ 'dir':  '\v[\/]\.(git|hg|svn)$',
+                \ 'file': '\v\.(exe|so|dll)$',
+                \ }
+    " Skip gitignored files
+    let g:ctrlp_user_command = ['.git', 'cd %s && git ls-files -co --exclude-standard']
 endif
 
 "---------------------------------------------------------------------------
