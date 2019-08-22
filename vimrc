@@ -58,7 +58,7 @@ endif
 "
 " set mouse=a                     " Enable mouse
 set t_Co=256
-set clipboard=unnamed
+set clipboard=unnamedplus
 set noswapfile
 set fileformat=unix
 set tabstop=4
