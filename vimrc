@@ -25,8 +25,6 @@ if isdirectory($HOME."/.vim/bundle/Vundle.vim")
     Plugin 'ctrlpvim/ctrlp.vim'
     " csv display
     Plugin 'chrisbra/csv.vim'
-    " nerdtree
-    Plugin 'scrooloose/nerdtree'
     " autoclose braces
     Plugin 'Raimondi/delimitMate'
     " auto complete
@@ -159,16 +157,32 @@ execute pathogen#infect()
 filetype plugin indent on
 
 "---------------------------------------------------------------------------
-" Config NERDTree
+" Config default netrw
 "
-if isdirectory($HOME."/.vim/bundle/nerdtree")
-    " Always display NERDTree on vim enter
-    " autocmd vimenter * NERDTree
-    " autocmd vimenter * if !argc() | NERDTree | endif
-    autocmd bufenter * if (winnr("$") == 1 && exists("b:NERDTreeType") && b:NERDTreeType == "primary") | q | endif
-    map <C-n> :NERDTreeToggle<CR>
-    map <F5> :NERDTreeToggle<CR>
-endif
+let g:netrw_banner = 0
+let g:netrw_liststyle = 3
+let g:netrw_browse_split = 4
+let g:netrw_altv = 1
+let g:netrw_winsize = 20
+
+let g:NetrwIsOpen=0
+function! ToggleNetrw()
+    if g:NetrwIsOpen
+        let i = bufnr("$")
+        while (i >= 1)
+            if (getbufvar(i, "&filetype") == "netrw")
+                silent exe "bwipeout " . i
+            endif
+            let i-=1
+        endwhile
+        let g:NetrwIsOpen=0
+    else
+        let g:NetrwIsOpen=1
+        silent Vexplore
+    endif
+endfunction
+map <C-n> :call ToggleNetrw()<CR>
+map <F5> :call ToggleNetrw()<CR>
 
 "---------------------------------------------------------------------------
 " Config Color theme - highlight
