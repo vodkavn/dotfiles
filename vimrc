@@ -1,115 +1,98 @@
-augroup HighlightTrailingSpaces
-    autocmd!
-    autocmd VimEnter,WinEnter,ColorScheme * highlight TrailingSpaces term=underline guibg=Red ctermbg=Red
-    autocmd VimEnter,WinEnter * match TrailingSpaces /\s\+$/
-    " Auto remove trailing whitespace in specific file type
-    autocmd FileType c,cpp,java,php,ctp,html,css autocmd BufWritePre <buffer> %s/\s\+$//e
-augroup END
-
-" Auto delete vim/.netrwhist
-au VimLeave * if filereadable($HOME."/.vim/.netrwhist")|call delete($HOME."/.vim/.netrwhist")|endif
-
-"--------------------------------
+"---------------------------------------------------------------------------
 " Vundle setting
+"
 set nocompatible
 filetype off
 
 if isdirectory($HOME."/.vim/bundle/Vundle.vim")
     set rtp+=~/.vim/bundle/Vundle.vim
     call vundle#begin()
-
-    " vundle itself
     Plugin 'gmarik/Vundle.vim'
 
-    " find files
+    " Editor
     Plugin 'ctrlpvim/ctrlp.vim'
-    " csv display
-    Plugin 'chrisbra/csv.vim'
-    " autoclose braces
     Plugin 'Raimondi/delimitMate'
-    " auto complete
     Plugin 'Shougo/neocomplete.vim'
-    " grep plugin
     Plugin 'yegappan/grep'
-    " surroundings
     Plugin 'tpope/vim-surround'
-    " git wrapper
     Plugin 'tpope/vim-fugitive'
-    " tag bar
     Plugin 'majutsushi/tagbar'
-    " custom statusline, tabline
+    Plugin 'tomtom/tcomment_vim'
     Plugin 'vim-airline/vim-airline'
     Plugin 'vim-airline/vim-airline-themes'
-    " rails
-    Plugin 'tpope/vim-rails'
-    " ruby
-    Plugin 'vim-ruby/vim-ruby'
-    " vue
-    Plugin 'posva/vim-vue'
 
-    Plugin 'tomtom/tcomment_vim'
+    " Development
+    Plugin 'chrisbra/csv.vim'
+    Plugin 'vim-ruby/vim-ruby'
+    Plugin 'tpope/vim-rails'
+    Plugin 'tpope/vim-rake'
+    Plugin 'pangloss/vim-javascript'
+    Plugin 'mxw/vim-jsx'
+    Plugin 'moll/vim-node'
+    Plugin 'posva/vim-vue'
 
     call vundle#end()
     set rtp+=~/.vim
 endif
-" End Vundle setting
+
 "--------------------------------
-" Other setting:
+" Other setting
 "
-" set mouse=a                     " Enable mouse
+syntax on
+filetype plugin on
+filetype indent on
+
 set t_Co=256
 set clipboard=unnamedplus
 set noswapfile
-set fileformat=unix
+
 set tabstop=4
 set shiftwidth=4
 set softtabstop=4
 set expandtab                   " Use spaces instead of tabs
-set smarttab                    " Be smart when using tabs ;)
-set wildmenu                    " show list instead of just completing
-" set spell                       " spell checking on
-set ffs=unix,dos,mac            " Use Unix as the standard file type
-" set showcmd                     " show (partial) commands
+set smarttab                    " Be smart when using tabs
 set autoread                    " Set to auto read when a file is changed from the outside
-set wildignore=*.o,*~,*.pyc     " Ignore compiled files
-let g:reload_on_write = 0
 set shiftround
 set autoindent
 set smartindent
 set number
 set ruler
-set backspace=indent,eol,start
 set laststatus=2
+set showcmd                     " Show (partial) command in the status line
 
 set backspace=indent,eol,start  " Backspace for dummies
 set linespace=0                 " No extra spaces between rows
 set showmatch                   " Show matching brackets/parenthesis
 set winminheight=0              " Windows can be 0 line high
-set ignorecase                  " Case insensitive search
-set smartcase                   " Case sensitive when uc present
 set wildmenu                    " Show list instead of just completing
 set wildmode=list:longest,full  " Command <Tab> completion, list matches, then longest common part, then all.
 set omnifunc=syntaxcomplete#Complete
 set whichwrap=b,s,h,l,<,>,[,]   " Backspace and cursor keys wrap too
 set scrolljump=5                " Lines to scroll when cursor leaves screen
 set scrolloff=3                 " Minimum lines to keep above and below cursor
-let g:DisableAutoPHPFolding = 1 " Disable autofold
-set list listchars=tab:\¦\ ,trail:•,extends:#,nbsp:. " Highlight problematic whitespace
-set list
-
-
-set fileformats=dos
-set ffs=unix,dos,mac            " Use Unix as the standard file type
-" Encode setting
+set colorcolumn=80
+set fileformat=unix
+set fileformats=unix,dos,mac    " Use Unix as the standard file type
 set encoding=utf-8
-" set fileencodings=ucs-bom,korea,utf-8,sjis,default
+set fileencoding=utf-8          " Fix unicode error while saving file
 set fileencodings=ucs-bom,iso-2022-jp-3,iso-2022-jp,eucjp-ms,euc-jisx0213,euc-jp,sjis,cp932,utf-8,sjis,default
-set fenc=utf-8                  " fix unicode error while saving file
-" set cc=81
-hi ColorColumn guibg=#2d2d2d ctermbg=246
-filetype plugin on
-filetype indent on
-syntax on
+
+set wildignore=*.o,*~,*.pyc     " Ignore compiled files
+set wildignore+=*/vendor/**
+set wildignore+=*/node_modules/**
+
+"---------------------------------------------------------------------------
+" Customize key map
+"
+inoremap jk <ESC>          " Map jk to <ESC> to quit INSERT mode faster
+inoremap jj <ESC>          " Map jj to <ESC> to quit INSERT mode faster
+let mapleader=" "          " Change leader key to SPACEBAR
+
+" Split navigations
+nnoremap <C-J> <C-W><C-J>  " Move to the split below
+nnoremap <C-K> <C-W><C-K>  " Move to the split above
+nnoremap <C-L> <C-W><C-L>  " Move to the split to the right
+nnoremap <C-H> <C-W><C-H>  " Move to the split to the left
 
 "---------------------------------------------------------------------------
 " Config for python
@@ -120,12 +103,6 @@ autocmd FileType python if &modifiable | retab | endif
 autocmd BufWritePre *.py normal m`:%s/\s\+$//e``
 
 "---------------------------------------------------------------------------
-" Config for php
-"
-autocmd FileType php set noro
-autocmd FileType html set noro
-
-"---------------------------------------------------------------------------
 " Config for ruby
 "
 autocmd FileType ruby,eruby,yaml,markdown set ai sw=2 sts=2 et
@@ -134,36 +111,23 @@ autocmd FileType ruby,eruby,yaml,markdown if &modifiable | retab | endif
 autocmd BufWritePre *.rb normal m`:%s/\s\+$//e``
 
 "---------------------------------------------------------------------------
-" Search:
+" Search
 "
-" Ignore the case of normal letters.
-set ignorecase
-" If the search pattern contains upper case characters, override ignorecase option.
-set smartcase
-
-" Enable incremental search.
-set incsearch
-" Don't highlight search result.
-set nohlsearch
-"set hlsearch
-
-" Searches wrap around the end of the file.
-set wrapscan
-
-"---------------------------------------------------------------------------
-" Load plugin by pathogen
-"
-execute pathogen#infect()
-filetype plugin indent on
+set ignorecase       " Ignore the case of normal letters.
+set smartcase        " If the search pattern contains upper case characters, override ignorecase option.
+set incsearch        " Enable incremental search.
+set nohlsearch       " Don't highlight search result.
+set wrapscan         " Searches wrap around the end of the file.
 
 "---------------------------------------------------------------------------
 " Config default netrw
 "
-let g:netrw_banner = 0
-let g:netrw_liststyle = 3
-let g:netrw_browse_split = 4
-let g:netrw_altv = 1
-let g:netrw_winsize = 20
+let g:netrw_dirhistmax=0        " Auto delete vim/.netrwhist
+let g:netrw_banner=0
+let g:netrw_liststyle=3
+let g:netrw_browse_split=4
+let g:netrw_altv=1
+let g:netrw_winsize=20
 
 let g:NetrwIsOpen=0
 function! ToggleNetrw()
@@ -190,7 +154,8 @@ map <F5> :call ToggleNetrw()<CR>
 "color molokai
 color dracula
 
-"Show trailing whitespace and spaces before a tab
+" Highlight problematic whitespace, trailing whitespace and spaces before a tab
+set list listchars=tab:\¦\ ,trail:•,extends:#,nbsp:.
 :highlight ExtraWhitespace ctermbg=red guibg=red
 :autocmd Syntax * syn match ExtraWhitespace /\s\+$\| \+\ze\\t/
 
@@ -209,10 +174,10 @@ if isdirectory($HOME."/.vim/bundle/neocomplete.vim")
 
     " Define dictionary.
     let g:neocomplete#sources#dictionary#dictionaries = {
-        \ 'default' : '',
-        \ 'ruby' : $HOME.'/.dotfiles/dict/ruby.dict',
-        \ 'jquery' : $HOME.'/.dotfiles/dict/jquery.dict'
-            \ }
+    \ 'default' : '',
+    \ 'ruby' : $HOME.'/.dotfiles/dict/ruby.dict',
+    \ 'jquery' : $HOME.'/.dotfiles/dict/jquery.dict'
+    \ }
 
     " Define keyword.
     if !exists('g:neocomplete#keyword_patterns')
@@ -258,7 +223,7 @@ if isdirectory($HOME."/.vim/bundle/neocomplete.vim")
 
     " Enable heavy omni completion.
     if !exists('g:neocomplete#sources#omni#input_patterns')
-    let g:neocomplete#sources#omni#input_patterns = {}
+        let g:neocomplete#sources#omni#input_patterns = {}
     endif
     "let g:neocomplete#sources#omni#input_patterns.php = '[^. \t]->\h\w*\|\h\w*::'
     "let g:neocomplete#sources#omni#input_patterns.c = '[^.[:digit:] *\t]\%(\.\|->\)'
@@ -300,13 +265,13 @@ if isdirectory($HOME."/.vim/bundle/ctrlp.vim")
     let g:ctrlp_show_hidden = 0
     let g:ctrlp_working_path_mode = 0
     let g:ctrlp_prompt_mappings = {
-                \ 'AcceptSelection("e")': ['<c-t>'],
-                \ 'AcceptSelection("t")': ['<cr>', '<2-LeftMouse>']
-                \ }
+    \ 'AcceptSelection("e")': ['<c-t>'],
+    \ 'AcceptSelection("t")': ['<cr>', '<2-LeftMouse>']
+    \ }
     let g:ctrlp_custom_ignore = {
-                \ 'dir':  '\v[\/]\.(git|hg|svn)$',
-                \ 'file': '\v\.(exe|so|dll)$',
-                \ }
+    \ 'dir':  '\v[\/]\.(git|hg|svn)$',
+    \ 'file': '\v\.(exe|so|dll)$',
+    \ }
     " Skip gitignored files
     let g:ctrlp_user_command = ['.git', 'cd %s && git ls-files -co --exclude-standard']
 endif
