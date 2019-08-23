@@ -1,5 +1,9 @@
 # vim cheatsheet
 
+## Useful links
+
+[Your problem with Vim is that you don't grok vi.](https://stackoverflow.com/questions/1218390/#1220118)
+
 Comment
 -------
 Go the vim way. Start by only using hjkl to move the cursor.
