@@ -13,6 +13,7 @@ if isdirectory($HOME."/.vim/bundle/Vundle.vim")
     Plugin 'ctrlpvim/ctrlp.vim'
     Plugin 'Raimondi/delimitMate'
     Plugin 'Shougo/neocomplete.vim'
+    Plugin 'Shougo/unite.vim'
     Plugin 'yegappan/grep'
     Plugin 'tpope/vim-surround'
     Plugin 'tpope/vim-fugitive'
@@ -70,7 +71,6 @@ set omnifunc=syntaxcomplete#Complete
 set whichwrap=b,s,h,l,<,>,[,]   " Backspace and cursor keys wrap too
 set scrolljump=5                " Lines to scroll when cursor leaves screen
 set scrolloff=3                 " Minimum lines to keep above and below cursor
-set colorcolumn=80
 set fileformat=unix
 set fileformats=unix,dos,mac    " Use Unix as the standard file type
 set encoding=utf-8
@@ -84,15 +84,24 @@ set wildignore+=*/node_modules/**
 "---------------------------------------------------------------------------
 " Customize key map
 "
+map <SPACE> <leader>
 inoremap jk <ESC>          " Map jk to <ESC> to quit INSERT mode faster
 inoremap jj <ESC>          " Map jj to <ESC> to quit INSERT mode faster
-let mapleader=" "          " Change leader key to SPACEBAR
 
 " Split navigations
 nnoremap <C-J> <C-W><C-J>  " Move to the split below
 nnoremap <C-K> <C-W><C-K>  " Move to the split above
 nnoremap <C-L> <C-W><C-L>  " Move to the split to the right
 nnoremap <C-H> <C-W><C-H>  " Move to the split to the left
+
+" Buffer navigations
+map <F5> :bp<CR>
+map <F6> :bn<CR>
+
+" Leader shortcuts
+map <leader>a ggVG         " Select all text in buffer
+map <leader>y ggVGy        " Copy all text in buffer
+map <leader>d ggVGd        " Cut all text in buffer
 
 "---------------------------------------------------------------------------
 " Config for python
@@ -146,7 +155,6 @@ function! ToggleNetrw()
     endif
 endfunction
 map <C-n> :call ToggleNetrw()<CR>
-map <F5> :call ToggleNetrw()<CR>
 
 "---------------------------------------------------------------------------
 " Config Color theme - highlight
@@ -235,19 +243,21 @@ if isdirectory($HOME."/.vim/bundle/neocomplete.vim")
 endif
 
 "---------------------------------------------------------------------------
+" Config Unite
+"
+if isdirectory($HOME."/.vim/bundle/unite.vim")
+    nnoremap <leader>u :<C-u>Unite<Space>
+    nnoremap <leader>f :<C-u>Unite file<CR>
+    nnoremap <leader>b :<C-u>Unite buffer<CR>
+endif
+
+"---------------------------------------------------------------------------
 " Config Tagbar
 "
 if isdirectory($HOME."/.vim/bundle/tagbar")
     " Toggle Tagbar
     map <C-t> :TagbarToggle<CR>
-    map <F6> :TagbarToggle<CR>
 endif
-
-"---------------------------------------------------------------------------
-" Config for tab
-"
-map <F7> :tabN<CR>
-map <F8> :tabn<CR>
 
 "---------------------------------------------------------------------------
 " Config Grep plugin
@@ -294,8 +304,6 @@ if isdirectory($HOME."/.vim/bundle/vim-airline")
     let g:airline_section_error = ''
     let g:airline_powerline_fonts = 1
     let g:airline_theme = 'dracula'
-    map <F9> :bp<CR>
-    map <F10> :bn<CR>
 endif
 
 "---------------------------------------------------------------------------
