@@ -27,7 +27,7 @@ Dir_bak=$HOME/.setting_backup_$timestamp
 #
 # Setting file list
 #
-file_list=(vim vimrc bash bashrc bash_profile bash_logout)
+file_list=(vim vimrc tmux bash bashrc bash_profile bash_logout)
 cp_file_list=(gitconfig tmux.conf)
 
 #
