@@ -94,6 +94,17 @@ nnoremap <C-K> <C-W><C-K>  " Move to the split above
 nnoremap <C-L> <C-W><C-L>  " Move to the split to the right
 nnoremap <C-H> <C-W><C-H>  " Move to the split to the left
 
+nnoremap <A-Down>  <C-W><C-J> " Move to the split below
+nnoremap <A-Up>    <C-W><C-K> " Move to the split above
+nnoremap <A-Right> <C-W><C-L> " Move to the split to the right
+nnoremap <A-Left>  <C-W><C-H> " Move to the split to the left
+
+" Tab navigations
+nnoremap <C-Up>    :tabnew<CR> " New tab
+nnoremap <C-Down>  :tabnew<CR> " New tab
+nnoremap <C-Right> :tabn<CR>   " Next tab
+nnoremap <C-Left>  :tabp<CR>   " Previous tab
+
 " Buffer navigations
 map <F5> :bp<CR>
 map <F6> :bn<CR>
