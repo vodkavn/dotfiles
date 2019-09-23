@@ -16,6 +16,8 @@
     rebase = true
 [push]
     default = simple
+[pager]
+    branch = false
 [credential]
     helper = store
 #    helper = manager
