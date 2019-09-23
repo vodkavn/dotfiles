@@ -156,30 +156,33 @@ function bash_prompt_powerline() {
     local GIT_COLOR="117m"
     local LOCK_COLOR="203m"
     local PROMPT_COLOR="84m"
-    local TEXT_COLOR="231m"
+    local TEXT_COLOR="00m"
     local FOREGROUND_COLOR="231m"
     local BACKGROUND_COLOR="17m"
+    local POWERLINE_SEPARATOR_RIGHT=""
+    local POWERLINE_LOCK_ICON=""
+    local POWERLINE_BRANCH_ICON=""
 
     local NONE="\[\e[0m\]"
     local GIT_TEXT="\[\e[38;5;$GIT_COLOR\]"
-    local NORMAL_TEXT="\[\e[38;5;$TEXT_COLOR\]"
+    local NORMAL_TEXT="\[\033[$TEXT_COLOR\]"
 
     local TIME_START="\[\e[48;5;$TIME_COLOR\]\[\e[38;5;$BACKGROUND_COLOR\]"
-    local TIME_END_INFO="\[\e[48;5;$INFO_COLOR\]\[\e[38;5;$TIME_COLOR\]"
-    local TIME_END_DIRECTORY="\[\e[48;5;$DIRECTORY_COLOR\]\[\e[38;5;$TIME_COLOR\]"
+    local TIME_END_INFO="\[\e[48;5;$INFO_COLOR\]\[\e[38;5;$TIME_COLOR\]$POWERLINE_SEPARATOR_RIGHT"
+    local TIME_END_DIRECTORY="\[\e[48;5;$DIRECTORY_COLOR\]\[\e[38;5;$TIME_COLOR\]$POWERLINE_SEPARATOR_RIGHT"
 
     local INFO_START="\[\e[48;5;$INFO_COLOR\]\[\e[38;5;$FOREGROUND_COLOR\]"
-    local INFO_END="\[\e[48;5;$DIRECTORY_COLOR\]\[\e[38;5;$INFO_COLOR\]"
+    local INFO_END="\[\e[48;5;$DIRECTORY_COLOR\]\[\e[38;5;$INFO_COLOR\]$POWERLINE_SEPARATOR_RIGHT"
 
     local DIRECTORY_START="\[\e[48;5;$DIRECTORY_COLOR\]\[\e[38;5;$FOREGROUND_COLOR\]"
-    local DIRECTORY_END="$NONE\[\e[38;5;$DIRECTORY_COLOR\]"            # when next segment is none
+    local DIRECTORY_END="$NONE\[\e[38;5;$DIRECTORY_COLOR\]$POWERLINE_SEPARATOR_RIGHT"            # when next segment is none
 
     if [ ! -w "$PWD" ]; then
         # Current directory is not writable
-        DIRECTORY_END="\[\e[48;5;$LOCK_COLOR\]\[\e[38;5;$DIRECTORY_COLOR\]\[\e[38;5;$FOREGROUND_COLOR\]  $NONE\[\e[38;5;$LOCK_COLOR\]"
+        DIRECTORY_END="\[\e[48;5;$LOCK_COLOR\]\[\e[38;5;$DIRECTORY_COLOR\]$POWERLINE_SEPARATOR_RIGHT\[\e[38;5;$FOREGROUND_COLOR\] $POWERLINE_LOCK_ICON $NONE\[\e[38;5;$LOCK_COLOR\]$POWERLINE_SEPARATOR_RIGHT"
     fi
 
-    PS1="$GIT_TEXT\$(__git_ps1 ' (%s)')\n\[\e[38;5;$PROMPT_COLOR\]\$ $NORMAL_TEXT"
+    PS1="$GIT_TEXT\$(__git_ps1 '$POWERLINE_BRANCH_ICON (%s)')\n\[\e[38;5;$PROMPT_COLOR\]\$ $NORMAL_TEXT"
     PS1="$DIRECTORY_START \W $DIRECTORY_END $PS1"
     if [[ `tput cols` -gt 50 ]]; then
         if [[ `tput cols` -lt 80 ]]; then
