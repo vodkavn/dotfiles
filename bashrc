@@ -34,6 +34,7 @@ export PROMPT_COMMAND=bash_prompt_powerline
 export CLICOLOR=1
 export LSCOLORS=ExFxBxDxCxegedabagacad
 export GREP_COLOR='1;35;40'
+export LESS='--raw-control-chars'
 
 # History datetime format
 export HISTTIMEFORMAT="%Y/%m/%d %T "

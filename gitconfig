@@ -1,20 +1,21 @@
-#[user]
-#  name = Hoang Xuan Thanh
-#  email = hoangxuanthanh1986@gmail.com
+[user]
+    # name = Hoang Xuan Thanh
+    # email = thanh.hx@zinza.com.vn
 [core]
-  editor = vim
-  autocrlf = input
+    editor = vim
+    autocrlf = input
+    pager = less --raw-control-chars
 [color]
-  ui = true
-  diff = auto
-  status = auto
-  branch = auto
-  interactive = auto
-  grep = auto
+    ui = true
+    diff = auto
+    status = auto
+    branch = auto
+    interactive = auto
+    grep = auto
 [pull]
-  rebase = true
+    rebase = true
 [push]
-  default = simple
+    default = simple
 [credential]
-  helper = store
-#  helper = manager
+    helper = store
+#    helper = manager
