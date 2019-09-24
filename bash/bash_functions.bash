@@ -142,7 +142,7 @@ function bash_prompt() {
 
 function bash_prompt_powerline() {
     case $TERM in
-        xterm*|rxvt*)
+        linux|xterm*|rxvt*|screen*)
             local TITLEBAR='\[\033]0;\u@\h:$PWD\007\]'
             ;;
         *)

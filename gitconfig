@@ -20,4 +20,3 @@
     branch = false
 [credential]
     helper = store
-#    helper = manager
