@@ -17,6 +17,26 @@ sudo grub2-mkconfig -o /boot/efi/EFI/centos/grub.cfg
 sudo update-grub
 ```
 
+## Docker config
+
+- Create file `/etc/docker/daemon.json`
+
+```
+{
+  "dns": ["8.8.8.8", "8.8.4.4", "1.1.1.1"],
+  "default-address-pools":[
+    {"base":"10.201.0.0/16","size":24},
+    {"base":"10.202.0.0/16","size":24}
+  ]
+}
+```
+
+- Restart docker
+
+```bash
+sudo service docker restart
+```
+
 ## Install vim with +lua and +clipboard
 
 ```bash
