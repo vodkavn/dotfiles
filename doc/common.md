@@ -9,6 +9,8 @@
 - Update grub
 
 ```bash
+# Redhat
+sudo grub2-mkconfig -o /boot/efi/EFI/redhat/grub.cfg
 # Centos
 sudo grub2-mkconfig -o /boot/efi/EFI/centos/grub.cfg
 # Ubuntu
