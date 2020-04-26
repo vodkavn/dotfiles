@@ -17,6 +17,35 @@ sudo grub2-mkconfig -o /boot/efi/EFI/centos/grub.cfg
 sudo update-grub
 ```
 
+## Bluetooth mouse
+
+```
+$ bluetoothctl
+
+// scan for bluetooth devices (make sure your mouse is in discovery mode before running this command)
+[bluetooth]# scan on
+...
+[bluetooth]# scan off
+Discovery stopped
+
+// turn the agent on just incase you need to supply a pin code
+[bluetooth]# agent on
+Agent registered
+
+[bluetooth]# pair 88:E7:A6:06:FC:87
+...
+[CHG] Device 88:E7:A6:06:FC:87 Paired: yes
+Pairing successful
+[CHG] Device 88:E7:A6:06:FC:87 Connected: no
+
+// once you have done this use the following two commands to
+// complete setup
+[bluetooth]# connect 88:E7:A6:06:FC:87
+...
+[bluetooth]# trust 88:E7:A6:06:FC:87
+...
+```
+
 ## Docker config
 
 - Create file `/etc/docker/daemon.json`
