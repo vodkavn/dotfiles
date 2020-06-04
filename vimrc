@@ -21,6 +21,7 @@ if isdirectory($HOME."/.vim/bundle/Vundle.vim")
     Plugin 'tomtom/tcomment_vim'
     Plugin 'vim-airline/vim-airline'
     Plugin 'vim-airline/vim-airline-themes'
+    Plugin 'dracula/vim', { 'name': 'dracula' }
 
     " Development
     Plugin 'chrisbra/csv.vim'
@@ -41,7 +42,8 @@ endif
 "
 filetype plugin on
 filetype indent on
-syntax on
+syntax enable
+colorscheme dracula
 
 set t_Co=256
 set clipboard=unnamedplus
@@ -314,7 +316,7 @@ if isdirectory($HOME."/.vim/bundle/vim-airline")
     let g:airline_section_warning = ''
     let g:airline_section_error = ''
     let g:airline_powerline_fonts = 1
-    " let g:airline_theme = 'dracula'
+    let g:airline_theme = 'dracula'
 endif
 
 "---------------------------------------------------------------------------
