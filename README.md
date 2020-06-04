@@ -35,12 +35,12 @@ bash -c "`curl -fsSL https://raw.githubusercontent.com/vodkavn/dotfiles/master/i
 
 ### Terminal
 
-![terminal](https://user-images.githubusercontent.com/26565145/57319190-fdb23c80-7136-11e9-9ab7-41ec70211d09.png)
+![terminal](https://github.com/vodkavn/dotfiles/blob/master/screenshots/terminal.png)
 
 ### Tmux
 
-![tmux](https://user-images.githubusercontent.com/26565145/57541596-59283880-738a-11e9-8579-6f5520cf98fb.png)
+![tmux](https://github.com/vodkavn/dotfiles/blob/master/screenshots/tmux.png)
 
 ### Vim
 
-![vim](https://user-images.githubusercontent.com/26565145/57319244-1b7fa180-7137-11e9-865e-b8c3903ba720.png)
+![vim](https://github.com/vodkavn/dotfiles/blob/master/screenshots/vim.png)
