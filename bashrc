@@ -61,6 +61,9 @@ export GIT_DISCOVERY_ACROSS_FILESYSTEM=1
 
 # User specific environment and startup programs
 PATH=$HOME/usr/bin:$HOME/bin:$HOME/.local/bin:$PATH
-PATH=/usr/local/heroku/bin:$PATH
 PATH=$HOME/.rvm/bin:$HOME/.rbenv/bin:$HOME/.bin:$PATH
+PATH=/usr/local/heroku/bin:$PATH
+PATH=$HOME/.ebcli-virtual-env/executables:$PATH
+PATH=$HOME/.pyenv/versions/3.7.2/bin:$PATH
+
 export PATH
