@@ -17,6 +17,16 @@ sudo grub2-mkconfig -o /boot/efi/EFI/centos/grub.cfg
 sudo update-grub
 ```
 
+## RHEL remove old kernels
+
+```bash
+# Check Installed Kernels and All Kernel Packages
+rpm -qa kernel\* |sort -V
+
+# Remove Old Kernels
+sudo dnf remove $(dnf repoquery --installonly --latest-limit=-2 -q)
+```
+
 ## Bluetooth mouse
 
 ```
