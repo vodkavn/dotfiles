@@ -27,9 +27,49 @@ rpm -qa kernel\* |sort -V
 sudo dnf remove $(dnf repoquery --installonly --latest-limit=-2 -q)
 ```
 
+## Docker config
+
+- Create file `/etc/docker/daemon.json`
+
+```text
+{
+  "dns": ["8.8.8.8", "8.8.4.4", "1.1.1.1"],
+  "default-address-pools":[
+    {"base":"10.201.0.0/16","size":24},
+    {"base":"10.202.0.0/16","size":24}
+  ]
+}
+```
+
+- Add docker to firewall
+
+```bash
+# Check what interface docker is using, e.g. 'docker0'
+ip link show
+
+# Check available firewalld zones, e.g. 'public'
+sudo firewall-cmd --get-active-zones
+
+# Check what zone the docker interface it bound to, most likely 'no zone' yet
+sudo firewall-cmd --get-zone-of-interface=docker0
+
+# So add the 'docker0' interface to the 'public' zone. Changes will be visible only after firewalld reload
+sudo nmcli connection modify docker0 connection.zone public
+
+# Masquerading allows for docker ingress and egress (this is the juicy bit)
+sudo firewall-cmd --zone=public --add-masquerade --permanent
+# Optional open required incomming ports (wasn't required in my tests)
+# sudo firewall-cmd --zone=public --add-port=443/tcp
+# Reload firewalld
+sudo firewall-cmd --reload
+
+# Reload dockerd
+sudo systemctl restart docker
+```
+
 ## Bluetooth mouse
 
-```
+```bash
 $ bluetoothctl
 
 // scan for bluetooth devices (make sure your mouse is in discovery mode before running this command)
@@ -54,65 +94,4 @@ Pairing successful
 ...
 [bluetooth]# trust 88:E7:A6:06:FC:87
 ...
-```
-
-## Docker config
-
-- Create file `/etc/docker/daemon.json`
-
-```
-{
-  "dns": ["8.8.8.8", "8.8.4.4", "1.1.1.1"],
-  "default-address-pools":[
-    {"base":"10.201.0.0/16","size":24},
-    {"base":"10.202.0.0/16","size":24}
-  ]
-}
-```
-
-- Restart docker
-
-```bash
-sudo service docker restart
-```
-
-## Install vim with +lua and +clipboard
-
-```bash
-# Centos
-# Install requirement libs and tools
-sudo yum install -y gcc \
-    ctags               \
-    ncurses             \
-    ncurses-devel       \
-    lua-devel           \
-    python-devel        \
-    libX11-devel        \
-    libXtst-devel       \
-    libXt-devel         \
-    libXpm-devel        \
-    libSM-devel
-# Get vim 7.4
-wget -O ~/vim-7.4.tar.bz2 ftp://ftp.vim.org/pub/vim/unix/vim-7.4.tar.bz2
-tar -xjf ~/vim-7.4.tar.bz2 -C ~
-# Build and install
-cd ~/vim74/src
-make distclean
-./configure --prefix=/usr     \
-    --enable-luainterp        \
-    --enable-pythoninterp     \
-    --enable-cscope           \
-    --disable-netbeans        \
-    --enable-multibyte        \
-    --enable-largefile        \
-    --enable-gui=auto         \
-    --with-x=yes              \
-    --x-includes=/usr/include \
-    --x-libraries=/usr/lib64  \
-    --with-features=huge
-make -j8
-sudo make install
-sudo cp -ru ~/vim/src/vim /usr/bin
-sudo ln -fs /usr/bin/vim /usr/local/bin/vim
-
 ```
