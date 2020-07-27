@@ -67,6 +67,14 @@ sudo firewall-cmd --reload
 sudo systemctl restart docker
 ```
 
+## Change display server to classic
+
+- Change file `/etc/gdm/custom.conf`
+
+```text
+WaylandEnable=false
+```
+
 ## Bluetooth mouse
 
 ```bash
