@@ -23,6 +23,9 @@ alias grep='grep --color=auto'
 alias fgrep='fgrep --color=auto'
 alias egrep='egrep --color=auto'
 
+# Search process
+alias psg='ps aux | grep '
+
 # Terminal
 alias c='clear'
 alias k='clear'
@@ -72,3 +75,9 @@ then
 else
   alias m='man'
 fi
+
+# Xargs with alias
+# alias: alias [-p] [name[=value] ... ]
+# A trailing space in value causes the next word to be checked for alias substitution when the alias is expanded.
+alias xargs='xargs '
+alias x='xargs '
