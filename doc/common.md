@@ -103,3 +103,9 @@ Pairing successful
 [bluetooth]# trust 88:E7:A6:06:FC:87
 ...
 ```
+
+## History with timestamp
+
+```bash
+$ HISTTIMEFORMAT="%d/%m/%y %T " history
+```
