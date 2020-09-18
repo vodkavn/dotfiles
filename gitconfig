@@ -5,6 +5,8 @@
     editor = vim
     autocrlf = input
     pager = less --raw-control-chars
+[format]
+    pretty = full
 [color]
     ui = true
     diff = auto
