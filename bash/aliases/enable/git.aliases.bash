@@ -27,9 +27,6 @@ alias gs='git status'
 alias gss='git status -s'
 alias gsu='git submodule update --init --recursive'
 alias gl='git log'
-alias gpr='git pull --rebase'
-alias gpp='git pull && git push'
-alias gup='git fetch && git rebase'
 alias gp='git push'
 alias gpo='git push origin'
 alias gpu='git push --set-upstream'
@@ -64,7 +61,7 @@ alias gexport='git archive --format zip --output'
 alias gdel='git branch -D'
 alias gmu='git fetch origin -v; git fetch upstream -v; git merge upstream/master'
 alias gll='git log --graph --pretty=oneline --abbrev-commit'
-alias gg="git log --graph --pretty=format:'%C(bold)%h%Creset%C(magenta)%d%Creset %s %C(yellow)<%an> %C(cyan)(%cr)%Creset' --abbrev-commit --date=relative"
+alias gg="git log --graph --pretty=format:'%C(bold)%h%Creset%C(magenta)%d%Creset %s %C(yellow)<%an> %C(blue)<%cn> %C(cyan)(%cr)%Creset' --abbrev-commit --date=relative"
 alias glo='git log --oneline --color=auto'
 alias glog='git log --pretty=format:"%h %ad | %s%d [%an]" --graph --date=short'
 alias ggs='gg --stat'
@@ -74,8 +71,6 @@ alias gt='git tag'
 alias gta='git tag -a'
 alias gtd='git tag -d'
 alias gtl='git tag -l'
-# From http://blogs.atlassian.com/2014/10/advanced-git-aliases/
-# Show commits since last pull
 alias gnew='git log HEAD@{1}..HEAD@{0}'
 # Add uncommitted and unstaged changes to the last commit
 alias gcaa='git commit -a --amend -C HEAD'
