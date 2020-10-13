@@ -70,5 +70,5 @@ PATH=$HOME/.rvm/bin:$HOME/.rbenv/bin:$HOME/.bin:$PATH
 PATH=/usr/local/heroku/bin:$PATH
 PATH=$HOME/.ebcli-virtual-env/executables:$PATH
 PATH=$HOME/.pyenv/versions/3.7.2/bin:$PATH
-
+PATH=/usr/local/go/bin:$PATH
 export PATH
