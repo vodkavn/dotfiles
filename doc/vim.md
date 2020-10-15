@@ -10,7 +10,7 @@ Go the vim way. Start by only using hjkl to move the cursor.
 
 Help
 ----
-    www.vimdoc.sourceforge.net
+www.vimdoc.sourceforge.net
 
 Starting Up
 -----------

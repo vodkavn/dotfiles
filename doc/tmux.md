@@ -2,12 +2,12 @@
 
 ## Command line
 
-    $ tmux                           -> start new
-    $ tmux new -s myname             -> start new w/session name
-    $ tmux a  #  (or at, or attach)  -> attach
-    $ tmux a -t myname               -> attach to named
-    $ tmux ls                        -> list sessions
-    $ tmux kill-session -t myname    -> kill session w/name
+    tmux                           -> start new
+    tmux new -s myname             -> start new w/session name
+    tmux a  #  (or at, or attach)  -> attach
+    tmux a -t myname               -> attach to named
+    tmux ls                        -> list sessions
+    tmux kill-session -t myname    -> kill session w/name
 
 ## Quick, oft-used shortcuts (defined in ~/.tmux.conf)
 
