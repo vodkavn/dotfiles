@@ -38,5 +38,5 @@ WaylandEnable=false
 ## History with timestamp
 
 ```bash
-$ HISTTIMEFORMAT="%d/%m/%y %T " history
+HISTTIMEFORMAT="%d/%m/%y %T " history
 ```
