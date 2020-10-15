@@ -27,8 +27,10 @@ bash -c "`curl -fsSL https://raw.githubusercontent.com/vodkavn/dotfiles/master/i
 ## Cheatsheet
 
 - [Common Settings](doc/common.md)
-- [Vim](doc/vim.md)
+- [Docker](doc/docker.md)
+- [Git](doc/git.md)
 - [Tmux](doc/tmux.md)
+- [Vim](doc/vim.md)
 - [Dracula Theme](doc/dracula.md)
 
 ## Screenshots
