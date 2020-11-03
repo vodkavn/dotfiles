@@ -14,6 +14,24 @@
 }
 ```
 
+## Move docker data directory
+
+Add to `/etc/docker/daemon.json`
+
+```text
+"data-root": "/home/docker",
+```
+
+Move files
+
+```bash
+sudo systemctl stop docker
+
+sudo rsync -aP /var/lib/docker/ /home/docker
+
+sudo systemctl start docker
+```
+
 ## Add docker to firewall
 
 ```bash
