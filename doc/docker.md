@@ -57,3 +57,10 @@ sudo firewall-cmd --reload
 # Reload dockerd
 sudo systemctl restart docker
 ```
+
+## Clean up
+
+```bash
+docker volume rm $(docker volume ls -q -f dangling=true)
+docker image rm $(docker images -q -f dangling=true)
+```
