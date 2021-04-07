@@ -64,3 +64,14 @@ sudo systemctl restart docker
 docker volume rm $(docker volume ls -q -f dangling=true)
 docker image rm $(docker images -q -f dangling=true)
 ```
+
+## Fix watcher, max map count
+/etc/sysctl.conf
+```text
+fs.inotify.max_user_watches=524288
+vm.max_map_count = 262144
+```
+
+```bash
+sudo systemctl restart docker
+```
