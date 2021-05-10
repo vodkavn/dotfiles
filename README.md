@@ -31,6 +31,7 @@ bash -c "`curl -fsSL https://raw.githubusercontent.com/vodkavn/dotfiles/master/i
 - [Git](doc/git.md)
 - [Tmux](doc/tmux.md)
 - [Vim](doc/vim.md)
+- [OpenVPN](doc/openvpn.md)
 - [Dracula Theme](doc/dracula.md)
 
 ## Screenshots
