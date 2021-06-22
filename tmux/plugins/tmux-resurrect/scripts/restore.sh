@@ -76,6 +76,14 @@ is_restoring_pane_contents() {
 	[ "$RESTORE_PANE_CONTENTS" == "true" ]
 }
 
+restored_session_0_true() {
+	RESTORED_SESSION_0="true"
+}
+
+has_restored_session_0() {
+	[ "$RESTORED_SESSION_0" == "true" ]
+}
+
 window_exists() {
 	local session_name="$1"
 	local window_number="$2"
@@ -163,6 +171,7 @@ new_pane() {
 	else
 		tmux split-window -t "${session_name}:${window_number}" -c "$dir"
 	fi
+	tmux rename-window -t "${session_name}:${window_number}" "$window_name"
 	# minimize window so more panes can fit
 	tmux resize-pane  -t "${session_name}:${window_number}" -U "999"
 }
@@ -173,8 +182,11 @@ restore_pane() {
 		dir="$(remove_first_char "$dir")"
 		window_name="$(remove_first_char "$window_name")"
 		pane_full_command="$(remove_first_char "$pane_full_command")"
+		if [ "$session_name" == "0" ]; then
+			restored_session_0_true
+		fi
 		if pane_exists "$session_name" "$window_number" "$pane_index"; then
-			tmux rename-window -t "$window_number" "$window_name"
+			tmux rename-window -t "${session_name}:${window_number}" "$window_name"
 			if is_restoring_from_scratch; then
 				# overwrite the pane
 				# happens only for the first pane if it's the only registered pane for the whole tmux server
@@ -187,7 +199,7 @@ restore_pane() {
 				register_existing_pane "$session_name" "$window_number" "$pane_index"
 			fi
 		elif window_exists "$session_name" "$window_number"; then
-			tmux rename-window -t "$window_number" "$window_name"
+			tmux rename-window -t "${session_name}:${window_number}" "$window_name"
 			new_pane "$session_name" "$window_number" "$window_name" "$dir" "$pane_index"
 		elif session_exists "$session_name"; then
 			new_window "$session_name" "$window_number" "$window_name" "$dir" "$pane_index"
@@ -266,6 +278,16 @@ restore_all_panes() {
 	done < $(last_resurrect_file)
 	if is_restoring_pane_contents; then
 		rm "$(pane_contents_dir "restore")"/*
+	fi
+}
+
+handle_session_0() {
+	if is_restoring_from_scratch && ! has_restored_session_0; then
+		local current_session="$(tmux display -p "#{client_session}")"
+		if [ "$current_session" == "0" ]; then
+			tmux switch-client -n
+		fi
+		tmux kill-session -t "0"
 	fi
 }
 
@@ -352,6 +374,7 @@ main() {
 		start_spinner "Restoring..." "Tmux restore complete!"
 		execute_hook "pre-restore-all"
 		restore_all_panes
+		handle_session_0
 		restore_pane_layout_for_each_window >/dev/null 2>&1
 		execute_hook "pre-restore-history"
 		if save_shell_history_option_on; then

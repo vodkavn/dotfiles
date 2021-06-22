@@ -25,6 +25,7 @@ restore_processes=""
 restore_process_strategy_option="@resurrect-strategy-"
 
 inline_strategy_token="->"
+inline_strategy_arguments_token="*"
 
 save_command_strategy_option="@resurrect-save-command-strategy"
 default_save_command_strategy="ps"
@@ -45,3 +46,6 @@ overwrite_option="@resurrect-never-overwrite"
 
 # Hooks are set via ${hook_prefix}${name}, i.e. "@resurrect-hook-post-save-all"
 hook_prefix="@resurrect-hook-"
+
+delete_backup_after_option="@resurrect-delete-backup-after"
+default_delete_backup_after="30" # days
