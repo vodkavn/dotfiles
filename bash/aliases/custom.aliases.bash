@@ -62,6 +62,10 @@ alias ,,='cd ..'         # Go up one directory (typo)
 alias ,,,='cd ../..'     # Go up two directories (typo)
 alias ,,,,='cd ../../..' # Go up three directories (typo)
 
+# VS Code
+alias 'code'='code .'
+alias 'code.'='code .'
+
 # Shorten extract
 alias xt='extract'
 
