@@ -102,8 +102,13 @@ nnoremap <A-Right> <C-W><C-L> " Move to the split to the right
 nnoremap <A-Left>  <C-W><C-H> " Move to the split to the left
 
 " Tab navigations
+if !exists('g:lasttab')
+  let g:lasttab = 1
+endif
+au TabLeave * let g:lasttab = tabpagenr()
+
 nnoremap <C-Up>    :tabnew<CR> " New tab
-nnoremap <C-Down>  :tabnew<CR> " New tab
+nnoremap <C-Down>  :exe "tabn ".g:lasttab<CR>
 nnoremap <C-Right> :tabn<CR>   " Next tab
 nnoremap <C-Left>  :tabp<CR>   " Previous tab
 
