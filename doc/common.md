@@ -40,3 +40,9 @@ WaylandEnable=false
 ```bash
 HISTTIMEFORMAT="%d/%m/%y %T " history
 ```
+
+## WSL: /bin/sh^M: bad interpreter
+
+```bash
+sudo apt-get install dos2unix
+```
