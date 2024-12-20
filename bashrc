@@ -33,7 +33,7 @@ export PROMPT_COMMAND=bash_prompt_powerline
 # Color scheme for grep and ls
 export CLICOLOR=1
 export LSCOLORS=ExFxBxDxCxegedabagacad
-export GREP_COLOR='1;35;40'
+export GREP_COLOR='mt=1;35;40'
 
 # Powerful less
 export LESS='--quit-if-one-screen --ignore-case --status-column --LONG-PROMPT --RAW-CONTROL-CHARS --HILITE-UNREAD --tabs=4 --no-init --window=-4'
