@@ -18,6 +18,14 @@ alias ll='ls -al'
 alias l='ls -a'
 alias l1='ls -1'
 
+# Ubuntu/Debian executable names
+if ! command -v fd >/dev/null 2>&1 && command -v fdfind >/dev/null 2>&1; then
+    alias fd='fdfind'
+fi
+if ! command -v bat >/dev/null 2>&1 && command -v batcat >/dev/null 2>&1; then
+    alias bat='batcat'
+fi
+
 # Colored grep
 alias grep='grep --color=auto'
 alias fgrep='fgrep --color=auto'

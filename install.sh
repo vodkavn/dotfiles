@@ -100,6 +100,7 @@ vim +PluginInstall +PluginClean! +qall
 #
 ########################
 #
+bash "$HOME/.dotfiles/.kilo/suggest-tools.sh"
 echo "DONE!"
 source $HOME/.bashrc
 ########################

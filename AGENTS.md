@@ -21,6 +21,14 @@ This repository contains personal Linux dotfiles, not an application.
 - Do not run `install.sh` without explicit approval. It changes files under `$HOME`, pulls repositories, installs plugins, and sources the user's shell configuration.
 - Do not source Bash startup files or reload the user's live tmux/Vim configuration as an automatic check. Use isolated environments for runtime checks.
 
+## Operating Rules
+
+- Verify required CLI tools with `command -v <tool>` before using them. A missing required tool blocks that step: give the user the installation command for their platform and stop that step, rather than substitute a weaker tool. Prefer available built-in agent tools when no external CLI is required.
+- Suggest, never install: do not run `sudo`, package installation commands, or remote installation scripts yourself. The user reviews and runs them.
+- On Ubuntu/Debian, common packages are `ripgrep` (`rg`), `fd-find` (`fdfind`), `bat` (`batcat`), `jq`, `shellcheck`, and `gh`. Do not assume `fd` or `bat` exists after apt installation; verify the exact executable required by the workflow.
+- Install structural search with `npm install -g @ast-grep/cli` using user-owned npm tooling. Verify `ast-grep`, not `sg`, which can be an unrelated system command. For GitLab's `glab`, consult upstream installation instructions before suggesting the community WakeMeOps repository; do not assume it is GitLab-owned or hard-code package versions.
+- `.kilo/suggest-tools.sh` prints optional Ubuntu/Debian toolchain suggestions at the end of installation. It can also be run independently with `bash .kilo/suggest-tools.sh`; it does not install anything.
+
 ## Validation
 
 There is no repository-wide test runner or CI test workflow.

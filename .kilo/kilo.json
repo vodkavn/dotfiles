@@ -1,4 +1,67 @@
 {
     "$schema": "https://app.kilo.ai/config.json",
-    "share": "disabled"
+    "share": "disabled",
+    "instructions": [
+        "AGENTS.md"
+    ],
+    "default_agent": "",
+    "agent": {
+        "ask": {
+            "hidden": true
+        },
+        "code": {
+            "hidden": false
+        },
+        "debug": {
+            "hidden": true
+        },
+        "plan": {
+            "hidden": true
+        },
+        "orchestrator": {
+            "hidden": true
+        }
+    },
+    "mcp": {
+        "context7": {
+            "type": "remote",
+            "url": "https://mcp.context7.com/mcp"
+        },
+        "sequential-thinking": {
+            "type": "local",
+            "command": [
+                "npx",
+                "-y",
+                "@modelcontextprotocol/server-sequential-thinking"
+            ],
+            "enabled": true
+        }
+    },
+    "permission": {
+        "bash": "allow",
+        "read": {
+            "*": "allow"
+        },
+        "edit": {
+            ".kilo/**": "allow",
+            "./AGENTS.md": "allow"
+        },
+        "grep": "allow",
+        "glob": "allow",
+        "todoread": "allow",
+        "todowrite": "allow",
+        "webfetch": "allow",
+        "websearch": "allow",
+        "codesearch": "allow",
+        "question": "allow",
+        "list": "allow",
+        "task": "allow",
+        "lsp": "allow",
+        "skill": "allow",
+        "external_directory": "allow",
+        "doom_loop": "allow",
+        "context7_*": "allow",
+        "sequential-thinking_*": "allow"
+    },
+    "snapshot": false
 }
