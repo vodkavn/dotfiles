@@ -1,27 +1,34 @@
 #!/usr/bin/env bash
 
-# Loads the system's Bash completion modules.
-# If Homebrew is installed (OS X), its Bash completion modules are loaded.
+# Load the system bash-completion provider and, when present, Homebrew's copy.
+#
+# Idempotent: skips loading when bash-completion is already active so an
+# equivalent load from bashrc does not run twice. On Ubuntu/Debian the provider
+# lives at /usr/share/bash-completion/bash_completion and /etc/bash_completion
+# sources it.
 
-if [ -f /etc/bash_completion ]; then
-  . /etc/bash_completion
+if ! declare -F _completion_loader >/dev/null 2>&1; then
+    if [ -r /etc/bash_completion ]; then
+        . /etc/bash_completion
+    elif [ -r /usr/share/bash-completion/bash_completion ]; then
+        . /usr/share/bash-completion/bash_completion
+    fi
+
+    # Distribution/profile script; also picks up XDG user completions. It is a
+    # no-op when bash-completion has already been sourced.
+    if [ -r /etc/profile.d/bash_completion.sh ]; then
+        . /etc/profile.d/bash_completion.sh
+    fi
 fi
 
-# Some distribution makes use of a profile.d script to import completion.
-if [ -f /etc/profile.d/bash_completion.sh ]; then
-  . /etc/profile.d/bash_completion.sh
-fi
+if [ "$(uname)" = "Darwin" ] && command -v brew >/dev/null 2>&1; then
+    BREW_PREFIX=$(brew --prefix)
 
-
-if [ $(uname) = "Darwin" ] && command -v brew &>/dev/null ; then
-  BREW_PREFIX=$(brew --prefix)
-
-  if [ -f "$BREW_PREFIX"/etc/bash_completion ]; then
-    . "$BREW_PREFIX"/etc/bash_completion
-  fi
-
-  # homebrew/versions/bash-completion2 (required for projects.completion.bash) is installed to this path
-  if [ -f "$BREW_PREFIX"/share/bash-completion/bash_completion ]; then
-    . "$BREW_PREFIX"/share/bash-completion/bash_completion
-  fi
+    # homebrew/versions/bash-completion2 installs to share/bash-completion
+    for fn in "$BREW_PREFIX/etc/bash_completion" \
+              "$BREW_PREFIX/share/bash-completion/bash_completion"; do
+        if [ -r "$fn" ]; then
+            . "$fn"
+        fi
+    done
 fi

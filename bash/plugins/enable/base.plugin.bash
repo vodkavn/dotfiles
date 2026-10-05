@@ -10,7 +10,7 @@ function ips ()
         ifconfig | awk '/inet /{ gsub(/addr:/, ""); print $2 }'
     elif command -v ip &>/dev/null
     then
-        ip addr | grep -oP 'inet \K[\d.]+'
+        ip -o addr show | awk '/inet /{ sub(/\/.*/, "", $4); print $4 }'
     else
         echo "You don't have ifconfig or ip command installed!"
     fi
@@ -22,6 +22,10 @@ function down4me ()
     param '1: website url'
     example '$ down4me http://www.google.com'
     group 'base'
+    if ! command -v curl &>/dev/null; then
+        echo "You don't have the curl command installed!" >&2
+        return 1
+    fi
     curl -Ls "http://downforeveryoneorjustme.com/$1" | sed '/just you/!d;s/<[^>]*>//g'
 }
 
@@ -29,16 +33,23 @@ function myip ()
 {
     about 'displays your ip address, as seen by the Internet'
     group 'base'
-    list=("http://myip.dnsomatic.com/" "http://checkip.dyndns.com/" "http://checkip.dyndns.org/")
-    for url in ${list[*]}
+    if ! command -v curl &>/dev/null; then
+        echo "You don't have the curl command installed!" >&2
+        return 1
+    fi
+    local res=''
+    local url
+    for url in "https://api.ipify.org" "https://checkip.amazonaws.com"
     do
-        res=$(curl -s "${url}")
-        if [ $? -eq 0 ];then
-            break;
-        fi
+        res=$(curl -fsSL --max-time 10 "$url") && [[ $res =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] && break
+        res=''
     done
-    res=$(echo "$res" | grep -Eo '[0-9\.]+')
-    echo -e "Your public IP is: ${echo_bold_green} $res ${echo_normal}"
+    if [ -n "$res" ]; then
+        echo "Your public IP is: ${res}"
+    else
+        echo "Could not determine your public IP address." >&2
+        return 1
+    fi
 }
 
 function pickfrom ()
@@ -49,9 +60,12 @@ function pickfrom ()
     group 'base'
     local file=$1
     [ -z "$file" ] && reference $FUNCNAME && return
-    length=$(cat $file | wc -l)
-    n=$(expr $RANDOM \* $length \/ 32768 + 1)
-    head -n $n $file | tail -1
+    [ -r "$file" ] || { echo "pickfrom: cannot read '$file'" >&2; return 1; }
+    local length n
+    length=$(wc -l < "$file")
+    (( length > 0 )) || return 1
+    n=$(( RANDOM * length / 32768 + 1 ))
+    head -n "$n" -- "$file" | tail -1
 }
 
 function passgen ()
@@ -62,10 +76,15 @@ function passgen ()
     example '$ passgen'
     example '$ passgen 6'
     group 'base'
-    local i pass length=${1:-4}
-    pass=$(echo $(for i in $(eval echo "{1..$length}"); do pickfrom /usr/share/dict/words; done))
+    local i pass='' word length=${1:-4}
+    [[ $length =~ ^[1-9][0-9]*$ ]] || { echo "passgen: length must be a positive integer" >&2; return 1; }
+    [ -r /usr/share/dict/words ] || { echo "passgen: /usr/share/dict/words not found" >&2; return 1; }
+    for (( i=0; i<length; i++ )); do
+        word=$(pickfrom /usr/share/dict/words) || return 1
+        pass+="${pass:+ }$word"
+    done
     echo "With spaces (easier to memorize): $pass"
-    echo "Without (use this as the password): $(echo $pass | tr -d ' ')"
+    echo "Without (use this as the password): ${pass// /}"
 }
 
 function pmdown ()
@@ -76,9 +95,15 @@ function pmdown ()
     group 'base'
     if command -v markdown &>/dev/null
     then
-      markdown $1 | browser
+      if command -v browser &>/dev/null; then
+          markdown "$1" | browser
+      else
+          echo "You don't have a browser command installed!" >&2
+          return 1
+      fi
     else
-      echo "You don't have a markdown command installed!"
+      echo "You don't have a markdown command installed!" >&2
+      return 1
     fi
 }
 
@@ -98,14 +123,14 @@ function lsgrep ()
 {
     about 'search through directory contents with grep'
     group 'base'
-    ls | grep "$*"
+    ls | grep -- "$*"
 }
 
 function quiet ()
 {
     about 'what *does* this do?'
     group 'base'
-    $* &> /dev/null &
+    "$@" &> /dev/null &
 }
 
 function banish-cookies ()
@@ -122,14 +147,14 @@ function usage ()
     about 'disk usage per directory, in Mac OS X and Linux'
     param '1: directory name'
     group 'base'
-    if [ $(uname) = "Darwin" ]; then
+    if [ "$(uname)" = "Darwin" ]; then
         if [ -n "$1" ]; then
             du -hd 1 "$1"
         else
             du -hd 1
         fi
 
-    elif [ $(uname) = "Linux" ]; then
+    elif [ "$(uname)" = "Linux" ]; then
         if [ -n "$1" ]; then
             du -h --max-depth=1 "$1"
         else
@@ -157,19 +182,21 @@ mkiso ()
     example 'mkiso ISO-Name dest/path src/path'
     group 'base'
 
-    if type "mkisofs" > /dev/null; then
-        [ -z ${1+x} ] && local isoname=${PWD##*/} || local isoname=$1
-        [ -z ${2+x} ] && local destpath=../ || local destpath=$2
-        [ -z ${3+x} ] && local srcpath=${PWD} || local srcpath=$3
+    if command -v mkisofs >/dev/null; then
+        local isoname destpath srcpath
+        [ -z "${1+x}" ] && isoname=${PWD##*/} || isoname=$1
+        [ -z "${2+x}" ] && destpath=../ || destpath=$2
+        [ -z "${3+x}" ] && srcpath=${PWD} || srcpath=$3
 
         if [ ! -f "${destpath}${isoname}.iso" ]; then
             echo "writing ${isoname}.iso to ${destpath} from ${srcpath}"
-            mkisofs -V ${isoname} -iso-level 3 -r -o "${destpath}${isoname}.iso" "${srcpath}"
+            mkisofs -V "${isoname}" -iso-level 3 -r -o "${destpath}${isoname}.iso" "${srcpath}"
         else
             echo "${destpath}${isoname}.iso already exists"
         fi
     else
-        echo "mkisofs cmd does not exist, please install cdrtools"
+        echo "mkisofs cmd does not exist, please install cdrtools" >&2
+        return 1
     fi
 }
 
@@ -180,8 +207,10 @@ function buf ()
     param 'filename'
     group 'base'
     local filename=$1
-    local filetime=$(date +%Y%m%d_%H%M%S)
-    cp -a "${filename}" "${filename}_${filetime}"
+    [ -n "$filename" ] || { echo "buf: missing filename" >&2; return 1; }
+    local filetime
+    filetime=$(date +%Y%m%d_%H%M%S)
+    cp -a -- "${filename}" "${filename}_${filetime}"
 }
 
 function del() {
@@ -189,5 +218,5 @@ function del() {
     param 'file or folder to be deleted'
     example 'del ./file.txt'
     group 'base'
-    mkdir -p /tmp/.trash && mv "$@" /tmp/.trash;
+    mkdir -p /tmp/.trash && mv -- "$@" /tmp/.trash;
 }

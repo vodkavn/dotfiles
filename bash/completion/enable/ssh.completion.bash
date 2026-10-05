@@ -1,40 +1,18 @@
 #!/usr/bin/env bash
-# Bash completion support for ssh.
 
-export COMP_WORDBREAKS=${COMP_WORDBREAKS/\:/}
+# ssh/scp/sftp completion
+#
+# Prefer the maintained system bash-completion provider (its ssh completion
+# already covers ~/.ssh/config hosts, known_hosts and /etc/hosts). The vendored
+# copy was removed in favour of that provider.
+#
+# Requires bash-completion to be loaded first (see system.completion.bash).
 
-_sshcomplete() {
-    local CURRENT_PROMPT="${COMP_WORDS[COMP_CWORD]}"
-    if [[ ${CURRENT_PROMPT} == *@*  ]] ; then
-      local OPTIONS="-P ${CURRENT_PROMPT/@*/}@ -- ${CURRENT_PROMPT/*@/}"
-    else
-      local OPTIONS=" -- ${CURRENT_PROMPT}"
-    fi
+command -v ssh >/dev/null 2>&1 || return 0
+complete -p ssh >/dev/null 2>&1 && return 0
 
-    # parse all defined hosts from .ssh/config and files included there
-    for fl in "$HOME/.ssh/config" \
-        $(grep "^\s*Include" "$HOME/.ssh/config" |
-            awk '{for (i=2; i<=NF; i++) print $i}' |
-            sed "s|^~/|$HOME/|")
-    do
-        if [ -r "$fl" ]; then
-            COMPREPLY=( ${COMPREPLY[@]} $(compgen -W "$(grep -i ^Host "$fl" |grep -v '[*!]' | awk '{for (i=2; i<=NF; i++) print $i}' )" ${OPTIONS}) )
-        fi
-    done
-
-    # parse all hosts found in .ssh/known_hosts
-    if [ -r "$HOME/.ssh/known_hosts" ]; then
-        if grep -v -q -e '^ ssh-rsa' "$HOME/.ssh/known_hosts" ; then
-            COMPREPLY=( ${COMPREPLY[@]} $(compgen -W "$( awk '{print $1}' "$HOME/.ssh/known_hosts" | grep -v ^\| | cut -d, -f 1 | sed -e 's/\[//g' | sed -e 's/\]//g' | cut -d: -f1 | grep -v ssh-rsa)" ${OPTIONS}) )
-        fi
-    fi
-
-    # parse hosts defined in /etc/hosts
-    if [ -r /etc/hosts ]; then
-        COMPREPLY=( ${COMPREPLY[@]} $(compgen -W "$( grep -v '^[[:space:]]*$' /etc/hosts | grep -v '^#' | awk '{for (i=2; i<=NF; i++) print $i}' )" ${OPTIONS}) )
-    fi
-
-    return 0
-}
-
-complete -o default -o nospace -F _sshcomplete ssh scp
+if declare -F _completion_loader >/dev/null 2>&1; then
+    _completion_loader ssh >/dev/null 2>&1
+elif declare -F _comp_load >/dev/null 2>&1; then
+    _comp_load -- ssh >/dev/null 2>&1
+fi

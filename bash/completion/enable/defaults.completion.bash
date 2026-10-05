@@ -6,6 +6,9 @@
 #
 # Version 1.0 (2006-11-08)
 
+# `defaults` is macOS-only; skip elsewhere (for example Linux).
+command -v defaults >/dev/null 2>&1 || return 0
+
 
 _defaults_domains()
 {

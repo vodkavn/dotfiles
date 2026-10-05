@@ -1,6 +1,6 @@
-# make sure that tmux is launched in 256 color mode
+# tmux is left to use the terminal-provided TERM (e.g. tmux-256color) so
+# correct terminfo is used. Previously forced TERM=xterm-256color, which
+# discarded modern terminal capabilities.
 
 cite about-plugin
-about-plugin 'make sure that tmux is launched in 256 color mode'
-
-alias tmux="TERM=xterm-256color tmux"
+about-plugin 'no-op: TMUX TERM is provided by the terminal'

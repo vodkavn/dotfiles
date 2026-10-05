@@ -3,7 +3,7 @@ about-plugin 'one command to extract them all...'
 
 # extract file(s) from compressed status
 extract() {
-    local opt
+    local opt status=0
     local OPTIND=1
     while getopts "hv" opt; do
         case "$opt" in
@@ -30,30 +30,57 @@ End-Of-Usage
     [ $# -eq 0 ] && extract -h && return 1
     while [ $# -gt 0 ]; do
 	    if [ -f "$1" ]; then
+            local tool=''
+		    case "$1" in
+                *.tar.bz2|*.tbz|*.tbz2) tool=tar ;;
+                *.tar.gz|*.tgz) tool=tar ;;
+                *.tar.xz) tool=tar ;;
+                *.tar.Z) tool=uncompress ;;
+                *.bz2) tool=bunzip2 ;;
+                *.deb) tool=dpkg-deb ;;
+                *.pax.gz) tool=gunzip ;;
+                *.gz) tool=gunzip ;;
+                *.pax) tool=pax ;;
+                *.pkg) tool=pkgutil ;;
+                *.rar) tool=unrar ;;
+                *.rpm) tool=rpm2cpio ;;
+                *.tar) tool=tar ;;
+                *.txz) tool=tar ;;
+                *.xz) tool=xz ;;
+                *.zip|*.war|*.jar) tool=unzip ;;
+                *.Z) tool=uncompress ;;
+                *.7z) tool=7za ;;
+                *) echo "'$1' cannot be extracted via extract" >&2; status=1; shift; continue ;;
+		    esac
+            if ! command -v "$tool" &>/dev/null; then
+                echo "extract: '$tool' is required to extract '$1' but is not installed" >&2
+                status=1; shift; continue
+            fi
 		    case "$1" in
                 *.tar.bz2|*.tbz|*.tbz2) tar "x${verbose}jf" "$1" ;;
                 *.tar.gz|*.tgz) tar "x${verbose}zf" "$1" ;;
-                *.tar.xz) xz --decompress "$1"; set -- "$@" "${1:0:-3}" ;;
-                *.tar.Z) uncompress "$1"; set -- "$@" "${1:0:-2}" ;;
+                *.tar.xz) tar "x${verbose}Jf" "$1" ;;
+                *.tar.Z) uncompress "$1" && set -- "$@" "${1:0:-2}" ;;
                 *.bz2) bunzip2 "$1" ;;
                 *.deb) dpkg-deb -x${verbose} "$1" "${1:0:-4}" ;;
-                *.pax.gz) gunzip "$1"; set -- "$@" "${1:0:-3}" ;;
+                *.pax.gz) gunzip "$1" && set -- "$@" "${1:0:-3}" ;;
                 *.gz) gunzip "$1" ;;
                 *.pax) pax -r -f "$1" ;;
                 *.pkg) pkgutil --expand "$1" "${1:0:-4}" ;;
                 *.rar) unrar x "$1" ;;
                 *.rpm) rpm2cpio "$1" | cpio -idm${verbose} ;;
                 *.tar) tar "x${verbose}f" "$1" ;;
-                *.txz) mv "$1" "${1:0:-4}.tar.xz"; set -- "$@" "${1:0:-4}.tar.xz" ;;
+                *.txz) tar "x${verbose}Jf" "$1" ;;
                 *.xz) xz --decompress "$1" ;;
                 *.zip|*.war|*.jar) unzip "$1" ;;
                 *.Z) uncompress "$1" ;;
                 *.7z) 7za x "$1" ;;
-                *) echo "'$1' cannot be extracted via extract" >&2;;
-		    esac
+		    esac || status=1
         else
 		    echo "extract: '$1' is not a valid file" >&2
+            status=1
 	    fi
         shift
     done
+    return "$status"
 }

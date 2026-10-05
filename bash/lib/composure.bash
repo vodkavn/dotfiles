@@ -84,6 +84,10 @@ transcribe ()
 
 typeset_functions ()
 {
+    if [ -n "${BASH_VERSION:-}" ]; then
+        compgen -A function
+        return
+    fi
     # unfortunately, there does not seem to be a easy, portable way to list just the
     # names of the defined shell functions...
 

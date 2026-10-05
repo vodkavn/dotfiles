@@ -1,7 +1,7 @@
 cite 'about-alias'
 about-alias 'yarn package manager aliases'
 
-# Aliases
+# Aliases (target Yarn 1.x classic; Yarn 2+ Berry removes global add/self-update/check)
 alias ya='yarn'
 alias yai='yarn init'
 alias yaa='yarn add'

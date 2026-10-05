@@ -27,9 +27,10 @@ if ! command -v bat >/dev/null 2>&1 && command -v batcat >/dev/null 2>&1; then
 fi
 
 # Colored grep
+# fgrep/egrep are deprecated GNU grep wrappers; use grep -F / grep -E directly
 alias grep='grep --color=auto'
-alias fgrep='fgrep --color=auto'
-alias egrep='egrep --color=auto'
+alias fgrep='grep -F --color=auto'
+alias egrep='grep -E --color=auto'
 
 # Search process
 alias psg='ps aux | grep '
@@ -50,10 +51,9 @@ alias h='history'
 alias hs='history'
 
 # Tree
-if [ ! -x "$(which tree 2>/dev/null)" ]
-then
-  alias tree="find . -print | sed -e 's;[^/]*/;|____;g;s;____|; |;g'"
-fi
+# No alias is defined when `tree` is unavailable: the previous find|sed
+# fallback produced a weaker, differently-formatted listing. Install `tree`
+# if you want a `tree` command.
 
 # Directory
 alias md='mkdir -p'
@@ -81,7 +81,7 @@ alias xt='extract'
 alias t='type'
 
 # Man or tldr
-if which tldr &> /dev/null
+if command -v tldr &> /dev/null
 then
   alias m='tldr'
 else

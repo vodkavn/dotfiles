@@ -7,17 +7,17 @@ upinfo ()
 
 # Check command exists
 function _command_exists() {
-    type "$1" &> /dev/null ;
+    command -v "$1" &> /dev/null ;
 }
 
 # Show ruby version
 function prompt_rvm {
+    local rbv=""
     if _command_exists rvm-prompt; then
-        rbv=`rvm-prompt`
+        rbv=$(rvm-prompt)
     fi
     if _command_exists rbenv; then
-        eval "$(rbenv init -)"
-        rbv=`rbenv version-name`
+        rbv=$(rbenv version-name)
     fi
     if [[ -n "${rbv/[ ]*\n/}" ]]; then
         #rbv=${rbv#ruby-}
@@ -30,17 +30,12 @@ function prompt_rvm {
 
 # Helper function loading various enable-able files
 function load_bash_files() {
-    subdirectory="$1"
-    if [ -d "$HOME/.bash/${subdirectory}/enable" ]
-    then
-        FILES="$HOME/.bash/${subdirectory}/enable/*.bash"
-        for config_file in $FILES
-        do
-            if [ -e "${config_file}" ]; then
-                source $config_file
-            fi
-        done
-    fi
+    local subdirectory="$1" config_file
+    for config_file in "$HOME/.bash/$subdirectory/enable/"*.bash; do
+        if [ -r "$config_file" ]; then
+            source "$config_file"
+        fi
+    done
 }
 
 function load_colors_16() {
@@ -79,12 +74,14 @@ then
         example 'pathmunge /path/to/dir is equivalent to PATH=/path/to/dir:$PATH'
         example 'pathmunge /path/to/dir after is equivalent to PATH=$PATH:/path/to/dir'
 
-        if ! [[ $PATH =~ (^|:)$1($|:) ]] ; then
-            if [ "$2" = "after" ] ; then
-                export PATH=$PATH:$1
-            else
-                export PATH=$1:$PATH
-            fi
+        [ -n "$1" ] || return 0
+        case ":$PATH:" in
+            *":$1:"*) return 0 ;;
+        esac
+        if [ "${2:-}" = "after" ]; then
+            export PATH="$PATH:$1"
+        else
+            export PATH="$1:$PATH"
         fi
     }
 fi
@@ -141,8 +138,12 @@ function bash_prompt() {
 }
 
 function bash_prompt_powerline() {
+    if [ "${TERM:-dumb}" = "dumb" ]; then
+        PS1='\u@\h:\w\$ '
+        return
+    fi
     case $TERM in
-        linux|xterm*|rxvt*|screen*)
+        xterm*|rxvt*|screen*|tmux*|alacritty*|foot*|kitty*)
             local TITLEBAR='\[\033]0;\u@\h:$PWD\007\]'
             ;;
         *)
@@ -182,10 +183,15 @@ function bash_prompt_powerline() {
         DIRECTORY_END="\[\e[48;5;$LOCK_COLOR\]\[\e[38;5;$DIRECTORY_COLOR\]$POWERLINE_SEPARATOR_RIGHT\[\e[38;5;$FOREGROUND_COLOR\] $POWERLINE_LOCK_ICON $NONE\[\e[38;5;$LOCK_COLOR\]$POWERLINE_SEPARATOR_RIGHT"
     fi
 
-    PS1="$GIT_TEXT\$(__git_ps1 '$POWERLINE_BRANCH_ICON (%s)')\n\[\e[38;5;$PROMPT_COLOR\]\$ $NORMAL_TEXT"
+    local git_prompt="" columns=${COLUMNS:-80}
+    if command -v git >/dev/null 2>&1 && declare -F __git_ps1 >/dev/null; then
+        git_prompt="\$(__git_ps1 '$POWERLINE_BRANCH_ICON (%s)')"
+    fi
+    [[ $columns =~ ^[0-9]+$ ]] || columns=80
+    PS1="$GIT_TEXT$git_prompt\n\[\e[38;5;$PROMPT_COLOR\]\$ $NORMAL_TEXT"
     PS1="$DIRECTORY_START \W $DIRECTORY_END $PS1"
-    if [[ `tput cols` -gt 50 ]]; then
-        if [[ `tput cols` -lt 80 ]]; then
+    if (( columns > 50 )); then
+        if (( columns < 80 )); then
             PS1="$TIME_START \t $TIME_END_DIRECTORY$PS1"
         else
             PS1="$TIME_START \t $TIME_END_INFO$INFO_START \u@\h $INFO_END$PS1"

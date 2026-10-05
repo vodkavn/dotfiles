@@ -22,7 +22,8 @@ function _set_pkg_aliases()
     alias kcgnan='kubectl get nodes --all-namespaces'
     alias kcgsan='kubectl get services --all-namespaces'
     # launches a disposable netshoot pod in the k8s cluster
-    alias kcnetshoot='kubectl run --generator=run-pod/v1 netshoot-$(date +%s) --rm -i --tty --image nicolaka/netshoot -- /bin/bash'
+    # --generator was removed in Kubernetes 1.18; --restart=Never is the replacement
+    alias kcnetshoot='kubectl run "netshoot-$(date +%s)" --restart=Never --rm -i --tty --image nicolaka/netshoot -- /bin/bash'
   fi
 }
 
