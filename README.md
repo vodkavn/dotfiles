@@ -24,6 +24,18 @@ bash -c "`curl -fsSL https://raw.githubusercontent.com/vodkavn/dotfiles/master/i
   - `.gitconfig`
   - `.tmux.conf`
 
+## Local Validation
+
+For Ubuntu 26.x, without changing your installed configuration:
+
+```bash
+bash scripts/doctor.sh
+bash scripts/check.sh
+```
+
+Full checks require ShellCheck and bash-completion. See `bash scripts/check.sh --help`
+for options or [AGENTS.md](AGENTS.md) for validation details.
+
 ## Cheatsheet
 
 - [Common Settings](doc/common.md)
