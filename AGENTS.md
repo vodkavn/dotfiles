@@ -11,14 +11,14 @@ This repository contains personal Linux dotfiles, not an application.
 - `install.sh`: installation, backups, symlinks, font copying, and plugin updates.
 - `scripts/` and `tests/`: read-only diagnostics and isolated local Bash validation.
 - `doc/` and `README.md`: usage notes and installation instructions.
-- `.kilo/`: all Kilo-specific project configuration. Keep this file tool-neutral.
+- `.kilo/` and `.opencode/`: all Kilo-specific and all opencode-specific project configuration respectively. Keep this file tool-neutral.
 
 ## Editing Rules
 
 - Make small, targeted changes and preserve existing key bindings and shell behavior unless the task requires otherwise.
 - Follow `.editorconfig`: four spaces, LF line endings, and a final newline. Preserve local conventions in existing files.
 - Treat `tmux/plugins/`, `vim/autoload/pathogen.vim`, and Git submodules in `.gitmodules` as third-party code; avoid incidental edits or updates.
-- Never commit credentials, machine-specific secrets, generated plugin files, or Kilo session/worktree state.
+- Never commit credentials, machine-specific secrets, generated plugin files, or agent session/worktree state.
 - Do not run `install.sh` without explicit approval. It changes files under `$HOME`, pulls repositories, installs plugins, and sources the user's shell configuration.
 - Do not source Bash startup files or reload the user's live tmux/Vim configuration as an automatic check. Use isolated environments for runtime checks.
 
@@ -35,8 +35,8 @@ This repository contains personal Linux dotfiles, not an application.
 The supported target is Ubuntu 26.x. There is no CI workflow.
 
 - Run `bash scripts/doctor.sh` for read-only prerequisite and executable-path diagnostics. It does not source personal configuration, inspect credentials, or install tools.
-- Run `bash scripts/check.sh` for syntax, isolated Bash regressions, ShellCheck on `scripts/` and `tests/`, and Git whitespace. Legacy configuration and bundled code receive syntax/runtime checks, not a clean-lint claim.
-- Exit codes: `0` means selected checks passed, `1` means a check failed, and `2` means validation is incomplete or usage is invalid. Missing ShellCheck blocks full validation; suggest `sudo apt install shellcheck`, never install it yourself.
+- Run `bash scripts/check.sh` for syntax, isolated Bash regressions, ShellCheck on `scripts/` and `tests/`, JSON validation of the agent config in `.opencode/`, `.kilo/`, and `.vscode/`, and Git whitespace. Legacy configuration and bundled code receive syntax/runtime checks, not a clean-lint claim.
+- Exit codes: `0` means selected checks passed, `1` means a check failed, and `2` means validation is incomplete or usage is invalid. Missing ShellCheck or `jq` blocks full validation; suggest `sudo apt install shellcheck jq`, never install them yourself.
 - `--syntax-only` selects syntax checks only. `--no-lint` explicitly excludes ShellCheck; report this exclusion rather than claiming full validation passed. Run `bash tests/run.sh` for standalone isolated runtime tests.
 
 - For changed Bash files, run `bash -n path/to/file` to check syntax without executing them. Root Bash files have no extension; modules use `.bash` and scripts commonly use `.sh`.

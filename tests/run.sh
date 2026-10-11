@@ -143,6 +143,7 @@ assert_not_contains() {
     [[ $1 != *"$2"* ]] || die "expected NOT to contain [$2]${3:+ ($3)}; actual [$1]"
 }
 assert_absent() { [[ ! -e $1 ]] || die "expected file to be absent: $1"; }
+assert_exists() { [[ -e $1 ]] || die "expected file to exist: $1"; }
 
 # --- child execution helpers -------------------------------------------------
 filter_harness_stderr() {
@@ -684,10 +685,112 @@ EOS
     return 0
 }
 
+# The AI alias module gates every tool on command -v and must emit nothing when
+# none of them exist, because it is sourced on every interactive shell startup.
+case_ai_alias_gates() {
+    local mocks_a="$CASE_DIR/mocksA"
+    mkdir -p -- "$mocks_a"
+    for tool in opencode gh glab ast-grep difft shfmt; do
+        printf '#!/bin/sh\nexit 0\n' > "$mocks_a/$tool"
+    done
+    chmod +x "$mocks_a"/*
+
+    cat > "$CASE_DIR/child.sh" <<'EOS'
+source "$REPO/bash/lib/composure.bash"
+source "$REPO/bash/aliases/enable/ai.aliases.bash"
+printf 'ai=[%s]\n' "$(alias ai 2>/dev/null)"
+printf 'air=[%s]\n' "$(alias air 2>/dev/null)"
+printf 'ghp=[%s]\n' "$(alias ghp 2>/dev/null)"
+printf 'ghrun=[%s]\n' "$(alias ghrun 2>/dev/null)"
+printf 'gtop=[%s]\n' "$(alias gtop 2>/dev/null)"
+printf 'asg=[%s]\n' "$(alias asg 2>/dev/null)"
+printf 'shfmtv=[%s]\n' "$(alias shfmtv 2>/dev/null)"
+EOS
+
+    # No AI tools on PATH: every alias stays undefined and the module is silent.
+    local out
+    out=$(run_child "$test_home" dumb "$bin_dir" 0 "$CASE_DIR/child.sh") \
+        || die "child (no AI tools) exited nonzero"
+    assert_eq "$out" "$(printf 'ai=[]\nair=[]\nghp=[]\nghrun=[]\ngtop=[]\nasg=[]\nshfmtv=[]')" \
+        "module must define nothing and print nothing"
+
+    # Tools present: aliases are defined, and the GitHub CLI ones bypass the
+    # pre-existing `gh` git-root alias from git.aliases.bash.
+    out=$(run_child "$test_home" dumb "$bin_dir:$mocks_a" 0 "$CASE_DIR/child.sh") \
+        || die "child (mocked AI tools) exited nonzero"
+    assert_contains "$out" "ai=[alias ai='opencode']"
+    assert_contains "$out" "air=[alias air='opencode run']"
+    assert_contains "$out" "ghp=[alias ghp='command gh pr']"
+    assert_contains "$out" "ghrun=[alias ghrun='command gh run']"
+    assert_contains "$out" "gtop=[alias gtop='cd \"\$(git rev-parse --show-toplevel)\"']"
+    assert_contains "$out" "asg=[alias asg='ast-grep']"
+    assert_contains "$out" "shfmtv=[alias shfmtv='shfmt -d']"
+
+    # The pre-existing `gh` git-root alias must survive the AI module.
+    cat > "$CASE_DIR/child2.sh" <<'EOS'
+source "$REPO/bash/lib/composure.bash"
+source "$REPO/bash/aliases/enable/git.aliases.bash"
+source "$REPO/bash/aliases/enable/ai.aliases.bash"
+printf 'gh=[%s]\n' "$(alias gh 2>/dev/null)"
+printf 'gl=[%s]\n' "$(alias gl 2>/dev/null)"
+EOS
+    out=$(run_child "$test_home" dumb "$bin_dir:$mocks_a" 0 "$CASE_DIR/child2.sh") \
+        || die "child (git aliases + AI aliases) exited nonzero"
+    assert_contains "$out" "gh=[alias gh='cd"
+    assert_contains "$out" "git rev-parse --show-toplevel"
+    assert_contains "$out" "gl=[alias gl='git log']"
+    return 0
+}
+
+# opencode completion must be absent without the binary, and must be generated
+# once and then served from the XDG cache on subsequent shells.
+case_opencode_completion_gate() {
+    local log="$CASE_DIR/mock.log"
+    : > "$log"
+    export MOCK_LOG="$log"
+
+    local mocks_a="$CASE_DIR/mocksA"
+    mkdir -p -- "$mocks_a"
+    cat > "$mocks_a/opencode" <<'EOS'
+#!/bin/sh
+printf 'invoked\n' >> "$MOCK_LOG"
+printf '_mock_opencode() { COMPREPLY=(); }\n'
+printf 'complete -F _mock_opencode opencode\n'
+EOS
+    chmod +x "$mocks_a/opencode"
+
+    cat > "$CASE_DIR/child.sh" <<'EOS'
+source "$REPO/bash/completion/enable/opencode.completion.bash"
+complete -p opencode >/dev/null 2>&1 && printf 'registered=yes\n' || printf 'registered=no\n'
+EOS
+
+    # Without the binary the module returns early and registers nothing.
+    local out
+    out=$(run_child "$test_home" dumb "$bin_dir" 0 "$CASE_DIR/child.sh") \
+        || die "child (no opencode) exited nonzero"
+    assert_eq "$out" 'registered=no' "completion must not register without opencode"
+
+    # First shell generates and caches the completion.
+    out=$(run_child "$test_home" dumb "$bin_dir:$mocks_a" 0 "$CASE_DIR/child.sh") \
+        || die "child (first opencode shell) exited nonzero"
+    assert_contains "$out" 'registered=yes'
+    assert_eq "$(cat "$log")" 'invoked' "generator must run exactly once"
+    assert_exists "$test_home/.cache/opencode/completions.bash"
+
+    # Second shell reuses the cache instead of running the generator again.
+    out=$(run_child "$test_home" dumb "$bin_dir:$mocks_a" 0 "$CASE_DIR/child.sh") \
+        || die "child (cached opencode shell) exited nonzero"
+    assert_contains "$out" 'registered=yes'
+    assert_eq "$(cat "$log")" 'invoked' "cached completion must be reused"
+    return 0
+}
+
 # =============================================================================
 # Run
 # =============================================================================
 
+run_case ai_alias_gates case_ai_alias_gates
+run_case opencode_completion_gate case_opencode_completion_gate
 run_case startup_reload_spaced_home case_startup_reload_spaced_home
 run_case startup_dumb_terminal case_startup_dumb_terminal
 run_case startup_noninteractive_silent case_startup_noninteractive_silent

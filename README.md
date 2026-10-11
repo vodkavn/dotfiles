@@ -39,6 +39,7 @@ for options or [AGENTS.md](AGENTS.md) for validation details.
 ## Cheatsheet
 
 - [Common Settings](doc/common.md)
+- [AI Coding](doc/ai.md)
 - [Docker](doc/docker.md)
 - [Git](doc/git.md)
 - [Tmux](doc/tmux.md)

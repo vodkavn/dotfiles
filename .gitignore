@@ -9,3 +9,6 @@ bash.d/local/after/*
 !bash.d/local/after/.empty
 tmux/resurrect
 *.swp
+
+# Agent worktrees created by `opencode` (see .opencode/opencode.json)
+.lane/

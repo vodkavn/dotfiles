@@ -1,14 +1,26 @@
 {
+  "json.schemas": [
+    {
+      "fileMatch": [
+        "/.opencode/opencode.json",
+        "/opencode.json"
+      ],
+      "url": "https://opencode.ai/config.json"
+    }
+  ],
   "cSpell.words": [
     "CMDLINE",
     "Cheatsheet",
     "HISTTIMEFORMAT",
     "RHEL",
+    "ast-grep",
     "dockerd",
     "firewalld",
+    "glab",
     "hjkl",
     "incomming",
     "installonly",
+    "jsonc",
     "mkconfig",
     "mlist",
     "modeset",
@@ -16,6 +28,7 @@
     "myname",
     "repoquery",
     "scrollwheel",
+    "shfmt",
     "vimrc",
     "vimtutor"
   ]

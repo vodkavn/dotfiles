@@ -8,7 +8,7 @@ case "${1:-}" in
     --no-lint) mode=no-lint ;;
     --help|-h)
         printf 'Usage: bash scripts/check.sh [--syntax-only|--no-lint]\n'
-        printf 'Default: Bash syntax, isolated regression tests, validation-script lint, Git whitespace.\n'
+        printf 'Default: Bash syntax, isolated regression tests, validation-script lint, agent JSON config, Git whitespace.\n'
         printf 'Exit codes: 0 = selected checks passed; 1 = failure; 2 = missing prerequisite or invalid usage.\n'
         exit 0
         ;;
@@ -36,6 +36,9 @@ files=("$root/bashrc" "$root/bash_profile" "$root/bash_logout" "$root/install.sh
     "$root"/bash/**/*.bash "$root"/bash/*.sh "$root"/.kilo/*.sh
     "$root"/scripts/**/*.sh "$root"/tests/**/*.sh)
 lint_files=("$root"/scripts/**/*.sh "$root"/tests/**/*.sh)
+json_files=("$root"/.opencode/**/*.json "$root"/.kilo/*.json "$root"/.vscode/*.json)
+meta_files=("$root"/.opencode/commands/*.md "$root"/.opencode/agents/*.md \
+    "$root"/.opencode/skills/*/SKILL.md)
 failures=0
 blocked=0
 syntax_errors=0
@@ -86,6 +89,46 @@ if [[ $mode != syntax ]]; then
     else
         printf 'BLOCKED: ShellCheck unavailable. Ubuntu: sudo apt install shellcheck\n' >&2
         blocked=$((blocked + 1))
+    fi
+
+    if ! command -v jq >/dev/null 2>&1 || ! jq_bin=$(type -P jq); then
+        printf 'BLOCKED: jq unavailable. Ubuntu: sudo apt install jq\n' >&2
+        blocked=$((blocked + 1))
+    else
+        json_errors=0
+        json_count=0
+        for file in "${json_files[@]}"; do
+            [ -r "$file" ] || continue
+            json_count=$((json_count + 1))
+            if ! "$jq_bin" empty "$file" >/dev/null 2>&1; then
+                printf 'FAIL: invalid JSON: %s\n' "${file#"$root/"}" >&2
+                json_errors=$((json_errors + 1))
+            fi
+        done
+        if (( json_errors )); then
+            failures=$((failures + 1))
+        else
+            printf 'PASS: JSON (.opencode/, .kilo/, .vscode/; %s files)\n' "$json_count"
+        fi
+    fi
+
+    # opencode advertises commands, agents, and skills to the model using the
+    # frontmatter description. A missing one silently hides the file rather
+    # than failing loudly, so assert it here.
+    meta_errors=0
+    meta_count=0
+    for file in "${meta_files[@]}"; do
+        [ -r "$file" ] || continue
+        meta_count=$((meta_count + 1))
+        if ! head -n 20 -- "$file" | grep -q '^description:'; then
+            printf 'FAIL: missing description frontmatter: %s\n' "${file#"$root/"}" >&2
+            meta_errors=$((meta_errors + 1))
+        fi
+    done
+    if (( meta_errors )); then
+        failures=$((failures + 1))
+    else
+        printf 'PASS: agent metadata (.opencode/ commands, agents, skills; %s files)\n' "$meta_count"
     fi
 
     whitespace_errors=0

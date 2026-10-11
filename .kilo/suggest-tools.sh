@@ -14,7 +14,7 @@ printf '\nAI CLI toolchain (optional, Ubuntu/Debian)\n'
 printf 'Suggestions only. Review and run these commands yourself.\n'
 
 packages=()
-for entry in rg:ripgrep jq:jq shellcheck:shellcheck; do
+for entry in rg:ripgrep jq:jq shellcheck:shellcheck gh:gh git-delta:git-delta shfmt:shfmt; do
     tool=${entry%%:*}
     if ! command -v "$tool" >/dev/null 2>&1; then
         packages+=("${entry#*:}")
@@ -28,7 +28,7 @@ if ! command -v bat >/dev/null 2>&1 && ! command -v batcat >/dev/null 2>&1; then
     packages+=(bat)
 fi
 if [ "${#packages[@]}" -gt 0 ]; then
-    printf '\nMissing apt packages (search, JSON, Bash lint, GitHub CLI):\n'
+    printf '\nMissing apt packages (search, JSON, Bash lint, GitHub CLI, diff review):\n'
     printf '  sudo apt update && sudo apt install'
     printf ' %s' "${packages[@]}"
     printf '\n'
@@ -43,6 +43,17 @@ if ! command -v bat >/dev/null 2>&1; then
     printf '\nbat provides batcat on Ubuntu/Debian. After installation, optionally expose bat:\n'
     printf '  mkdir -p "$HOME/.local/bin"\n'
     printf '  ln -s /usr/bin/batcat "$HOME/.local/bin/bat"\n'
+fi
+
+if ! command -v glab >/dev/null 2>&1; then
+    printf '\nGitLab CLI (glab) is not carried in the Ubuntu archive. Consult upstream\n'
+    printf 'installation instructions rather than an unofficial mirror:\n'
+    printf '  https://gitlab.com/gitlab-org/cli/-/blob/main/docs/install/linux.md\n'
+fi
+
+if ! command -v difft >/dev/null 2>&1; then
+    printf '\nOptional structural diff (difftastic), not in the Ubuntu archive:\n'
+    printf '  https://difftastic.wilfred.me.uk/\n'
 fi
 
 if ! command -v ast-grep >/dev/null 2>&1; then
