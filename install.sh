@@ -84,8 +84,8 @@ done
 #   config/opencode/plugins/       ->  ~/.config/opencode/plugins/
 #
 # opencode auto-discovers ~/.config/opencode/plugins/ and the project's
-# .opencode/plugins/, so the sidebar inspector needs no entry in opencode.json.
-# A plugin directory is discovered from its flat index.ts and ui.tsx siblings;
+# .opencode/plugins/, so the sidebar plugins need no entry in opencode.json.
+# A plugin directory is discovered from its flat index.ts and tui.tsx siblings;
 # a nested src/ directory or a package.json is not resolved.
 #
 # Skills stay project-scoped under .opencode/skills/ and are not linked here.
@@ -99,7 +99,7 @@ done
 # .opencode/. Note that ~/.opencode is opencode's own data directory, not its
 # config directory; never link this repository's .opencode there.
 #
-ai_link_list=(opencode.json plugins/inspector)
+ai_link_list=(opencode.json plugins/inspector plugins/tokens)
 ai_global=$HOME/.config/opencode
 
 if command -v opencode >/dev/null 2>&1; then
