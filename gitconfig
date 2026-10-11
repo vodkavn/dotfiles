@@ -3,10 +3,10 @@
     # email = hoangxuanthanh1986@gmail.com
 [core]
     editor = vim
-    autocrlf = input
+    autocrlf = input # should set to `false` in wsl
     pager = less --raw-control-chars
 [format]
-    pretty = full
+    pretty = fuller # `full` omits dates; `fuller` adds AuthorDate and CommitDate
 [color]
     ui = true
     diff = auto
