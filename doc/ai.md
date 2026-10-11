@@ -1,10 +1,9 @@
 # AI coding cheatsheet
 
-This repository ships agent configuration for [opencode](https://opencode.ai).
-Project-scoped files live under `.opencode/`, mirroring how `.kilo/` holds
-Kilo-specific configuration, so `AGENTS.md` stays tool-neutral. Files that must
-apply to every project live under `config/` and are linked into `$HOME` by
-`install.sh`.
+Agent configuration for [opencode](https://opencode.ai). Project-scoped files
+live under `.opencode/`, mirroring `.kilo/` for Kilo, so `AGENTS.md` stays
+tool-neutral. Files that must apply to every project live under `config/` and
+are linked into `$HOME` by `install.sh`.
 
 ## Layout
 
@@ -12,151 +11,112 @@ apply to every project live under `config/` and are linked into `$HOME` by
                                            websearch, update, agents, references,
                                            MCP servers
     config/opencode/commands/new-ai.md     global: /new-ai scaffolder
-    config/opencode/skills/requirement-doc/   requirements & acceptance criteria
-    config/opencode/skills/design-review/     design docs & trade-offs
-    config/opencode/skills/test-scenario/     test scenarios & coverage
-    config/opencode/skills/deliverable-trace/ evidence-checked findings
-    config/opencode/skills/release-rollback/  rollback preflight and ordering
-    config/opencode/skills/workspace-hygiene/ no trash files, no history prose
-    config/opencode/plugins/inspector/     sidebar inspector (CLI plugin)
-    config/opencode/plugins/tokens/        token/speed panel (CLI plugin)
-    config/opencode/plugins/shell-guard/   deny privileged commands (server plugin)
-    config/opencode/plugins/compaction-memory/  keep intent across compaction
+    config/opencode/skills/                global: requirement-doc, design-review,
+                                           test-scenario, deliverable-trace,
+                                           release-rollback, workspace-hygiene
+    config/opencode/plugins/               global: inspector, tokens (TUI)
+                                           shell-guard, compaction-memory (server)
     .opencode/opencode.json                 project: permissions, watcher, worktree
     .opencode/commands/*.md                 slash commands
     .opencode/agents/reviewer.md            read-only review subagent
-    .opencode/skills/opencode-plugin-dev/   opencode v2 plugin development guide
-    .opencode/skills/dotfiles-change/       repo conventions as a loadable skill
+    .opencode/skills/                       project: opencode-plugin-dev,
+                                           dotfiles-change
 
-`config/` follows the same rule as the rest of the repository: a path is named
-after the `$HOME` dotfile it becomes. So `config/opencode/opencode.json` is
-literally `~/.config/opencode/opencode.json`, the same way `vim/` is `~/.vim`
-and `gitconfig` is `~/.gitconfig`.
+`config/` follows the repository-wide rule that a path is named after the
+`$HOME` dotfile it becomes, so `config/opencode/opencode.json` is
+`~/.config/opencode/opencode.json`, as `vim/` is `~/.vim` and `gitconfig` is
+`~/.gitconfig`.
 
-Configuration is strict JSON, not JSONC, so `scripts/check.sh` can validate it
-with `jq`. The `$schema` key still gives editors validation and autocomplete.
+Configuration is strict JSON so `scripts/check.sh` can validate it with `jq`.
+The `$schema` key still gives editors validation and autocomplete.
 
-## What `install.sh` links
+## Two layers
 
-`install.sh` discovers the global layer from the filesystem rather than from a
-list. Under `config/opencode/` it links:
-
-- each top-level `*.json` file — currently just `opencode.json`
-- each directory inside `plugins/`, **individually**
-- every other top-level directory, linked whole — `agents/`, `commands/`,
-  `skills/` today, and anything added later
-
-Plugins are expanded one by one on purpose. Linking `plugins/` as a single
-directory would merge this repository's plugins into
-`~/.config/opencode/plugins/` wholesale, which is the same place
-`opencode plugin add` installs community packages as real directories. Linking
-each plugin separately leaves those alone, and the existing check — skip when the
-destination is already a symlink pointing into this checkout — never matches a
-community plugin.
-
-The practical consequence: **adding a plugin, agent, command, or skill under
-`config/opencode/` needs no edit to `install.sh`.** Drop the file in and re-run
-the installer. `case_ai_config_link_discovery` in `tests/run.sh` pins both the
-discovery rule and the current set of shipped plugins, so a rename that silently
-drops one fails the suite.
-
-## The two layers
-
-`install.sh` links `config/opencode/opencode.json` to
-`~/.config/opencode/opencode.json`. opencode loads, in increasing precedence:
+`install.sh` links the global layer into `~/.config/opencode/`. opencode loads,
+in increasing precedence:
 
 1. `~/.config/opencode/opencode.json` — global
 2. `~/.config/opencode/` — global agents, commands, skills
 3. `.opencode/opencode.json` — project
 4. `.opencode/` — project agents, commands, skills
 
-`permissions` arrays concatenate across the layers, global rules first, and the
-last matching rule wins. A global deny therefore still applies here unless a
-later project rule overrides it.
+Agents, skills, and commands **replace** global ones by ID, so a project
+overrides one global entry without disturbing the others. Permission arrays are
+the exception: they **concatenate**, global first, last match wins.
 
-**Global layer** is CLI-wide settings, MCP servers, agents, the `/new-ai`
-command, the working-method skills, and the plugins: `shell`, `formatter`,
-`compaction`, `websearch`, `update`, the `agents` block, the `mcp.servers`
-block, the four `config/opencode/plugins/` directories, and the six
-`config/opencode/skills/` entries.
-
-**Project layer** keeps this repository's own commands and every permission
-rule, because all of those encode what this repository cares about.
-
-The dividing line is reuse, not tool. `commands/new-ai.md` is global because it
-scaffolds agent, skill, and command files for _any_ project. The global skills
-are global because they describe _how the work is done_ — writing an acceptance
-criterion, framing a trade-off, covering a boundary case, backing a finding with
-evidence, planning a rollback, keeping a repository clean — which is the same in
-every repository. What each project uses, what its documents mean, and which
-source is authoritative are project facts and stay out.
+The dividing line is reuse, not tool. The global layer carries CLI-wide
+settings, MCP servers, agents, the `/new-ai` command, the working-method
+skills, and the plugins. The project layer keeps this repository's own commands
+and every permission rule.
 
 Method is portable only when it carries no project-specific assumptions. A
 global skill must survive being read in a repository that shares nothing with
 the one it was written in, so any reference to a particular directory layout,
-tracker, framework, or issue system is a sign it belongs in that project rather
-than here.
+tracker, framework, or issue system means it belongs in that project. When
+adapting existing material, rewrite the reasoning and strip the source
+project's paths and identifiers; keep the judgement calls, which transfer.
 
-When adapting existing material, rewrite the reasoning rather than copying the
-text. Strip the source project's paths, internal identifiers, and its own
-meta-conventions; keep the judgement calls, which are the part that transfers.
-
-Global skills here are standalone, with no header pointing back at wherever they
-were adapted from. The cost is that an adapted copy and its original can drift
-apart, and edits made here never reach the original. Keep new
-project-specific method in that project.
-
-That split is also what keeps the two layers from fighting. Project agents,
-skills, and commands **replace** global ones by ID, so a project overrides any
-global skill without disturbing the others. Permission rules are the one place
-that behaves differently: the arrays **concatenate**, global first, last match
-wins. A global `deny` is therefore a floor a project can override but not
-escape — which is why the global layer deliberately defines no permission rules
-at all.
+Because permission rules concatenate, a global `deny` is a floor a project can
+override but not escape — so the global layer defines no permission rules at
+all.
 
 Two traps:
 
 - `~/.opencode` is opencode's own **data** directory (it holds `bin/`), not its
-  config directory. Never symlink this repository's `.opencode` there, or it
+  config directory. Never link this repository's `.opencode` there, or it
   shadows the binary and injects `/validate` and `/doctor` into every project.
-  `install.sh` links into `~/.config/opencode/` for this reason.
 - opencode caches configuration when its service starts. After adding or moving
   a config file, restart opencode or the change is ignored.
 
+## What `install.sh` links
+
+The global layer is discovered from the filesystem rather than a list. Under
+`config/opencode/` it links each top-level `*.json` file, each directory inside
+`plugins/` **individually**, and every other top-level directory whole
+(`commands/`, `skills/`, and anything added later).
+
+Plugins are expanded one by one on purpose. Linking `plugins/` wholesale would
+merge this repository's plugins into `~/.config/opencode/plugins/`, the same
+place `opencode plugin add` installs community packages as real directories.
+Linking each separately leaves those alone, and the existing check — skip when
+the destination is already a symlink pointing into this checkout — never
+matches a community plugin.
+
+The practical consequence: **adding a plugin, agent, command, or skill under
+`config/opencode/` needs no edit to `install.sh`.** Drop the file in and re-run
+the installer. `case_ai_config_link_discovery` in `tests/run.sh` pins both the
+discovery rule and the current set of shipped plugins.
+
 ## Slash commands
 
-The global command, available in every project:
+Global, available in every project:
 
     /new-ai <agent|skill|command>   scaffold one in the current project's .opencode/
 
-`/new-ai` lives in `config/opencode/commands/`, so `install.sh` links it into
-`~/.config/opencode/commands/` and it loads everywhere. It creates
-**project-level** files — `.opencode/agents/`, `.opencode/skills/`, or
-`.opencode/commands/` relative to the directory you are standing in — because
-an agent scoped to one codebase does not belong in the global layer. It writes
-a skeleton with valid frontmatter and then plans the real content before
-filling it in.
+`/new-ai` creates **project-level** files relative to the directory you are
+standing in, because an agent scoped to one codebase does not belong in the
+global layer. It writes a skeleton with valid frontmatter, then plans the real
+content before filling it in.
 
-Type the project commands in the opencode TUI:
+Project commands, typed in the opencode TUI:
 
     /validate         run scripts/check.sh and report the result
     /doctor           run scripts/doctor.sh (read-only diagnostics)
     /review-changes   review uncommitted changes via the reviewer subagent
     /new-module       plan a new alias/completion/plugin module
 
-opencode ships a builtin `/review` that accepts `[commit|branch|pr]`. The
-repository command is deliberately named `/review-changes` so both remain
-available instead of one replacing the other.
-
 `/validate` and `/doctor` use shell blocks, which run when the command is
 evaluated rather than through the agent's permission flow. They only ever run
 this repository's own scripts.
 
+The repository command is named `/review-changes` because opencode ships a
+builtin `/review` accepting `[commit|branch|pr]`, so both stay available.
+
 ## Permissions
 
-Permissions are project-scoped, in `.opencode/opencode.json`. The broad `allow`
-rules come first; exceptions come after them, because the last matching rule
-wins. The denies encode rules that would otherwise only be prose in `AGENTS.md`:
+Project-scoped, in `.opencode/opencode.json`. Broad `allow` rules come first
+because the last matching rule wins. The denies encode rules that would
+otherwise only be prose in `AGENTS.md`:
 
 - never run `sudo`, `curl`, or `wget` from an agent
 - never run `install.sh`
@@ -164,49 +124,34 @@ wins. The denies encode rules that would otherwise only be prose in `AGENTS.md`:
 - never write `.env` files
 - `git push` asks first
 
-Because these live in the project layer, they apply here and nowhere else. The
-`sudo`/`curl`/`wget` rules are repo-agnostic, and the global **shell-guard**
-plugin (below) now enforces them in every project, so the duplicated entries
-here are defence in depth rather than the only line of defence.
+The `sudo`/`curl`/`wget` rules are repo-agnostic and the global **shell-guard**
+plugin enforces them in every project, so these entries are defence in depth.
 
 ## Global settings
 
-These live in `config/opencode/opencode.json` and therefore apply in every
-project on any machine this repository is installed on.
+These live in `config/opencode/opencode.json` and apply in every project on any
+machine this repository is installed on.
 
 ### `agents`
 
-One global primary agent, `doc-writer`, aimed at documentation work. Its system
-prompt encodes the two rules that matter most when a model is writing docs
-rather than code: match the voice and frontmatter of the document being edited,
-and **verify every command, flag, and path before writing it down**. A
-plausible command that does not exist is the worst output this agent can
-produce. It is `mode: primary` so it can be selected with `/agent doc-writer`,
-but it does not override the default agent for ordinary coding sessions.
+One global primary agent, `doc-writer`, for documentation work. Its system
+prompt encodes the rules that matter most when a model writes docs rather than
+code: match the voice and frontmatter of the document being edited, and verify
+every command, flag, and path before writing it down. A plausible command that
+does not exist is the worst output this agent can produce. It is `mode: primary`
+so it can be selected with `/agent doc-writer`, but it does not override the
+default agent for coding sessions.
 
 ### `references`
 
 `references` gives opencode named access to directories outside the current
-project and advertises each one to the agent through its `description`, so the
-agent knows _when_ to reach for it rather than having to be told. Attach one in
-the client, then ask for what is needed:
+project and advertises each through its `description`, so the agent knows _when_
+to reach for it. Attach one in the client, then ask for what is needed.
 
-    /reference runbook
-    Summarise the rollback procedure in runbook/database.md.
-
-| Alias       | Path                    | Use                                     |
-| ----------- | ----------------------- | --------------------------------------- |
-| `runbook`   | `~/work/docs/runbooks`  | procedures, on-call, deployment steps   |
-| `standards` | `~/work/docs/standards` | team coding and documentation standards |
-
-**This block is currently empty.** It once held the two placeholders above,
-which pointed at `~/work/docs/` — a directory that does not exist on the
-machine, so both were silently useless. They were removed rather than
-repointed, because a document corpus is a per-project fact: the right path for
-a requirements repo is not the right path for a code repo, and a global
-reference that is wrong for most projects is worse than none.
-
-Declare your own in a project's config instead:
+**This block is empty.** A document corpus is a per-project fact — the right path
+for a requirements repo is not the right path for a code repo — and a global
+reference wrong for most projects is worse than none. Declare references in the
+project that owns them:
 
 ```jsonc
 {
@@ -224,14 +169,11 @@ Write a relative path as `./docs`, not `docs` — a bare value with no prefix is
 read as a _Git repository_. An unresolvable reference is ignored without
 warning, so confirm the path exists.
 
-### `websearch` and `update`
+### `websearch`, `update`, `compaction`
 
-`websearch.provider` is `random`, which picks an available provider
-automatically instead of leaving search unconfigured. `update` is `notify`, the
-default, stated explicitly so a work machine does not silently auto-install a new
-release.
-
-### `compaction`
+`websearch.provider` is `random`, picking an available provider automatically
+instead of leaving search unconfigured. `update` is `notify`, the default, stated
+explicitly so a work machine does not silently auto-install a new release.
 
     "compaction": {
         "auto": true,
@@ -239,16 +181,14 @@ release.
         "buffer": 20000
     }
 
-`keep.tokens` is the recent tail preserved verbatim when a summary happens. This
-is the counterpart to the **compaction-memory** plugin below: that plugin
-protects the _original ask_ across compaction, and this keeps the _recent
-detail_. Raise `keep.tokens` for long documentation sessions where the recent
-back-and-forth matters more than the summary being short.
+`keep.tokens` is the recent tail preserved verbatim when a summary happens; this
+keeps the _recent detail_, while the **compaction-memory** plugin protects the
+_original ask_. Raise it for long documentation sessions.
 
 ### `formatter`
 
-`formatter` is enabled globally, with the built-in `prettier` entry overridden to
-run through `npx`. It applies to **`.mdx` only**:
+Enabled globally, with the built-in `prettier` entry overridden to run through
+`npx`. It applies to **`.mdx` only**:
 
     "formatter": {
         "prettier": {
@@ -262,190 +202,104 @@ without a `package.json` in the target project, which a documentation or
 requirements repository usually does not have.
 
 **`.md` is deliberately excluded.** Prettier normalises Markdown tables
-unconditionally — there is no flag that turns it off, and this was verified
-against a real requirement document rather than assumed:
-
-| Attempt                         | Lines changed in one table |
-| ------------------------------- | -------------------------- |
-| `--prose-wrap preserve`         | 88                         |
-| `--print-width 1`               | 88                         |
-| `--no-config`                   | 88                         |
-| project-local `.prettierignore` | 0                          |
-
-The damage is not cosmetic. Requirement tables often use non-breaking spaces
-to align columns; prettier converts them to ordinary spaces and reflows every
-column, so a customer-facing document comes back looking corrupted. Because the
-formatter runs after every `write`/`edit`, an agent asked to fix one typo in a
-table would silently restyle the whole file.
-
-`--prose-wrap preserve` is not a workaround: it governs prose wrapping, not
-table formatting. The only reliable protections are a project-local
-`.prettierignore` or not running the formatter, and a global config cannot
-reach a project-local ignore file — which is why `.md` is dropped rather than
+unconditionally and no flag turns it off: `--prose-wrap preserve`,
+`--print-width 1`, and `--no-config` each left 88 lines changed in one test
+table, while a project-local `.prettierignore` left 0. Requirement tables often
+align columns with non-breaking spaces, which prettier converts to ordinary
+spaces and reflows, so a customer-facing document comes back looking corrupted.
+Because the formatter runs after every `write`/`edit`, an agent asked to fix one
+typo in a table would silently restyle the whole file. A global config cannot
+reach a project-local ignore file, which is why `.md` is dropped rather than
 configured more narrowly.
 
-Enable it per project where table normalisation is actually wanted:
-
-```jsonc
-{
-    "$schema": "https://opencode.ai/config.json",
-    "formatter": {
-        "prettier": {
-            "command": ["npx", "-y", "prettier", "--write", "$FILE"],
-            "extensions": [".md"],
-        },
-    },
-}
-```
+Enable it per project where table normalisation is actually wanted, with
+`"extensions": [".md"]`.
 
 ## Plugins
 
-Four plugins live in `config/opencode/plugins/`, all global. Two are CLI
-plugins that draw (`inspector`, `tokens`); two are server plugins that only
-change behaviour (`shell-guard`, `compaction-memory`).
+Four plugins in `config/opencode/plugins/`, all global. `inspector` and `tokens`
+are CLI plugins that draw; `shell-guard` and `compaction-memory` are server
+plugins that only change behaviour.
 
-Community packages are a separate mechanism. `opencode plugin add <pkg>`
-installs into the same `~/.config/opencode/plugins/` directory as real
-directories that opencode manages, and the installer deliberately leaves them
-alone — see [What `install.sh` links](#what-installsh-links). Pin the version
-(`opencode plugin add <pkg>@1.2.0`) so a work machine and a laptop do not drift.
+Community packages are a separate mechanism: `opencode plugin add <pkg>`
+installs into the same directory as real directories the installer leaves alone
+(see [What `install.sh` links](#what-installsh-links)). Pin the version
+(`opencode plugin add <pkg>@1.2.0`) so machines do not drift.
 
 Discovery is by **flat sibling filenames**, not a `package.json` manifest: a
 directory holding only `index.ts` loads fine as a server-only plugin, while one
-with `index.ts` plus `tui.tsx` also gets a terminal half. Restart opencode after
-adding or removing a plugin — the service caches config at startup.
+with `index.ts` plus `tui.tsx` also gets a terminal half.
 
 ### `shell-guard` (server)
 
 Denies `sudo`, `doas`, `su`, `curl`, `wget`, and `apt*` before the shell runs
 them, in every project, via the v2 `shell.hook("create.before")` hook. This
-replaces re-spelling `sudo *` as a permission rule in each project config, and it
+replaces re-spelling `sudo *` as a permission rule in each project config and
 rejects with a reason the model reads instead of a silent permission prompt.
 
 It matches **command position**, not substrings, by tokenising the command and
 testing each command's first word. `grep -r curl src/` and `echo 'use curl
 later'` are allowed; `echo hi && sudo rm -rf /` is not.
 
-It is a guardrail, not a sandbox. `bash -c 'sudo ls'`, `xargs sudo`, and
-`node -e 'child_process…'` all bypass it, because it matches strings rather than
-intercepting execution. To tighten or loosen it, edit the `BLOCKED` map at the
-top of `index.ts`.
+It is a guardrail, not a sandbox: `bash -c 'sudo ls'`, `xargs sudo`, and
+`node -e 'child_process…'` all bypass it, because it matches strings rather
+than intercepting execution. To tighten or loosen it, edit the `BLOCKED` map at
+the top of `index.ts`.
 
 ### `compaction-memory` (server)
 
 Keeps a small per-session note — the original task and any files the user
-attached — and re-injects it as system context on every compaction, so the reason
-a session started survives summarisation. Captured on the first prompt only and
-never rewritten, so a summary claiming the goal changed cannot overwrite the
-original ask. State lives in durable plugin storage keyed by session and is
-pruned lazily after 14 days.
+attached — and re-injects it as system context on every compaction, so the
+reason a session started survives summarisation. It is captured on the first
+prompt only and never rewritten, so a summary claiming the goal changed cannot
+overwrite the original ask. State lives in durable plugin storage keyed by
+session and is pruned lazily after 14 days.
 
-### `inspector` and `tokens` (CLI)
+### `inspector` (CLI)
 
-`inspector` renders what opencode actually loaded at the current location into
-`sidebar.content`: the agents, slash commands, and skills, each as a section that
-starts collapsed and expands or collapses on **mouse click**. MCP servers are
-deliberately absent — opencode already shows those itself.
+Renders what opencode actually loaded at the current location into
+`sidebar.content`: agents, slash commands, and skills, each a section that
+starts collapsed and toggles on **mouse click**. MCP servers are deliberately
+absent — opencode already shows those itself.
 
-`tokens` adds two collapsible sections to `sidebar.content`, plus one live line
-in `prompt.footer.status`.
+### `tokens` (CLI)
 
-**Tokens** is per model, so a mid-run model switch shows up as separate blocks
-instead of one blended average. Each block pairs throughput with its cache rate,
-prompt with completion, cache read with cache write, and spend with turn count.
+Adds two collapsible sections to `sidebar.content` plus one live line in
+`prompt.footer.status`. Blocks are per model, so a mid-run model switch shows up
+separately instead of as one blended average. Each stat line is a click target
+that opens a dialog explaining both numbers, what moves them, and what is
+normal; the model name opens a dialog built from opencode's registry entry
+(modalities, limits, pricing, variants) rather than from the session. **Context**
+answers a different question — what is filling the window — by splitting the
+prompt by data type (`sys+tools`, `summary`, `reasoning`, `tool output`,
+`tool call`, `answer`, `prompt`, `files`), largest first.
 
-Each of the four lines is a **click target**, opening a dialog titled
-`model · pair` that explains what both of its numbers are, what moves them, and
-what is normal. The model name itself is a fifth target, opening a dialog built
-from opencode's registry entry rather than from this session: what the model is
-registered as, its family, status and release date, its context and output
-limits, its price per million tokens, the modalities it accepts and returns,
-whether it supports tools, the variants offered, and which variant the block
-used. Each paragraph drops out when the provider did not report enough to fill
-it, and a model with no registry entry says so outright instead of showing a
-blank box.
+The total is exact, because opencode reports the prompt size of each assistant
+message. The split is estimated from character counts at roughly four characters
+per token, because the CLI plugin runtime ships no tokenizer; rows are scaled to
+add up to the reported total. `sys+tools` is a residual — the agent system
+prompt, instruction files, and tool schemas — and is usually the largest slice.
 
-The stat line target is the line, not the individual number: a box per number
-either stacks the two columns or needs a third level of nesting, and both were
-tried. The line box is shaped exactly like a context row — one text inside, no
-`key`, no extra box — and `statLines` emits strings identical to the panel's
-original single-string-per-line output, which `stats.ts` asserts against a
-verbatim copy of that implementation. The registry read goes through
-`matchesModel` and `summary`, which are defensive because the entry is
-provider-supplied: opencode carries both a bare `modelID` and a qualified `id`,
-so matching accepts either.
-
-Every provider string is flattened to a single trimmed line on its way into a
-note, because a note is structured by newlines and a capability or variant
-carrying one would break that structure. Prices are tier-aware: models that price
-by prompt length report one entry per tier, and the note picks the tier the
-model's own prompt actually fell into, using the same input plus cache read plus
-cache write total the cache rate is built from. A rate the provider sent as
-negative or non-finite is dropped rather than printed, and a max input equal to
-the context window is not printed twice.
-
-`fuzz.ts` throws 20,000 generated registry entries at `summary()` and
-`modelNote()` and asserts none throws and none leaks `undefined`, `NaN`,
-`[object Object]`, a stray newline, or a double space into the dialog.
-
-No comment may sit inside a JSX expression anywhere in this plugin. opencode's
-transform compiles one there into a text node and OpenTUI rejects the region with
-`Orphan text error`. Both panels had one and both had to be moved out. Every
-click target acts on pointer release rather than pointer press.
-
-**Context** answers a different question — what is filling the window — by
-breaking the prompt down by data type: `sys+tools`, `summary`, `reasoning`,
-`tool output`, `tool call`, `answer`, `prompt`, and `files`. Rows are sorted
-largest first and zero-sized ones are dropped.
-
-Each row is also a **click target**, opening a dialog titled `category · share of
-context` that explains what lands in that bucket, what makes it grow, and what to
-do about it.
-
-All twelve notes are stored as one paragraph per line and left unwrapped,
-because how wide a dialog actually draws its message is the host's business.
-Targets carry no visual cue of their own, so the interaction is undiscoverable
-except by trying them. Every target opens on pointer release, not pointer press,
-so holding the button does not open it.
-
-The total is exact; the split is not. opencode reports the prompt size of each
-assistant message (`input` plus both cache counters), and that is the number
-under `Context`. The individual rows come from character counts at roughly four
-characters per token, because the CLI plugin runtime ships no tokenizer.
-Characters give the shares reliably, and the rows are scaled so they add up to
-the real total. A character walk can overshoot, when opencode has pruned older
-tool output that is still on disk, in which case the rows are scaled down to fit
-the reported total instead.
-
-`sys+tools` is a residual rather than a measurement: it is everything the message
-walk cannot see — the agent system prompt, the instruction files, and the tool
-schemas. It is usually the largest single slice of a window, and it is re-sent
-on every turn. A completed compaction resets the window to its summary plus the
-retained tail, so pre-compaction messages are not counted against a context they
-are no longer part of.
-
-Both sections start collapsed and expand on **mouse click**, with their own
-disclosure state held in memory.
+Plugin-authoring constraints worth knowing before editing either TUI plugin: no
+comment may sit inside a JSX expression (opencode's transform compiles one into
+a text node and OpenTUI rejects the region with `Orphan text error`), and click
+targets act on pointer release rather than pointer press.
 
 `.opencode/skills/opencode-plugin-dev/` is the opencode v2 plugin development
 guide, including which builtin plugins already exist. It stays project-scoped
 with the rest of this repository's opencode configuration.
 
-## Parallel work
+## Shell integration
 
 `worktree.directory` is `.lane/trees`, so `opencode` worktrees land inside the
-checkout and are gitignored rather than scattering under the server's data
-directory. Start one with `/worktree`.
+checkout and are gitignored. Start one with `/worktree`.
 
-## tmux
+In tmux, `M-o` opens opencode in a popup on the current directory. The binding
+is guarded, so it reports that opencode is missing rather than opening a dead
+pane.
 
-`M-o` opens opencode in a popup on the current directory. The binding is guarded,
-so it reports that opencode is missing rather than opening a dead pane.
-
-## Aliases
-
-Defined in `bash/aliases/enable/ai.aliases.bash`, all gated on the executable
-actually existing:
+Aliases in `bash/aliases/enable/ai.aliases.bash`, all gated on the executable
+existing:
 
     ai / aim / aic / ais     opencode, mini, continue, service status
     air                      opencode run (one-shot)
@@ -460,39 +314,31 @@ actually existing:
     dcheck dcheckfast        scripts/check.sh
     ddoctor                  scripts/doctor.sh
 
-### The `gh` collision
-
-`bash/aliases/enable/git.aliases.bash` has always defined `gh` as "cd to the Git
-root". Bash expands aliases only in the first word, so `gh pr list` would expand
-to `cd "$(git rev-parse --show-toplevel)" pr list` and fail.
-
-The existing alias is left alone to preserve muscle memory, and every GitHub CLI
-alias routes through `command gh` instead. The Git-root behaviour is also
-available as `gtop`. To flip this the other way round, move `gh` to the CLI and
-rename the Git-root alias to `gtop`.
-
-`gl` is taken by `git log`, so `glab` keeps its full name.
+`bash/aliases/enable/git.aliases.bash` defines `gh` as "cd to the Git root", and
+bash expands aliases only in the first word, so `gh pr list` would expand to
+`cd "$(git rev-parse --show-toplevel)" pr list` and fail. That alias is kept for
+muscle memory and every GitHub CLI alias routes through `command gh`; the
+Git-root behaviour is also `gtop`. `gl` is taken by `git log`, so `glab` keeps
+its full name.
 
 ## Optional tools
 
 `.kilo/suggest-tools.sh` prints, without installing anything, what the AI
-toolchain is missing: `ripgrep`, `fd-find`, `bat`, `jq`, `shellcheck`, `gh`,
-`git-delta`, `shfmt`, plus upstream install links for `glab` and `difftastic`,
-nvm/Node.js LTS when `npx` is absent, and `npm install -g @ast-grep/cli`.
-
-`npx` is a hard prerequisite for the `sequential-thinking` MCP server, which is
-in the global layer and therefore started in every project. Ubuntu's archive
-ships an outdated Node.js, so use nvm and `nvm install --lts` rather than apt,
-and never `sudo npm install -g`.
-
-Run it any time:
+toolchain is missing, with upstream install links for `glab`, difftastic, nvm
+(Node.js LTS when `npx` is absent), and `npm install -g @ast-grep/cli`:
 
     bash .kilo/suggest-tools.sh
+
+`npx` is a hard prerequisite for the `sequential-thinking` MCP server, which is
+global and therefore started in every project. See `AGENTS.md` for the toolchain
+policy — verify before using, suggest but never install, and never
+`sudo npm install -g`.
 
 ## Gotchas
 
 - An interactive alias is not an executable. After `sudo apt install fd-find`
-  the binary is `fdfind`, not `fd`. `scripts/doctor.sh` reports this.
+  the binary is `fdfind`, not `fd`. `scripts/doctor.sh` reports this. Same for
+  `bat`/`batcat`.
 - Verify `ast-grep`, not `sg`. On Ubuntu `sg` can be an unrelated system
   command, so the alias is `asg`.
 - `instructions` in an opencode config file is accepted but not loaded. Use
@@ -503,8 +349,8 @@ Run it any time:
   repository uses `servers`, which is what opencode v2.0.26 loads.
 - A plugin that fails to load can print nothing at all. Check positively with
   `opencode api get /api/plugin`, which lists every plugin with its source and
-  `active` status. Note it resolves against the service's location, which is
-  not necessarily the directory you launched from.
+  `active` status. It resolves against the service's location, which is not
+  necessarily the directory you launched from.
 
 ## Validation
 
@@ -512,3 +358,5 @@ Agent-facing config is covered by the same suite as the Bash:
 
     bash scripts/check.sh      # includes a JSON group for .opencode/.kilo/.vscode/config
     bash scripts/check.sh --syntax-only
+
+See `AGENTS.md` for exit codes and prerequisites.
