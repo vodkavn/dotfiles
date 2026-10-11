@@ -4,7 +4,7 @@
 
 This repository contains personal Linux dotfiles, not an application.
 
-- `bashrc`, `bash_profile`, `bash_logout`, and `bash/`: Bash startup, aliases, completion, and plugins. Enabled modules live in `bash/{aliases,completion,plugins}/enable/`.
+- `bashrc`, `bash_profile`, `bash_logout`, and `bash/`: Bash startup, aliases, completion, and plugins. Enabled modules live in `bash/{aliases,completion,plugins}/enable/`. `bash/setup.bash` holds the terminal environment, toolchains, and PATH, and is sourced from `bashrc` before the modules.
 - `vimrc` and `vim/`: Vim configuration, local scripts, colors, and Vundle plugins.
 - `tmux.conf` and `tmux/`: tmux configuration, themes, and bundled plugins.
 - `gitconfig`: Git defaults; do not replace personal identity settings without a request.
