@@ -39,7 +39,9 @@ lint_files=("$root"/scripts/**/*.sh "$root"/tests/**/*.sh)
 json_files=("$root"/.opencode/**/*.json "$root"/.kilo/*.json "$root"/.vscode/*.json
     "$root"/config/**/*.json)
 meta_files=("$root"/.opencode/commands/*.md "$root"/.opencode/agents/*.md \
-    "$root"/.opencode/skills/*/SKILL.md)
+    "$root"/.opencode/skills/*/SKILL.md \
+    "$root"/config/opencode/commands/*.md "$root"/config/opencode/agents/*.md \
+    "$root"/config/opencode/skills/*/SKILL.md)
 failures=0
 blocked=0
 syntax_errors=0
@@ -129,7 +131,7 @@ if [[ $mode != syntax ]]; then
     if (( meta_errors )); then
         failures=$((failures + 1))
     else
-        printf 'PASS: agent metadata (.opencode/ commands, agents, skills; %s files)\n' "$meta_count"
+        printf 'PASS: agent metadata (.opencode/ and config/opencode/ commands, agents, skills; %s files)\n' "$meta_count"
     fi
 
     # GitHub Actions workflows are YAML. A malformed one fails only after a push,

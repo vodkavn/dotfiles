@@ -99,6 +99,10 @@ done
 # skills, if any are added later, would live in config/opencode/skills/ and are
 # picked up by the discovery below.
 #
+# config/opencode/commands/ is the one command directory that is global:
+# new-ai.md scaffolds agents, skills, and commands for whatever project you are
+# standing in, so it is useful everywhere. What it creates is still project-level.
+#
 # Community packages installed with `opencode plugin add` land in the same
 # ~/.config/opencode/plugins/ directory but are NOT symlinked from here. Linking
 # each plugin individually, as this used to, meant every new plugin needed an
@@ -118,9 +122,10 @@ done
 #   $HOME/.dotfiles/.opencode/   project; this repository only
 #
 # The global layer carries CLI-wide settings, MCP servers, agents, references,
-# and plugins. Commands, skills, and permission rules stay project-scoped in
-# .opencode/. Note that ~/.opencode is opencode's own data directory, not its
-# config directory; never link this repository's .opencode there.
+# tool-agnostic commands, and plugins. Repository-specific commands, skills, and
+# permission rules stay project-scoped in .opencode/. Note that ~/.opencode is
+# opencode's own data directory, not its config directory; never link this
+# repository's .opencode there.
 #
 ai_global=$HOME/.config/opencode
 ai_src=$HOME/.dotfiles/config/opencode

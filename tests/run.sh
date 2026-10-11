@@ -873,8 +873,9 @@ case_ai_config_link_discovery() {
     )
     assert_eq "$out_missing" '' "a missing source directory must produce an empty list"
 
-    # The real repository tree must still discover the four shipped plugins, so
-    # a rename cannot silently drop one.
+    # The real repository tree must still discover the four shipped plugins and
+    # every other shipped top-level entry, so a rename cannot silently drop one.
+    # config/opencode/commands/ holds the global /new-ai command.
     local real
     real=$(
         cd "$repo_root/config/opencode" 2>/dev/null || exit 0
@@ -884,8 +885,8 @@ case_ai_config_link_discovery() {
             find . -mindepth 1 -maxdepth 1 -type d ! -name plugins -printf '%P\n'
         } | LC_ALL=C sort
     )
-    assert_eq "$real" "$(printf 'opencode.json\nplugins/compaction-memory\nplugins/inspector\nplugins/shell-guard\nplugins/tokens')" \
-        "the shipped global config must discover exactly its four plugins"
+    assert_eq "$real" "$(printf 'commands\nopencode.json\nplugins/compaction-memory\nplugins/inspector\nplugins/shell-guard\nplugins/tokens')" \
+        "the shipped global config must discover its four plugins and its command directory"
     return 0
 }
 

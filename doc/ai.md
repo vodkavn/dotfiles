@@ -11,6 +11,7 @@ apply to every project live under `config/` and are linked into `$HOME` by
     config/opencode/opencode.json          global: shell, formatter, compaction,
                                            websearch, update, agents, references,
                                            MCP servers
+    config/opencode/commands/new-ai.md     global: /new-ai scaffolder
     config/opencode/plugins/inspector/     sidebar inspector (CLI plugin)
     config/opencode/plugins/tokens/        token/speed panel (CLI plugin)
     config/opencode/plugins/shell-guard/   deny privileged commands (server plugin)
@@ -67,13 +68,17 @@ drops one fails the suite.
 last matching rule wins. A global deny therefore still applies here unless a
 later project rule overrides it.
 
-**Global layer** is CLI-wide settings, MCP servers, references, agents, and the
-plugins: `shell`, `formatter`, `compaction`, `websearch`, `update`, the
-`agents` and `references` blocks, the `mcp.servers` block, and the four
-`config/opencode/plugins/` directories.
+**Global layer** is CLI-wide settings, MCP servers, references, agents, the
+`/new-ai` command, and the plugins: `shell`, `formatter`, `compaction`,
+`websearch`, `update`, the `agents` and `references` blocks, the
+`mcp.servers` block, and the four `config/opencode/plugins/` directories.
 
-**Project layer** keeps commands, skills, and every permission rule, because all
-of those encode what this repository cares about.
+**Project layer** keeps this repository's own commands, skills, and every
+permission rule, because all of those encode what this repository cares about.
+
+The dividing line is reuse, not tool: `commands/new-ai.md` is global because it
+scaffolds agent, skill, and command files for *any* project, while
+`.opencode/commands/` holds commands that only make sense here.
 
 Two traps:
 
@@ -86,7 +91,19 @@ Two traps:
 
 ## Slash commands
 
-Type these in the opencode TUI:
+The global command, available in every project:
+
+    /new-ai <agent|skill|command>   scaffold one in the current project's .opencode/
+
+`/new-ai` lives in `config/opencode/commands/`, so `install.sh` links it into
+`~/.config/opencode/commands/` and it loads everywhere. It creates
+**project-level** files — `.opencode/agents/`, `.opencode/skills/`, or
+`.opencode/commands/` relative to the directory you are standing in — because
+an agent scoped to one codebase does not belong in the global layer. It writes
+a skeleton with valid frontmatter and then plans the real content before
+filling it in.
+
+Type the project commands in the opencode TUI:
 
     /validate         run scripts/check.sh and report the result
     /doctor           run scripts/doctor.sh (read-only diagnostics)
