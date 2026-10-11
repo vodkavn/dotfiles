@@ -12,6 +12,12 @@ apply to every project live under `config/` and are linked into `$HOME` by
                                            websearch, update, agents, references,
                                            MCP servers
     config/opencode/commands/new-ai.md     global: /new-ai scaffolder
+    config/opencode/skills/requirement-doc/   requirements & acceptance criteria
+    config/opencode/skills/design-review/     design docs & trade-offs
+    config/opencode/skills/test-scenario/     test scenarios & coverage
+    config/opencode/skills/deliverable-trace/ evidence-checked findings
+    config/opencode/skills/release-rollback/  rollback preflight and ordering
+    config/opencode/skills/workspace-hygiene/ no trash files, no history prose
     config/opencode/plugins/inspector/     sidebar inspector (CLI plugin)
     config/opencode/plugins/tokens/        token/speed panel (CLI plugin)
     config/opencode/plugins/shell-guard/   deny privileged commands (server plugin)
@@ -68,17 +74,45 @@ drops one fails the suite.
 last matching rule wins. A global deny therefore still applies here unless a
 later project rule overrides it.
 
-**Global layer** is CLI-wide settings, MCP servers, references, agents, the
-`/new-ai` command, and the plugins: `shell`, `formatter`, `compaction`,
-`websearch`, `update`, the `agents` and `references` blocks, the
-`mcp.servers` block, and the four `config/opencode/plugins/` directories.
+**Global layer** is CLI-wide settings, MCP servers, agents, the `/new-ai`
+command, the working-method skills, and the plugins: `shell`, `formatter`,
+`compaction`, `websearch`, `update`, the `agents` block, the `mcp.servers`
+block, the four `config/opencode/plugins/` directories, and the six
+`config/opencode/skills/` entries.
 
-**Project layer** keeps this repository's own commands, skills, and every
-permission rule, because all of those encode what this repository cares about.
+**Project layer** keeps this repository's own commands and every permission
+rule, because all of those encode what this repository cares about.
 
-The dividing line is reuse, not tool: `commands/new-ai.md` is global because it
-scaffolds agent, skill, and command files for *any* project, while
-`.opencode/commands/` holds commands that only make sense here.
+The dividing line is reuse, not tool. `commands/new-ai.md` is global because it
+scaffolds agent, skill, and command files for _any_ project. The global skills
+are global because they describe _how the work is done_ — writing an acceptance
+criterion, framing a trade-off, covering a boundary case, backing a finding with
+evidence, planning a rollback, keeping a repository clean — which is the same in
+every repository. What each project uses, what its documents mean, and which
+source is authoritative are project facts and stay out.
+
+Method is portable only when it carries no project-specific assumptions. A
+global skill must survive being read in a repository that shares nothing with
+the one it was written in, so any reference to a particular directory layout,
+tracker, framework, or issue system is a sign it belongs in that project rather
+than here.
+
+When adapting existing material, rewrite the reasoning rather than copying the
+text. Strip the source project's paths, internal identifiers, and its own
+meta-conventions; keep the judgement calls, which are the part that transfers.
+
+Global skills here are standalone, with no header pointing back at wherever they
+were adapted from. The cost is that an adapted copy and its original can drift
+apart, and edits made here never reach the original. Keep new
+project-specific method in that project.
+
+That split is also what keeps the two layers from fighting. Project agents,
+skills, and commands **replace** global ones by ID, so a project overrides any
+global skill without disturbing the others. Permission rules are the one place
+that behaves differently: the arrays **concatenate**, global first, last match
+wins. A global `deny` is therefore a floor a project can override but not
+escape — which is why the global layer deliberately defines no permission rules
+at all.
 
 Two traps:
 
@@ -154,23 +188,41 @@ but it does not override the default agent for ordinary coding sessions.
 
 `references` gives opencode named access to directories outside the current
 project and advertises each one to the agent through its `description`, so the
-agent knows *when* to reach for it rather than having to be told. Attach one in
+agent knows _when_ to reach for it rather than having to be told. Attach one in
 the client, then ask for what is needed:
 
     /reference runbook
     Summarise the rollback procedure in runbook/database.md.
 
-| Alias | Path | Use |
-| --- | --- | --- |
-| `runbook` | `~/work/docs/runbooks` | procedures, on-call, deployment steps |
+| Alias       | Path                    | Use                                     |
+| ----------- | ----------------------- | --------------------------------------- |
+| `runbook`   | `~/work/docs/runbooks`  | procedures, on-call, deployment steps   |
 | `standards` | `~/work/docs/standards` | team coding and documentation standards |
 
-**Both paths are placeholders.** Edit them to wherever the document corpus
-actually lives on the machine in question — this repository cannot know that, and
-a reference pointing at a directory that does not exist is silently useless
-rather than an error. Local references resolve `~`, relative, and absolute
-paths; a bare `docs` with no prefix is read as a *Git repository*, so write
-`./docs`, `~/docs`, or an absolute path.
+**This block is currently empty.** It once held the two placeholders above,
+which pointed at `~/work/docs/` — a directory that does not exist on the
+machine, so both were silently useless. They were removed rather than
+repointed, because a document corpus is a per-project fact: the right path for
+a requirements repo is not the right path for a code repo, and a global
+reference that is wrong for most projects is worse than none.
+
+Declare your own in a project's config instead:
+
+```jsonc
+{
+    "$schema": "https://opencode.ai/config.json",
+    "references": {
+        "specs": {
+            "path": "./02_docs",
+            "description": "Business knowledge base, glossary, and solution docs.",
+        },
+    },
+}
+```
+
+Write a relative path as `./docs`, not `docs` — a bare value with no prefix is
+read as a _Git repository_. An unresolvable reference is ignored without
+warning, so confirm the path exists.
 
 ### `websearch` and `update`
 
@@ -189,31 +241,62 @@ release.
 
 `keep.tokens` is the recent tail preserved verbatim when a summary happens. This
 is the counterpart to the **compaction-memory** plugin below: that plugin
-protects the *original ask* across compaction, and this keeps the *recent
-detail*. Raise `keep.tokens` for long documentation sessions where the recent
+protects the _original ask_ across compaction, and this keeps the _recent
+detail_. Raise `keep.tokens` for long documentation sessions where the recent
 back-and-forth matters more than the summary being short.
 
 ### `formatter`
 
 `formatter` is enabled globally, with the built-in `prettier` entry overridden to
-run through `npx`:
+run through `npx`. It applies to **`.mdx` only**:
 
     "formatter": {
         "prettier": {
             "command": ["npx", "-y", "prettier", "--write", "$FILE"],
-            "extensions": [".md", ".mdx"]
+            "extensions": [".mdx"]
         }
     }
 
-This is what normalises the Markdown tables language models get wrong. The
-built-in `prettier` definition normally requires a `prettier` entry in the
-target project's `package.json`, which a documentation repository often does not
-have; overriding `command` and narrowing `extensions` to `.md`/`.mdx` runs it
-everywhere without adding a Node dependency to any project.
+Overriding `command` and setting `extensions` explicitly is what makes this run
+without a `package.json` in the target project, which a documentation or
+requirements repository usually does not have.
 
-A community plugin doing this job, `opencode-md-table-formatter`, is **v1 only**
-— it hooks `experimental.text.complete`, which does not exist in v2 — so it would
-load and do nothing. This is the supported replacement.
+**`.md` is deliberately excluded.** Prettier normalises Markdown tables
+unconditionally — there is no flag that turns it off, and this was verified
+against a real requirement document rather than assumed:
+
+| Attempt                         | Lines changed in one table |
+| ------------------------------- | -------------------------- |
+| `--prose-wrap preserve`         | 88                         |
+| `--print-width 1`               | 88                         |
+| `--no-config`                   | 88                         |
+| project-local `.prettierignore` | 0                          |
+
+The damage is not cosmetic. Requirement tables often use non-breaking spaces
+to align columns; prettier converts them to ordinary spaces and reflows every
+column, so a customer-facing document comes back looking corrupted. Because the
+formatter runs after every `write`/`edit`, an agent asked to fix one typo in a
+table would silently restyle the whole file.
+
+`--prose-wrap preserve` is not a workaround: it governs prose wrapping, not
+table formatting. The only reliable protections are a project-local
+`.prettierignore` or not running the formatter, and a global config cannot
+reach a project-local ignore file — which is why `.md` is dropped rather than
+configured more narrowly.
+
+Enable it per project where table normalisation is actually wanted:
+
+```jsonc
+{
+    "$schema": "https://opencode.ai/config.json",
+    "formatter": {
+        "prettier": {
+            "command": ["npx", "-y", "prettier", "--write", "$FILE"],
+            "extensions": [".md"],
+        },
+    },
+}
+```
 
 ## Plugins
 
