@@ -170,10 +170,27 @@ Mouse and keyboard both have traps:
   pointer-up family. A conventional click prop exists on opencode's own
   internal components but **not** on the raw elements you write, where it
   silently does nothing.
+- *verified* **Act on pointer-up, not pointer-down.** Acting on down opens a
+  dialog the instant the button goes down and leaves it hanging for as long as
+  the button is held, which reads as a stuck panel rather than a click. Bind the
+  press to stop propagation only, and the release to the action; that also makes
+  press-and-drag-away a natural cancel.
 - Pointer events propagate. Stop propagation in your handler so a click inside
   your region does not trigger whatever the host binds to it.
 - Bind your handler to a wrapping container rather than to the text inside it,
   so the whole row is a target instead of only the glyphs.
+- *verified* **Never write a comment inside a JSX expression.** opencode's
+  transform compiles a `//` comment sitting between the arrow of a `.map()`
+  callback and the element it returns into a **text node** instead of dropping
+  it, and OpenTUI then fails the region with `Orphan text error: ... must have
+  a <text> as a parent`. Keep explanatory comments at module scope or in the
+  component body above its `return`. This is easy to miss because a comment in
+  the same position in a *different* component may not be reached yet, so one
+  broken panel can hide another.
+- *verified* Keep a clickable row to **one box holding one text**. Giving each
+  cell of a two-column row its own box either stacks the columns when they are
+  direct children of the row, or needs a third level of nesting that stops the
+  region rendering at all. Prefer one target for the whole row.
 - **Check for conflicts before binding a shortcut.** *verified* opencode
   already reserves a family of digit bindings for switching sessions, so the
   obvious "one digit per section" scheme collides. Inspect the live keymap

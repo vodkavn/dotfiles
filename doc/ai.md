@@ -347,8 +347,85 @@ pruned lazily after 14 days.
 starts collapsed and expands or collapses on **mouse click**. MCP servers are
 deliberately absent — opencode already shows those itself.
 
-`tokens` shows per-model throughput and cache rate: one live line in
-`prompt.footer.status` plus a collapsible panel in `sidebar.content`.
+`tokens` adds two collapsible sections to `sidebar.content`, plus one live line
+in `prompt.footer.status`.
+
+**Tokens** is per model, so a mid-run model switch shows up as separate blocks
+instead of one blended average. Each block pairs throughput with its cache rate,
+prompt with completion, cache read with cache write, and spend with turn count.
+
+Each of the four lines is a **click target**, opening a dialog titled
+`model · pair` that explains what both of its numbers are, what moves them, and
+what is normal. The model name itself is a fifth target, opening a dialog built
+from opencode's registry entry rather than from this session: what the model is
+registered as, its family, status and release date, its context and output
+limits, its price per million tokens, the modalities it accepts and returns,
+whether it supports tools, the variants offered, and which variant the block
+used. Each paragraph drops out when the provider did not report enough to fill
+it, and a model with no registry entry says so outright instead of showing a
+blank box.
+
+The stat line target is the line, not the individual number: a box per number
+either stacks the two columns or needs a third level of nesting, and both were
+tried. The line box is shaped exactly like a context row — one text inside, no
+`key`, no extra box — and `statLines` emits strings identical to the panel's
+original single-string-per-line output, which `stats.ts` asserts against a
+verbatim copy of that implementation. The registry read goes through
+`matchesModel` and `summary`, which are defensive because the entry is
+provider-supplied: opencode carries both a bare `modelID` and a qualified `id`,
+so matching accepts either.
+
+Every provider string is flattened to a single trimmed line on its way into a
+note, because a note is structured by newlines and a capability or variant
+carrying one would break that structure. Prices are tier-aware: models that price
+by prompt length report one entry per tier, and the note picks the tier the
+model's own prompt actually fell into, using the same input plus cache read plus
+cache write total the cache rate is built from. A rate the provider sent as
+negative or non-finite is dropped rather than printed, and a max input equal to
+the context window is not printed twice.
+
+`fuzz.ts` throws 20,000 generated registry entries at `summary()` and
+`modelNote()` and asserts none throws and none leaks `undefined`, `NaN`,
+`[object Object]`, a stray newline, or a double space into the dialog.
+
+No comment may sit inside a JSX expression anywhere in this plugin. opencode's
+transform compiles one there into a text node and OpenTUI rejects the region with
+`Orphan text error`. Both panels had one and both had to be moved out. Every
+click target acts on pointer release rather than pointer press.
+
+**Context** answers a different question — what is filling the window — by
+breaking the prompt down by data type: `sys+tools`, `summary`, `reasoning`,
+`tool output`, `tool call`, `answer`, `prompt`, and `files`. Rows are sorted
+largest first and zero-sized ones are dropped.
+
+Each row is also a **click target**, opening a dialog titled `category · share of
+context` that explains what lands in that bucket, what makes it grow, and what to
+do about it.
+
+All twelve notes are stored as one paragraph per line and left unwrapped,
+because how wide a dialog actually draws its message is the host's business.
+Targets carry no visual cue of their own, so the interaction is undiscoverable
+except by trying them. Every target opens on pointer release, not pointer press,
+so holding the button does not open it.
+
+The total is exact; the split is not. opencode reports the prompt size of each
+assistant message (`input` plus both cache counters), and that is the number
+under `Context`. The individual rows come from character counts at roughly four
+characters per token, because the CLI plugin runtime ships no tokenizer.
+Characters give the shares reliably, and the rows are scaled so they add up to
+the real total. A character walk can overshoot, when opencode has pruned older
+tool output that is still on disk, in which case the rows are scaled down to fit
+the reported total instead.
+
+`sys+tools` is a residual rather than a measurement: it is everything the message
+walk cannot see — the agent system prompt, the instruction files, and the tool
+schemas. It is usually the largest single slice of a window, and it is re-sent
+on every turn. A completed compaction resets the window to its summary plus the
+retained tail, so pre-compaction messages are not counted against a context they
+are no longer part of.
+
+Both sections start collapsed and expand on **mouse click**, with their own
+disclosure state held in memory.
 
 `.opencode/skills/opencode-plugin-dev/` is the opencode v2 plugin development
 guide, including which builtin plugins already exist. It stays project-scoped
