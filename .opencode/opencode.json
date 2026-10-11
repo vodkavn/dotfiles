@@ -1,0 +1,108 @@
+{
+    "$schema": "https://opencode.ai/config.json",
+    "shell": "/bin/bash",
+    "formatter": true,
+    "worktree": {
+        "directory": ".lane/trees"
+    },
+    "watcher": {
+        "ignore": [
+            ".git/**",
+            ".lane/**",
+            "vim/bundle/**",
+            "vim/tmp/**",
+            "vim/local/**",
+            "tmux/plugins/**",
+            "screenshots/**",
+            "font/**"
+        ]
+    },
+    "mcp": {
+        "servers": {
+            "context7": {
+                "type": "remote",
+                "url": "https://mcp.context7.com/mcp"
+            },
+            "sequential-thinking": {
+                "type": "local",
+                "command": [
+                    "npx",
+                    "-y",
+                    "@modelcontextprotocol/server-sequential-thinking"
+                ]
+            }
+        }
+    },
+    "permissions": [
+        {
+            "action": "shell",
+            "resource": "*",
+            "effect": "allow"
+        },
+        {
+            "action": "edit",
+            "resource": "*",
+            "effect": "allow"
+        },
+        {
+            "action": "read",
+            "resource": "*",
+            "effect": "allow"
+        },
+        {
+            "action": "shell",
+            "resource": "sudo *",
+            "effect": "deny"
+        },
+        {
+            "action": "shell",
+            "resource": "curl *",
+            "effect": "deny"
+        },
+        {
+            "action": "shell",
+            "resource": "wget *",
+            "effect": "deny"
+        },
+        {
+            "action": "shell",
+            "resource": "bash install.sh",
+            "effect": "deny"
+        },
+        {
+            "action": "shell",
+            "resource": "sh install.sh",
+            "effect": "deny"
+        },
+        {
+            "action": "shell",
+            "resource": "./install.sh",
+            "effect": "deny"
+        },
+        {
+            "action": "shell",
+            "resource": "git push *",
+            "effect": "ask"
+        },
+        {
+            "action": "edit",
+            "resource": "tmux/plugins/**",
+            "effect": "deny"
+        },
+        {
+            "action": "edit",
+            "resource": "vim/bundle/**",
+            "effect": "deny"
+        },
+        {
+            "action": "edit",
+            "resource": "vim/autoload/pathogen.vim",
+            "effect": "deny"
+        },
+        {
+            "action": "edit",
+            "resource": "**/.env*",
+            "effect": "deny"
+        }
+    ]
+}
