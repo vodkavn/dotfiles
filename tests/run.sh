@@ -558,18 +558,28 @@ EOS
 }
 
 case_passgen_fixture_dict() {
+    # passgen guards on the absolute path /usr/share/dict/words. Bash cannot
+    # redefine the `[` builtin, so that guard cannot be stubbed from the child:
+    # a `'['() { ... }` definition is a syntax error, not a stub. Source a copy
+    # with the path rewritten to an isolated fixture instead. The real passgen
+    # code still runs, and the host dictionary is never read.
+    sed "s|/usr/share/dict/words|$CASE_DIR/words.txt|g" \
+        "$repo_root/bash/plugins/enable/base.plugin.bash" > "$CASE_DIR/base.sh"
+    if grep -q '/usr/share/dict/words' "$CASE_DIR/base.sh"; then
+        die "fixture rewrite did not replace the host dictionary path"
+    fi
+    printf 'alpha\nbeta\ngamma\ndelta\nepsilon\n' > "$CASE_DIR/words.txt"
+
     cat > "$CASE_DIR/child.sh" <<'EOS'
 source "$REPO/bash/lib/composure.bash"
-source "$REPO/bash/plugins/enable/base.plugin.bash"
+source "$CASE_DIR/base.sh"
 
 passgen 0 >/dev/null 2>&1; printf 'zero=%s\n' "$?"
 passgen abc >/dev/null 2>&1; printf 'abc=%s\n' "$?"
 passgen -3 >/dev/null 2>&1; printf 'neg=%s\n' "$?"
 
-# Deterministic dictionary via a pickfrom stub, with the machine dictionary
-# guard mocked so the suite never depends on /usr/share/dict/words content.
-FIXTURE_WORDS="$HOME/words.txt"
-printf 'alpha\nbeta\ngamma\ndelta\nepsilon\n' > "$FIXTURE_WORDS"
+# Deterministic word order via a pickfrom stub, so the assertions never depend
+# on the host dictionary or on RANDOM.
 PICK_COUNT="$HOME/pick.count"
 : > "$PICK_COUNT"
 pickfrom() {
@@ -577,14 +587,7 @@ pickfrom() {
     n=$(cat "$PICK_COUNT" 2>/dev/null || printf 0)
     n=$(( n + 1 ))
     printf '%s\n' "$n" > "$PICK_COUNT"
-    sed -n "${n}p" "$FIXTURE_WORDS"
-}
-'['() {
-    if [[ $# -eq 2 && $1 == -r && $2 == /usr/share/dict/words ]]; then
-        builtin [ -r "$FIXTURE_WORDS"
-    else
-        builtin [ "$@"
-    fi
+    sed -n "${n}p" "$CASE_DIR/words.txt"
 }
 
 out=$(passgen 3)

@@ -1,5 +1,5 @@
 ---
-description: Review the current changes for correctness and regressions
+description: Review this repository's uncommitted changes against AGENTS.md and editorconfig
 agent: reviewer
 subagent: true
 ---

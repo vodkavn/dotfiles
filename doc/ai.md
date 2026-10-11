@@ -19,10 +19,14 @@ with `jq`. The `$schema` key still gives editors validation and autocomplete.
 
 Type these in the opencode TUI:
 
-    /validate      run scripts/check.sh and report the result
-    /doctor        run scripts/doctor.sh (read-only diagnostics)
-    /review        review uncommitted changes via the reviewer subagent
-    /new-module    plan a new alias/completion/plugin module
+    /validate         run scripts/check.sh and report the result
+    /doctor           run scripts/doctor.sh (read-only diagnostics)
+    /review-changes   review uncommitted changes via the reviewer subagent
+    /new-module       plan a new alias/completion/plugin module
+
+opencode ships a builtin `/review` that accepts `[commit|branch|pr]`. The
+repository command is deliberately named `/review-changes` so both remain
+available instead of one replacing the other.
 
 `/validate` and `/doctor` use shell blocks, which run when the command is
 evaluated rather than through the agent's permission flow. They only ever run
