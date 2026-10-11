@@ -218,15 +218,14 @@ const Panel = (props: {
     return (
         <box flexDirection="column" gap={0}>
             <box flexDirection="row" flexShrink={0} onMouseDown={props.toggle} onMouseUp={props.stop}>
-                <text fg={surface.text.base}>
-                    {props.open
-                        ? props.rows.length === 0
-                            ? "▾ Tokens"
-                            : `▾ Tokens (${props.rows.length} model${props.rows.length === 1 ? "" : "s"})`
-                        : props.rows.length === 0
-                          ? "▸ Tokens"
-                          : `▸ Tokens (${perSecond(props.rows[0])} · ${hitRate(props.rows[0])})`}
-                </text>
+                <text fg={surface.text.base}>{`${props.open ? "▾" : "▸"} Tokens`}</text>
+                {props.rows.length > 0 && (
+                    <text fg={surface.text.muted}>
+                        {props.open
+                            ? ` (${props.rows.length} model${props.rows.length === 1 ? "" : "s"})`
+                            : ` (${perSecond(props.rows[0])} · ${hitRate(props.rows[0])})`}
+                    </text>
+                )}
             </box>
             {props.open &&
                 props.rows.map((row, index) => (
