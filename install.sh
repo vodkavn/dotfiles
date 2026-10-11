@@ -81,17 +81,25 @@ done
 #
 # Like every other entry here, the source path is named after its $HOME target:
 #   config/opencode/opencode.json  ->  ~/.config/opencode/opencode.json
+#   config/opencode/plugins/       ->  ~/.config/opencode/plugins/
+#
+# opencode auto-discovers ~/.config/opencode/plugins/ and the project's
+# .opencode/plugins/, so the sidebar inspector needs no entry in opencode.json.
+# A plugin directory is discovered from its flat index.ts and ui.tsx siblings;
+# a nested src/ directory or a package.json is not resolved.
+#
+# Skills stay project-scoped under .opencode/skills/ and are not linked here.
 #
 # opencode merges two layers, global first and project second:
 #   $HOME/.config/opencode/      global; applies to every project
 #   $HOME/.dotfiles/.opencode/   project; this repository only
 #
-# The global layer carries CLI-wide settings and MCP servers only. Commands,
-# agents, skills, and permission rules are project-scoped and stay in
+# The global layer carries CLI-wide settings, MCP servers, and the plugin only.
+# Commands, agents, skills, and permission rules are project-scoped and stay in
 # .opencode/. Note that ~/.opencode is opencode's own data directory, not its
 # config directory; never link this repository's .opencode there.
 #
-ai_link_list=(opencode.json)
+ai_link_list=(opencode.json plugins/inspector)
 ai_global=$HOME/.config/opencode
 
 if command -v opencode >/dev/null 2>&1; then
@@ -117,9 +125,13 @@ if command -v opencode >/dev/null 2>&1; then
         echo "--> Installing .config/opencode/$file..."
         mkdir -p $(dirname "$dst")
         ln -sf "$src" "$dst"
-        if command -v jq >/dev/null 2>&1; then
-            jq empty "$dst" || echo "-->   WARNING: installed config is not valid JSON"
-        fi
+        case $file in
+            *.json)
+                if command -v jq >/dev/null 2>&1; then
+                    jq empty "$dst" || echo "-->   WARNING: $file is not valid JSON"
+                fi
+                ;;
+        esac
     done
     echo "--> Restart any running opencode; it caches config at startup."
 else

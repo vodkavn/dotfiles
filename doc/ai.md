@@ -9,9 +9,11 @@ apply to every project live under `config/` and are linked into `$HOME` by
 ## Layout
 
     config/opencode/opencode.json          global: shell, formatter, MCP servers
+    config/opencode/plugins/inspector/     sidebar inspector (CLI plugin)
     .opencode/opencode.json                 project: permissions, watcher, worktree
     .opencode/commands/*.md                 slash commands
     .opencode/agents/reviewer.md            read-only review subagent
+    .opencode/skills/opencode-plugin-dev/   opencode v2 plugin development guide
     .opencode/skills/dotfiles-change/       repo conventions as a loadable skill
 
 `config/` follows the same rule as the rest of the repository: a path is named
@@ -36,8 +38,9 @@ with `jq`. The `$schema` key still gives editors validation and autocomplete.
 last matching rule wins. A global deny therefore still applies here unless a
 later project rule overrides it.
 
-**Global layer** is CLI-wide settings and MCP servers only: `shell`, `formatter`,
-and the `mcp.servers` block. `plugin` belongs here too — it is empty today.
+**Global layer** is CLI-wide settings, MCP servers, and the sidebar inspector
+plugin: `shell`, `formatter`, the `mcp.servers` block, and
+`config/opencode/plugins/inspector/`.
 
 **Project layer** keeps commands, agents, skills, and every permission rule,
 because all of those encode what this repository cares about.
@@ -83,6 +86,24 @@ wins. The denies encode rules that would otherwise only be prose in `AGENTS.md`:
 Because these live in the project layer, they apply here and nowhere else. The
 `sudo`/`curl`/`wget`, `.env`, and `git push` rules are repo-agnostic; move them
 to `config/opencode/opencode.json` if you want them in every project.
+
+## Sidebar inspector
+
+`config/opencode/plugins/inspector/` renders what opencode actually loaded at
+the current location into `sidebar.content`: the agents, slash commands, and
+skills, each as a section that starts collapsed and expands or collapses on
+**mouse click**.
+
+MCP servers are deliberately absent — opencode already shows those itself.
+
+The plugin is a CLI (TUI) plugin, not a server plugin. Both entrypoints live as
+flat siblings in the plugin directory; opencode discovers them by sibling name,
+not by a `package.json` manifest. Restart opencode after changing it, because
+the service caches configuration at startup.
+
+`.opencode/skills/opencode-plugin-dev/` is the opencode v2 plugin development
+guide. It stays project-scoped with the rest of this repository's opencode
+configuration.
 
 ## Parallel work
 

@@ -12,7 +12,7 @@ This repository contains personal Linux dotfiles, not an application.
 - `scripts/` and `tests/`: read-only diagnostics and isolated local Bash validation.
 - `doc/` and `README.md`: usage notes and installation instructions.
 - `.kilo/` and `.opencode/`: all Kilo-specific and all opencode-specific *project* configuration respectively. Keep this file tool-neutral.
-- `config/`: configuration `install.sh` links into `$HOME` so it applies to every project. Like every other entry, the path is named after its target, so `config/opencode/opencode.json` becomes `~/.config/opencode/opencode.json`. It holds CLI-wide settings and MCP servers only; commands, agents, skills, and permission rules stay project-scoped in `.opencode/`. Note `~/.opencode` is opencode's own data directory, not its config directory — never link this repository's `.opencode` there.
+- `config/`: configuration `install.sh` links into `$HOME` so it applies to every project. Like every other entry, the path is named after its target, so `config/opencode/opencode.json` becomes `~/.config/opencode/opencode.json`. It holds CLI-wide settings, MCP servers, and the global opencode plugin under `config/opencode/plugins/`; commands, agents, skills, and permission rules stay project-scoped in `.opencode/`. Note `~/.opencode` is opencode's own data directory, not its config directory — never link this repository's `.opencode` there.
 
 ## Editing Rules
 

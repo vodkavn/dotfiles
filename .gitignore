@@ -12,3 +12,6 @@ tmux/resurrect
 
 # Agent worktrees created by `opencode` (see .opencode/opencode.json)
 .lane/
+
+# Dependencies a local opencode plugin may pull in via `bun install`
+config/opencode/plugins/*/node_modules/
