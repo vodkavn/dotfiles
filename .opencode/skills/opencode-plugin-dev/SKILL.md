@@ -7,6 +7,59 @@ Reference for building opencode **v2** plugins. Claims marked *verified* were
 tested against opencode v2.0.26 rather than read from documentation, because the
 docs describe a later release than that binary ships.
 
+## Which docs to use
+
+Two different questions draw from two different sources:
+
+- **How to build a plugin:** only the v2 docs — the server guide at
+  `/v2/docs/build/plugins`, the terminal guide at `/v2/docs/build/plugins/cli`,
+  and the effect variants under `/v2/docs/build/plugins/effect`. Never build
+  from `/docs/plugins`, which documents v1.
+- **What plugins exist and what to build next:** both v1 and v2 community
+  plugins are fair game. opencode has no v2 ecosystem page; the community list
+  lives at `/docs/ecosystem` and mixes eras, so read each entry's version before
+  copying its approach. A v1 plugin is still a good source of *ideas* — an idea
+  ports, its code does not.
+
+The v2 config schema URL embedded in `opencode.json` may describe v1. Do not
+use it to infer v2 field names.
+
+## Look before you build
+
+*verified* opencode ships roughly 90 **builtin** plugins, and they already
+occupy most of the obvious extension points. They register under
+`source.type: "builtin"` and are not configurable from `opencode.json`, but they
+are the reason several plugins below are less work than they look.
+
+The groups worth knowing, because they decide whether you need a plugin at all:
+
+- **Config domain** (`opencode.config.*`) — agent, command, skill, mcp,
+  provider, compaction, formatter, instruction, policy, reference, snapshot,
+  shell, tool-output, websearch, watcher.
+- **Providers** (`opencode.provider.*`) — bundled auth for GitHub Copilot,
+  OpenAI, GitLab, Bedrock, Vertex, Azure, Ollama, LM Studio, OpenRouter, and
+  roughly twenty more. Only worth overriding to rename, retag, or price-filter.
+- **Tools** (`opencode.tool.*`) — read, write, edit, glob, grep, shell, patch,
+  webfetch, websearch, skill, subagent, question. Registering a tool with the
+  same name overrides the builtin.
+- **Websearch** (`opencode.websearch.*`) — exa, tavily, firecrawl, parallel,
+  tinyfish.
+- **VCS** (`opencode.vcs.git`, `opencode.vcs.hg`) — the default strategies for
+  worktrees.
+- **Behaviour** — `opencode.prompt.*`, `opencode.warming`, `opencode.browser`,
+  `opencode.wellknown`, `opencode.models.dev`.
+
+Ask the running service what is actually loaded before assuming any of this:
+
+```sh
+opencode api get /api/plugin
+```
+
+It prints every plugin with its id, source, whether `server` and/or `tui` is
+active, and its state — so it answers "did my plugin load" in one step, and
+"does opencode already do this" just as fast. Note it resolves against the
+*service's* location, which may not be the directory you launched from.
+
 ## Two kinds of plugin
 
 opencode v2 splits extension points in two, and choosing wrong is the most

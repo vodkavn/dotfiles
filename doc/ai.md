@@ -10,6 +10,9 @@ apply to every project live under `config/` and are linked into `$HOME` by
 
     config/opencode/opencode.json          global: shell, formatter, MCP servers
     config/opencode/plugins/inspector/     sidebar inspector (CLI plugin)
+    config/opencode/plugins/tokens/        token/speed panel (CLI plugin)
+    config/opencode/plugins/shell-guard/   deny privileged commands (server plugin)
+    config/opencode/plugins/compaction-memory/  keep intent across compaction
     .opencode/opencode.json                 project: permissions, watcher, worktree
     .opencode/commands/*.md                 slash commands
     .opencode/agents/reviewer.md            read-only review subagent
@@ -38,9 +41,9 @@ with `jq`. The `$schema` key still gives editors validation and autocomplete.
 last matching rule wins. A global deny therefore still applies here unless a
 later project rule overrides it.
 
-**Global layer** is CLI-wide settings, MCP servers, and the sidebar inspector
-plugin: `shell`, `formatter`, the `mcp.servers` block, and
-`config/opencode/plugins/inspector/`.
+**Global layer** is CLI-wide settings, MCP servers, and the plugins:
+`shell`, `formatter`, the `mcp.servers` block, and the four
+`config/opencode/plugins/` directories.
 
 **Project layer** keeps commands, agents, skills, and every permission rule,
 because all of those encode what this repository cares about.
@@ -84,26 +87,59 @@ wins. The denies encode rules that would otherwise only be prose in `AGENTS.md`:
 - `git push` asks first
 
 Because these live in the project layer, they apply here and nowhere else. The
-`sudo`/`curl`/`wget`, `.env`, and `git push` rules are repo-agnostic; move them
-to `config/opencode/opencode.json` if you want them in every project.
+`sudo`/`curl`/`wget` rules are repo-agnostic, and the global **shell-guard**
+plugin (below) now enforces them in every project, so the duplicated entries
+here are defence in depth rather than the only line of defence.
 
-## Sidebar inspector
+## Plugins
 
-`config/opencode/plugins/inspector/` renders what opencode actually loaded at
-the current location into `sidebar.content`: the agents, slash commands, and
-skills, each as a section that starts collapsed and expands or collapses on
-**mouse click**.
+Four plugins live in `config/opencode/plugins/`, all global. Two are CLI
+plugins that draw (`inspector`, `tokens`); two are server plugins that only
+change behaviour (`shell-guard`, `compaction-memory`).
 
-MCP servers are deliberately absent — opencode already shows those itself.
+Discovery is by **flat sibling filenames**, not a `package.json` manifest: a
+directory holding only `index.ts` loads fine as a server-only plugin, while one
+with `index.ts` plus `tui.tsx` also gets a terminal half. Restart opencode after
+adding or removing a plugin — the service caches config at startup.
 
-The plugin is a CLI (TUI) plugin, not a server plugin. Both entrypoints live as
-flat siblings in the plugin directory; opencode discovers them by sibling name,
-not by a `package.json` manifest. Restart opencode after changing it, because
-the service caches configuration at startup.
+### `shell-guard` (server)
+
+Denies `sudo`, `doas`, `su`, `curl`, `wget`, and `apt*` before the shell runs
+them, in every project, via the v2 `shell.hook("create.before")` hook. This
+replaces re-spelling `sudo *` as a permission rule in each project config, and it
+rejects with a reason the model reads instead of a silent permission prompt.
+
+It matches **command position**, not substrings, by tokenising the command and
+testing each command's first word. `grep -r curl src/` and `echo 'use curl
+later'` are allowed; `echo hi && sudo rm -rf /` is not.
+
+It is a guardrail, not a sandbox. `bash -c 'sudo ls'`, `xargs sudo`, and
+`node -e 'child_process…'` all bypass it, because it matches strings rather than
+intercepting execution. To tighten or loosen it, edit the `BLOCKED` map at the
+top of `index.ts`.
+
+### `compaction-memory` (server)
+
+Keeps a small per-session note — the original task and any files the user
+attached — and re-injects it as system context on every compaction, so the reason
+a session started survives summarisation. Captured on the first prompt only and
+never rewritten, so a summary claiming the goal changed cannot overwrite the
+original ask. State lives in durable plugin storage keyed by session and is
+pruned lazily after 14 days.
+
+### `inspector` and `tokens` (CLI)
+
+`inspector` renders what opencode actually loaded at the current location into
+`sidebar.content`: the agents, slash commands, and skills, each as a section that
+starts collapsed and expands or collapses on **mouse click**. MCP servers are
+deliberately absent — opencode already shows those itself.
+
+`tokens` shows per-model throughput and cache rate: one live line in
+`prompt.footer.status` plus a collapsible panel in `sidebar.content`.
 
 `.opencode/skills/opencode-plugin-dev/` is the opencode v2 plugin development
-guide. It stays project-scoped with the rest of this repository's opencode
-configuration.
+guide, including which builtin plugins already exist. It stays project-scoped
+with the rest of this repository's opencode configuration.
 
 ## Parallel work
 
@@ -175,6 +211,10 @@ Run it any time:
   either `{ "servers": { ... } }` or a flat `{ "name": { ... } }`; if any flat
   key is present the nested `servers` object is silently ignored. This
   repository uses `servers`, which is what opencode v2.0.26 loads.
+- A plugin that fails to load can print nothing at all. Check positively with
+  `opencode api get /api/plugin`, which lists every plugin with its source and
+  `active` status. Note it resolves against the service's location, which is
+  not necessarily the directory you launched from.
 
 ## Validation
 
