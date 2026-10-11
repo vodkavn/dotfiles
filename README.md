@@ -36,6 +36,17 @@ bash scripts/check.sh
 Full checks require ShellCheck and bash-completion. See `bash scripts/check.sh --help`
 for options or [AGENTS.md](AGENTS.md) for validation details.
 
+## Continuous Integration
+
+`.github/workflows/validate.yml` runs `bash scripts/check.sh` on every push and
+pull request, so a change that breaks the suite locally fails on the runner too.
+It installs its own prerequisites (`bash-completion`, `jq`, `shellcheck`) and
+checks out without submodules, since `vim/bundle/` is vendored third-party code
+that no check reads.
+
+Workflow YAML is itself checked by `scripts/check.sh`, so a malformed workflow
+fails locally instead of after a push.
+
 ## Cheatsheet
 
 - [Common Settings](doc/common.md)

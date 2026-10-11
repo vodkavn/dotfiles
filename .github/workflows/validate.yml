@@ -1,0 +1,87 @@
+name: Validate
+
+# Runs scripts/check.sh on every push and pull request. That script is the same
+# entry point AGENTS.md tells a contributor to run locally, so CI cannot pass
+# while the local suite fails.
+#
+# The suite is fast (a few seconds), so concurrency cancels superseded runs on
+# a busy branch rather than queueing them.
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # Keep in step with the version a developer is likely to have locally. Bump
+  # deliberately, and re-run the suite locally first: a newer ShellCheck may
+  # report findings an older one did not. When bumping, update the checksum from
+  # the release's published SHA256.
+  SHELLCHECK_VERSION: "0.11.0"
+  SHELLCHECK_SHA256: "8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198"
+
+concurrency:
+  group: validate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: check.sh
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+        with:
+          # check.sh inspects the working tree, and the tests resolve the
+          # repository root from the checkout path. Submodules are deliberately
+          # not fetched: vim/bundle/ is vendored third-party code that no check
+          # reads, and cloning it would make every run slower and able to fail
+          # for reasons unrelated to this repository's own files.
+          submodules: false
+
+      - name: Install test prerequisites
+        # Each maps to a hard prerequisite the scripts gate on:
+        #   bash-completion  tests/run.sh blocks without this marker file
+        #   shellcheck       check.sh reports BLOCKED (exit 2) without it
+        #   jq               check.sh validates every agent JSON file with it
+        # Without these the run would be incomplete rather than passing.
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            bash-completion \
+            jq
+
+      - name: Install pinned ShellCheck
+        # Pinned deliberately. The distro package tracks the runner image, and
+        # the image moves: ubuntu-latest shipped 0.9.0, whose reachability
+        # analysis reported SC2317 on tests/run.sh for functions reached
+        # through `run_case "$@"` and `trap cleanup EXIT`. Those are false
+        # positives -- ShellCheck's own SC2317 page documents the trap and
+        # indirect-call cases -- but they turn a green local run into a red
+        # push. A fixed version keeps CI and a current local install in
+        # agreement. The checksum is the value published with the release.
+        run: |
+          curl -fsSL --retry 3 \
+            https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz \
+            -o /tmp/sc.tar.xz
+          echo "${SHELLCHECK_SHA256}  /tmp/sc.tar.xz" | sha256sum --check --strict
+          mkdir -p /tmp/sc && tar -xJf /tmp/sc.tar.xz -C /tmp/sc --strip-components=1
+          sudo install -m 0755 /tmp/sc/shellcheck /usr/local/bin/shellcheck
+          shellcheck --version | sed -n '2p'
+
+      - name: Report tool versions
+        run: |
+          bash --version | head -1
+          git --version
+          jq --version
+          shellcheck --version | sed -n '2p'
+
+      - name: Run checks
+        # Exit codes are contractual: 0 passed, 1 failed, 2 blocked or invalid.
+        # A blocked run fails this step on purpose rather than passing quietly.
+        run: bash scripts/check.sh

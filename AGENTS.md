@@ -11,7 +11,7 @@ This repository contains personal Linux dotfiles, not an application.
 - `install.sh`: installation, backups, symlinks, font copying, and plugin updates.
 - `scripts/` and `tests/`: read-only diagnostics and isolated local Bash validation.
 - `doc/` and `README.md`: usage notes and installation instructions.
-- `.kilo/` and `.opencode/`: all Kilo-specific and all opencode-specific *project* configuration respectively. Keep this file tool-neutral.
+- `.kilo/` and `.opencode/`: all Kilo-specific and all opencode-specific _project_ configuration respectively. Keep this file tool-neutral.
 - `config/`: configuration `install.sh` links into `$HOME` so it applies to every project. Like every other entry, the path is named after its target, so `config/opencode/opencode.json` becomes `~/.config/opencode/opencode.json`. It holds CLI-wide settings, MCP servers, and the global opencode plugin under `config/opencode/plugins/`; commands, agents, skills, and permission rules stay project-scoped in `.opencode/`. Note `~/.opencode` is opencode's own data directory, not its config directory — never link this repository's `.opencode` there.
 
 ## Editing Rules
@@ -34,12 +34,13 @@ This repository contains personal Linux dotfiles, not an application.
 
 ## Validation
 
-The supported target is Ubuntu 26.x. There is no CI workflow.
+The supported target is Ubuntu 26.x. CI runs `scripts/check.sh` on every push and pull request via `.github/workflows/validate.yml`.
 
 - Run `bash scripts/doctor.sh` for read-only prerequisite and executable-path diagnostics. It does not source personal configuration, inspect credentials, or install tools.
-- Run `bash scripts/check.sh` for syntax, isolated Bash regressions, ShellCheck on `scripts/` and `tests/`, JSON validation of the agent config in `.opencode/`, `.kilo/`, `.vscode/`, and `config/`, and Git whitespace. Legacy configuration and bundled code receive syntax/runtime checks, not a clean-lint claim.
-- Exit codes: `0` means selected checks passed, `1` means a check failed, and `2` means validation is incomplete or usage is invalid. Missing ShellCheck or `jq` blocks full validation; suggest `sudo apt install shellcheck jq`, never install them yourself.
+- Run `bash scripts/check.sh` for syntax, isolated Bash regressions, ShellCheck on `scripts/` and `tests/`, JSON validation of the agent config in `.opencode/`, `.kilo/`, `.vscode/`, and `config/`, workflow YAML validation, and Git whitespace. Legacy configuration and bundled code receive syntax/runtime checks, not a clean-lint claim.
+- Exit codes: `0` means selected checks passed, `1` means a check failed, and `2` means validation is incomplete or usage is invalid. Missing ShellCheck, `jq`, or `python3` blocks full validation; suggest `sudo apt install shellcheck jq`, never install them yourself. CI installs its prerequisites itself, so a blocked run there means a genuine gap.
 - `--syntax-only` selects syntax checks only. `--no-lint` explicitly excludes ShellCheck; report this exclusion rather than claiming full validation passed. Run `bash tests/run.sh` for standalone isolated runtime tests.
+- CI checks out without submodules, because `vim/bundle/` is vendored third-party code that no check reads. A change that only passes with submodules present will fail on the runner.
 
 - For changed Bash files, run `bash -n path/to/file` to check syntax without executing them. Root Bash files have no extension; modules use `.bash` and scripts commonly use `.sh`.
 - If ShellCheck is installed, run `shellcheck -s bash path/to/file` on changed Bash files. Distinguish existing warnings from regressions; do not reformat vendored code to silence them.

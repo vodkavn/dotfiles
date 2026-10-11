@@ -8,7 +8,9 @@ apply to every project live under `config/` and are linked into `$HOME` by
 
 ## Layout
 
-    config/opencode/opencode.json          global: shell, formatter, MCP servers
+    config/opencode/opencode.json          global: shell, formatter, compaction,
+                                           websearch, update, agents, references,
+                                           MCP servers
     config/opencode/plugins/inspector/     sidebar inspector (CLI plugin)
     config/opencode/plugins/tokens/        token/speed panel (CLI plugin)
     config/opencode/plugins/shell-guard/   deny privileged commands (server plugin)
@@ -27,6 +29,30 @@ and `gitconfig` is `~/.gitconfig`.
 Configuration is strict JSON, not JSONC, so `scripts/check.sh` can validate it
 with `jq`. The `$schema` key still gives editors validation and autocomplete.
 
+## What `install.sh` links
+
+`install.sh` discovers the global layer from the filesystem rather than from a
+list. Under `config/opencode/` it links:
+
+- each top-level `*.json` file — currently just `opencode.json`
+- each directory inside `plugins/`, **individually**
+- every other top-level directory, linked whole — `agents/`, `commands/`,
+  `skills/` today, and anything added later
+
+Plugins are expanded one by one on purpose. Linking `plugins/` as a single
+directory would merge this repository's plugins into
+`~/.config/opencode/plugins/` wholesale, which is the same place
+`opencode plugin add` installs community packages as real directories. Linking
+each plugin separately leaves those alone, and the existing check — skip when the
+destination is already a symlink pointing into this checkout — never matches a
+community plugin.
+
+The practical consequence: **adding a plugin, agent, command, or skill under
+`config/opencode/` needs no edit to `install.sh`.** Drop the file in and re-run
+the installer. `case_ai_config_link_discovery` in `tests/run.sh` pins both the
+discovery rule and the current set of shipped plugins, so a rename that silently
+drops one fails the suite.
+
 ## The two layers
 
 `install.sh` links `config/opencode/opencode.json` to
@@ -41,12 +67,13 @@ with `jq`. The `$schema` key still gives editors validation and autocomplete.
 last matching rule wins. A global deny therefore still applies here unless a
 later project rule overrides it.
 
-**Global layer** is CLI-wide settings, MCP servers, and the plugins:
-`shell`, `formatter`, the `mcp.servers` block, and the four
+**Global layer** is CLI-wide settings, MCP servers, references, agents, and the
+plugins: `shell`, `formatter`, `compaction`, `websearch`, `update`, the
+`agents` and `references` blocks, the `mcp.servers` block, and the four
 `config/opencode/plugins/` directories.
 
-**Project layer** keeps commands, agents, skills, and every permission rule,
-because all of those encode what this repository cares about.
+**Project layer** keeps commands, skills, and every permission rule, because all
+of those encode what this repository cares about.
 
 Two traps:
 
@@ -91,11 +118,97 @@ Because these live in the project layer, they apply here and nowhere else. The
 plugin (below) now enforces them in every project, so the duplicated entries
 here are defence in depth rather than the only line of defence.
 
+## Global settings
+
+These live in `config/opencode/opencode.json` and therefore apply in every
+project on any machine this repository is installed on.
+
+### `agents`
+
+One global primary agent, `doc-writer`, aimed at documentation work. Its system
+prompt encodes the two rules that matter most when a model is writing docs
+rather than code: match the voice and frontmatter of the document being edited,
+and **verify every command, flag, and path before writing it down**. A
+plausible command that does not exist is the worst output this agent can
+produce. It is `mode: primary` so it can be selected with `/agent doc-writer`,
+but it does not override the default agent for ordinary coding sessions.
+
+### `references`
+
+`references` gives opencode named access to directories outside the current
+project and advertises each one to the agent through its `description`, so the
+agent knows *when* to reach for it rather than having to be told. Attach one in
+the client, then ask for what is needed:
+
+    /reference runbook
+    Summarise the rollback procedure in runbook/database.md.
+
+| Alias | Path | Use |
+| --- | --- | --- |
+| `runbook` | `~/work/docs/runbooks` | procedures, on-call, deployment steps |
+| `standards` | `~/work/docs/standards` | team coding and documentation standards |
+
+**Both paths are placeholders.** Edit them to wherever the document corpus
+actually lives on the machine in question — this repository cannot know that, and
+a reference pointing at a directory that does not exist is silently useless
+rather than an error. Local references resolve `~`, relative, and absolute
+paths; a bare `docs` with no prefix is read as a *Git repository*, so write
+`./docs`, `~/docs`, or an absolute path.
+
+### `websearch` and `update`
+
+`websearch.provider` is `random`, which picks an available provider
+automatically instead of leaving search unconfigured. `update` is `notify`, the
+default, stated explicitly so a work machine does not silently auto-install a new
+release.
+
+### `compaction`
+
+    "compaction": {
+        "auto": true,
+        "keep": { "tokens": 15000 },
+        "buffer": 20000
+    }
+
+`keep.tokens` is the recent tail preserved verbatim when a summary happens. This
+is the counterpart to the **compaction-memory** plugin below: that plugin
+protects the *original ask* across compaction, and this keeps the *recent
+detail*. Raise `keep.tokens` for long documentation sessions where the recent
+back-and-forth matters more than the summary being short.
+
+### `formatter`
+
+`formatter` is enabled globally, with the built-in `prettier` entry overridden to
+run through `npx`:
+
+    "formatter": {
+        "prettier": {
+            "command": ["npx", "-y", "prettier", "--write", "$FILE"],
+            "extensions": [".md", ".mdx"]
+        }
+    }
+
+This is what normalises the Markdown tables language models get wrong. The
+built-in `prettier` definition normally requires a `prettier` entry in the
+target project's `package.json`, which a documentation repository often does not
+have; overriding `command` and narrowing `extensions` to `.md`/`.mdx` runs it
+everywhere without adding a Node dependency to any project.
+
+A community plugin doing this job, `opencode-md-table-formatter`, is **v1 only**
+— it hooks `experimental.text.complete`, which does not exist in v2 — so it would
+load and do nothing. This is the supported replacement.
+
 ## Plugins
 
 Four plugins live in `config/opencode/plugins/`, all global. Two are CLI
 plugins that draw (`inspector`, `tokens`); two are server plugins that only
 change behaviour (`shell-guard`, `compaction-memory`).
+
+Community packages are a separate mechanism. `opencode plugin add <pkg>`
+installs into the same `~/.config/opencode/plugins/` directory as real
+directories that opencode manages, and the installer deliberately leaves them
+alone — see [What `install.sh` links](#what-installsh-links). Pin the version
+(`opencode plugin add <pkg>@1.2.0`) so a work machine and a laptop do not drift.
 
 Discovery is by **flat sibling filenames**, not a `package.json` manifest: a
 directory holding only `index.ts` loads fine as a server-only plugin, while one

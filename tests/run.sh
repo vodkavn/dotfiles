@@ -17,6 +17,16 @@
 
 # Case callbacks are invoked through run_case's "$@"; cleanup is an EXIT trap.
 # shellcheck disable=SC2329
+#
+# SC2317 ("command appears to be unreachable") is a false positive here for the
+# same reason. ShellCheck 0.9.0, which ubuntu-latest ships, cannot see that
+# die/assert_* are reached from case_* callbacks passed to run_case, nor that
+# cleanup runs via `trap cleanup EXIT`. ShellCheck 0.10+ tightened the
+# reachability analysis and stopped reporting it, so this fires on the runner and
+# not on a newer local install. Every function it names is genuinely called:
+# die() from 24 call sites, assert_eq() from 14, cleanup() from the EXIT trap.
+# Kept as a file-wide disable so the suite lints identically on any ShellCheck.
+# shellcheck disable=SC2317
 set -u
 
 # --- blocking prerequisite checks --------------------------------------------
@@ -788,10 +798,102 @@ EOS
     return 0
 }
 
+# The global opencode config install must discover its link list from
+# config/opencode/ instead of a hardcoded array, so a new plugin, agent, command,
+# or skill is picked up on the next run with no edit to install.sh.
+#
+# install.sh is not executed here: it clones, writes to $HOME, and runs Vim. This
+# exercises the discovery pipeline it uses, against a synthetic tree, so the rule
+# is pinned without the blast radius.
+case_ai_config_link_discovery() {
+    local tree="$CASE_DIR/config/opencode"
+    mkdir -p -- "$tree/plugins/alpha" "$tree/plugins/beta" "$tree/agents" \
+        "$tree/commands" "$tree/skills/doc-guide"
+
+    # Shaped like the real tree: one config file, several plugins, and the
+    # directory kinds the global layer may grow later.
+    printf '{}\n' > "$tree/opencode.json"
+    : > "$tree/plugins/alpha/index.ts"
+    : > "$tree/plugins/beta/index.ts"
+
+    discover() (
+        cd "$tree" 2>/dev/null || exit 0
+        {
+            find . -mindepth 1 -maxdepth 1 -type f -name '*.json' -printf '%P\n'
+            find . -mindepth 2 -maxdepth 2 -type d -path './plugins/*' -printf '%P\n'
+            find . -mindepth 1 -maxdepth 1 -type d ! -name plugins -printf '%P\n'
+        } | LC_ALL=C sort
+    )
+
+    # Baseline: the config file, every plugin individually, and the other
+    # top-level directories linked whole.
+    local out
+    out=$(discover)
+    assert_eq "$out" "$(printf 'agents\ncommands\nopencode.json\nplugins/alpha\nplugins/beta\nskills')" \
+        "discovery must list config, each plugin, and other top-level directories"
+
+    # A plugin must never be emitted as plugins/ itself: linking that directory
+    # wholesale would merge it into ~/.config/opencode/plugins/, where community
+    # plugins installed by `opencode plugin add` already live as real dirs.
+    assert_eq "$(printf '%s\n' "$out" | grep -cx 'plugins')" '0' \
+        "plugins/ must be expanded, never linked wholesale"
+
+    # The point of the change: a plugin added later needs no edit anywhere.
+    mkdir -p -- "$tree/plugins/gamma"
+    : > "$tree/plugins/gamma/index.ts"
+    out=$(discover)
+    assert_contains "$out" 'plugins/gamma'
+    assert_eq "$(printf '%s\n' "$out" | grep -cx 'plugins/[a-z]*')" '3' \
+        "a newly added plugin must be discovered automatically"
+
+    # Nested files inside a plugin must not be emitted; only the plugin dir is.
+    mkdir -p -- "$tree/plugins/gamma/src"
+    : > "$tree/plugins/gamma/src/index.ts"
+    out=$(discover)
+    assert_eq "$(printf '%s\n' "$out" | grep -c 'gamma')" '1' \
+        "only the plugin directory is linked, not its contents"
+
+    # Non-JSON top-level files are not config and must be ignored.
+    printf 'x\n' > "$tree/README.md"
+    out=$(discover)
+    assert_eq "$(printf '%s\n' "$out" | grep -cx 'README.md')" '0' \
+        "non-JSON top-level files must not be linked"
+
+    # A missing source directory yields an empty list rather than an error, so
+    # install.sh reports "nothing to do" instead of failing under set -e.
+    local missing="$CASE_DIR/absent"
+    local out_missing
+    out_missing=$(
+        cd "$missing" 2>/dev/null || exit 0
+        {
+            find . -mindepth 1 -maxdepth 1 -type f -name '*.json' -printf '%P\n'
+            find . -mindepth 2 -maxdepth 2 -type d -path './plugins/*' -printf '%P\n'
+            find . -mindepth 1 -maxdepth 1 -type d ! -name plugins -printf '%P\n'
+        } | LC_ALL=C sort
+    )
+    assert_eq "$out_missing" '' "a missing source directory must produce an empty list"
+
+    # The real repository tree must still discover the four shipped plugins, so
+    # a rename cannot silently drop one.
+    local real
+    real=$(
+        cd "$repo_root/config/opencode" 2>/dev/null || exit 0
+        {
+            find . -mindepth 1 -maxdepth 1 -type f -name '*.json' -printf '%P\n'
+            find . -mindepth 2 -maxdepth 2 -type d -path './plugins/*' -printf '%P\n'
+            find . -mindepth 1 -maxdepth 1 -type d ! -name plugins -printf '%P\n'
+        } | LC_ALL=C sort
+    )
+    assert_eq "$real" "$(printf 'opencode.json\nplugins/compaction-memory\nplugins/inspector\nplugins/shell-guard\nplugins/tokens')" \
+        "the shipped global config must discover exactly its four plugins"
+    return 0
+}
+
 # =============================================================================
 # Run
 # =============================================================================
 
+run_case ai_config_link_discovery case_ai_config_link_discovery
 run_case ai_alias_gates case_ai_alias_gates
 run_case opencode_completion_gate case_opencode_completion_gate
 run_case startup_reload_spaced_home case_startup_reload_spaced_home

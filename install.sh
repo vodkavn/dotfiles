@@ -94,25 +94,65 @@ done
 # tui.tsx. shell-guard and compaction-memory only change behaviour, so each is
 # index.ts alone.
 #
-# Skills stay project-scoped under .opencode/skills/ and are not linked here.
+# Skills under .opencode/skills/ stay project-scoped: that directory belongs to
+# this repository, not to the global layer, and is never linked here. Global
+# skills, if any are added later, would live in config/opencode/skills/ and are
+# picked up by the discovery below.
+#
+# Community packages installed with `opencode plugin add` land in the same
+# ~/.config/opencode/plugins/ directory but are NOT symlinked from here. Linking
+# each plugin individually, as this used to, meant every new plugin needed an
+# edit to the list below plus a re-run to take effect. Instead the tree is
+# discovered at run time: one entry per top-level JSON file and directory in
+# config/opencode/, plus one entry per plugin inside config/opencode/plugins/.
+# Adding a plugin, agent, command, or skill under config/opencode/ is therefore
+# enough on its own; nothing in this file needs to change.
+#
+# Plugins installed with `opencode plugin add` are real directories rather than
+# symlinks, so the "unchanged" test below never matches them and they are left
+# in place. Only an entry that is already a symlink into this checkout, or a
+# file this repository is meant to own, is ever replaced.
 #
 # opencode merges two layers, global first and project second:
 #   $HOME/.config/opencode/      global; applies to every project
 #   $HOME/.dotfiles/.opencode/   project; this repository only
 #
-# The global layer carries CLI-wide settings, MCP servers, and the plugin only.
-# Commands, agents, skills, and permission rules are project-scoped and stay in
+# The global layer carries CLI-wide settings, MCP servers, agents, references,
+# and plugins. Commands, skills, and permission rules stay project-scoped in
 # .opencode/. Note that ~/.opencode is opencode's own data directory, not its
 # config directory; never link this repository's .opencode there.
 #
-ai_link_list=(opencode.json plugins/inspector plugins/tokens plugins/shell-guard plugins/compaction-memory)
 ai_global=$HOME/.config/opencode
+ai_src=$HOME/.dotfiles/config/opencode
+
+# Build the link list from the filesystem rather than a hardcoded array. Emits
+# paths relative to config/opencode/ (opencode.json, plugins/inspector, ...) and
+# is sorted so two runs print the same order.
+#
+#   top-level *.json  the config file itself
+#   plugins/*/        each plugin on its own, so a plugin directory is never
+#                     merged wholesale into ~/.config/opencode/plugins/, which
+#                     would collide with community plugins living there
+#   other top-level   agents/, commands/, skills/ and anything added later,
+#   directories       linked whole
+#
+ai_link_list=$(
+    cd "$ai_src" 2>/dev/null || exit 0
+    {
+        find . -mindepth 1 -maxdepth 1 -type f -name '*.json' -printf '%P\n'
+        find . -mindepth 2 -maxdepth 2 -type d -path './plugins/*' -printf '%P\n'
+        find . -mindepth 1 -maxdepth 1 -type d ! -name plugins -printf '%P\n'
+    } | LC_ALL=C sort
+)
 
 if command -v opencode >/dev/null 2>&1; then
     echo "Installing AI configuration..."
-    for file in "${ai_link_list[@]}"
+    if [ -z "$ai_link_list" ]; then
+        echo "--> No global AI configuration found in $ai_src, skipped"
+    fi
+    for file in $ai_link_list
     do
-        src=$HOME/.dotfiles/config/opencode/$file
+        src=$ai_src/$file
         dst=$ai_global/$file
         if [ ! -e "$src" ]; then
             echo "--> Missing $src, skipped"

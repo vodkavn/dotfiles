@@ -132,6 +132,30 @@ if [[ $mode != syntax ]]; then
         printf 'PASS: agent metadata (.opencode/ commands, agents, skills; %s files)\n' "$meta_count"
     fi
 
+    # GitHub Actions workflows are YAML. A malformed one fails only after a push,
+    # so parse it here. python3 is on the runner image and on Ubuntu; when it is
+    # absent this is a BLOCKED run, never a silent pass.
+    workflow_errors=0
+    workflow_count=0
+    if ! command -v python3 >/dev/null 2>&1 || ! python3_bin=$(type -P python3); then
+        printf 'BLOCKED: python3 unavailable (needed to parse workflow YAML)\n' >&2
+        blocked=$((blocked + 1))
+    else
+        for file in "$root"/.github/workflows/*.yml "$root"/.github/workflows/*.yaml; do
+            [ -r "$file" ] || continue
+            workflow_count=$((workflow_count + 1))
+            if ! "$python3_bin" -c 'import sys,yaml; yaml.safe_load(open(sys.argv[1]))' "$file" >/dev/null 2>&1; then
+                printf 'FAIL: invalid workflow YAML: %s\n' "${file#"$root/"}" >&2
+                workflow_errors=$((workflow_errors + 1))
+            fi
+        done
+        if (( workflow_errors )); then
+            failures=$((failures + 1))
+        else
+            printf 'PASS: workflow YAML (.github/workflows/; %s files)\n' "$workflow_count"
+        fi
+    fi
+
     whitespace_errors=0
     if ! "$git_bin" -C "$root" diff HEAD --check; then
         whitespace_errors=$((whitespace_errors + 1))
