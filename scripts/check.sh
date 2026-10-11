@@ -36,7 +36,8 @@ files=("$root/bashrc" "$root/bash_profile" "$root/bash_logout" "$root/install.sh
     "$root"/bash/**/*.bash "$root"/bash/*.sh "$root"/.kilo/*.sh
     "$root"/scripts/**/*.sh "$root"/tests/**/*.sh)
 lint_files=("$root"/scripts/**/*.sh "$root"/tests/**/*.sh)
-json_files=("$root"/.opencode/**/*.json "$root"/.kilo/*.json "$root"/.vscode/*.json)
+json_files=("$root"/.opencode/**/*.json "$root"/.kilo/*.json "$root"/.vscode/*.json
+    "$root"/config/**/*.json)
 meta_files=("$root"/.opencode/commands/*.md "$root"/.opencode/agents/*.md \
     "$root"/.opencode/skills/*/SKILL.md)
 failures=0
@@ -108,7 +109,7 @@ if [[ $mode != syntax ]]; then
         if (( json_errors )); then
             failures=$((failures + 1))
         else
-            printf 'PASS: JSON (.opencode/, .kilo/, .vscode/; %s files)\n' "$json_count"
+            printf 'PASS: JSON (.opencode/, .kilo/, .vscode/, config/; %s files)\n' "$json_count"
         fi
     fi
 

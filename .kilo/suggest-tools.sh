@@ -56,12 +56,21 @@ if ! command -v difft >/dev/null 2>&1; then
     printf '  https://difftastic.wilfred.me.uk/\n'
 fi
 
+if ! command -v npx >/dev/null 2>&1; then
+    printf '\nNode.js (npx) is required by the sequential-thinking MCP server and by\n'
+    printf 'npm-based tools such as ast-grep. The Ubuntu archive ships an outdated\n'
+    printf 'release, so use nvm and install the current LTS:\n'
+    printf '  https://github.com/nvm-sh/nvm#installing-and-updating\n'
+    printf '  nvm install --lts\n'
+    printf '  nvm use --lts\n'
+    printf 'Direct downloads: https://nodejs.org/en/download\n'
+    printf 'Never install global npm packages with sudo.\n'
+fi
+
 if ! command -v ast-grep >/dev/null 2>&1; then
     printf '\nOptional structural search: ast-grep (not the unrelated system sg command).\n'
-    if ! command -v npm >/dev/null 2>&1; then
-        printf '  Install Node.js/npm first: https://nodejs.org/en/download\n'
-    fi
     printf '  npm install -g @ast-grep/cli\n'
+    printf '  Requires npx/npm; see the Node.js suggestion above.\n'
     printf '  Use a user-owned npm prefix or Node version manager; do not use sudo npm.\n'
 fi
 
