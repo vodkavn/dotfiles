@@ -1,68 +1,18 @@
 # Keep non-interactive shells (including scp) silent.
 [[ $- == *i* ]] || return
-# Load RVM into a shell session *as a function*
-[[ -s "$HOME/.rvm/scripts/rvm" ]] && source "$HOME/.rvm/scripts/rvm"
 
-# Initialize Node tools before registering their aliases and completions.
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
-
-# pnpm
-export PNPM_HOME="$HOME/.local/share/pnpm"
-case ":$PATH:" in
-    *":$PNPM_HOME/bin:"*) ;;
-    *) export PATH="$PNPM_HOME/bin:$PATH" ;;
-esac
-
-# Load .bash_functions
-if [ -r "$HOME/.bash/bash_functions.bash" ]; then
-    . "$HOME/.bash/bash_functions.bash"
-fi
-
-# Load composure first, so we support function metadata
-if [ -r "$HOME/.bash/lib/composure.bash" ]; then
-    source "$HOME/.bash/lib/composure.bash"
-fi
-
-# Load in the git branch prompt script.
-export GIT_PS1_SHOWSTASHSTATE=1
-export GIT_PS1_SHOWDIRTYSTATE=1
-export GIT_PS1_SHOWCOLORHINTS=1
-export GIT_PS1_SHOWUNTRACKEDFILES=""
-for git_prompt_file in /usr/lib/git-core/git-sh-prompt /usr/share/git-core/contrib/completion/git-prompt.sh "$HOME/.bash/git-prompt.sh"; do
-    if [ -r "$git_prompt_file" ]; then
-        source "$git_prompt_file"
-        break
-    fi
-done
-unset git_prompt_file
-
-# Ubuntu's maintained completions must load before local completion modules.
-if ! declare -F _completion_loader >/dev/null && [ -r /usr/share/bash-completion/bash_completion ]; then
-    source /usr/share/bash-completion/bash_completion
-fi
-
-# Load enabled aliases, completion, plugins
-for file_type in "aliases" "completion" "plugins"
-do
-    if declare -F load_bash_files >/dev/null && declare -F cite >/dev/null; then
-        load_bash_files "$file_type"
-    fi
-done
-
-# Load custom aliases, completion, plugins
-for file_type in "aliases" "completion" "plugins"
-do
-    if declare -F cite >/dev/null && [ -r "$HOME/.bash/${file_type}/custom.${file_type}.bash" ]; then
-        source "$HOME/.bash/${file_type}/custom.${file_type}.bash"
-    fi
-done
-unset file_type
-
-if declare -F bash_prompt_powerline >/dev/null && [[ " ${PROMPT_COMMAND[*]} " != *" bash_prompt_powerline "* ]]; then
-    PROMPT_COMMAND+=(bash_prompt_powerline)
-fi
+# Source the first readable candidate. Defined here, rather than in
+# bash_functions.bash, because the blocks below use it to load that file too.
+source_first_readable() {
+    local candidate
+    for candidate in "$@"; do
+        if [ -r "$candidate" ]; then
+            source "$candidate"
+            return 0
+        fi
+    done
+    return 1
+}
 
 # Color scheme for grep and ls
 export CLICOLOR=1
@@ -93,17 +43,68 @@ export TERM="${TERM:-xterm-256color}"
 # Git in WSL
 export GIT_DISCOVERY_ACROSS_FILESYSTEM=1
 
-# User specific environment and startup programs
-for user_bin in "$HOME/.local/bin" "$HOME/bin" "$HOME/usr/bin" \
-    "$HOME/.bin" "$HOME/.rbenv/bin" "$HOME/.rvm/bin" \
-    /usr/local/heroku/bin "$HOME/.ebcli-virtual-env/executables" \
-    "$HOME/.pyenv/bin" /usr/local/go/bin; do
-    if [ -d "$user_bin" ]; then
+# Load RVM into a shell session *as a function*. RVM must be initialized before
+# the modules below: rvm.completion.bash reads $rvm_path.
+source_first_readable "$HOME/.rvm/scripts/rvm"
+
+# Initialize Node tools before the modules below: npm.completion.bash runs
+# `npm completion`, so npm has to exist on PATH by the time it is sourced.
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+
+# pnpm
+export PNPM_HOME="$HOME/.local/share/pnpm"
+
+# User specific environment and startup programs, including the pnpm bin
+# directory, which is added even when missing because corepack can still create
+# it. Directories already on PATH are skipped, so re-sourcing bashrc leaves PATH
+# unchanged.
+for user_bin in "$PNPM_HOME/bin" "$HOME/.local/bin" "$HOME/bin" "$HOME/usr/bin" \
+        "$HOME/.bin" "$HOME/.rbenv/bin" "$HOME/.rvm/bin" \
+        /usr/local/heroku/bin "$HOME/.ebcli-virtual-env/executables" \
+        "$HOME/.pyenv/bin" /usr/local/go/bin "$HOME/.opencode/bin"; do
+    if [ -d "$user_bin" ] || [ "$user_bin" = "$PNPM_HOME/bin" ]; then
         case ":$PATH:" in
-            *":$user_bin:"*) ;;
-            *) PATH="$user_bin:$PATH" ;;
+            *":$user_bin:"*) continue ;;
         esac
+        PATH="$user_bin:$PATH"
     fi
 done
 unset user_bin
 export PATH
+
+# Load .bash_functions, then composure, so modules can cite function metadata.
+source_first_readable "$HOME/.bash/bash_functions.bash"
+source_first_readable "$HOME/.bash/lib/composure.bash"
+
+# Load in the git branch prompt script.
+export GIT_PS1_SHOWSTASHSTATE=1
+export GIT_PS1_SHOWDIRTYSTATE=1
+export GIT_PS1_SHOWCOLORHINTS=1
+export GIT_PS1_SHOWUNTRACKEDFILES=""
+source_first_readable /usr/lib/git-core/git-sh-prompt \
+    /usr/share/git-core/contrib/completion/git-prompt.sh "$HOME/.bash/git-prompt.sh"
+
+# Ubuntu's maintained completions must load before local completion modules.
+if ! declare -F _completion_loader >/dev/null; then
+    source_first_readable /usr/share/bash-completion/bash_completion
+fi
+
+# Load enabled aliases, completion, plugins, then the custom overrides of each.
+if declare -F cite >/dev/null; then
+    bash_module_types=(aliases completion plugins)
+    if declare -F load_bash_files >/dev/null; then
+        for file_type in "${bash_module_types[@]}"; do
+            load_bash_files "$file_type"
+        done
+    fi
+    for file_type in "${bash_module_types[@]}"; do
+        source_first_readable "$HOME/.bash/$file_type/custom.$file_type.bash"
+    done
+    unset bash_module_types file_type
+fi
+
+if declare -F bash_prompt_powerline >/dev/null && [[ " ${PROMPT_COMMAND[*]} " != *" bash_prompt_powerline "* ]]; then
+    PROMPT_COMMAND+=(bash_prompt_powerline)
+fi
