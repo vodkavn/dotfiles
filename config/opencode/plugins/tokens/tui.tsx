@@ -1,4 +1,5 @@
 import { Plugin } from "@opencode/plugin/tui"
+import { createSessionTracker } from "./session-tracker"
 
 // Token speed and cache rate for the active session, kept per model so a
 // mid-run model switch shows up as separate blocks instead of one blended
@@ -1021,65 +1022,7 @@ export default Plugin.define({
         //                cannot know about it yet, so session.created is what
         //                closes the gap between two paints.
 
-        const synced = new Set<string>()
-
-        // The session the panel is currently showing. A child is only interesting
-        // while its parent is on screen, and switching sessions must not leave
-        // one session's bookkeeping behind to label another's children.
-        let shown: string | undefined
-
-        // Parent links seen on session.created. A child that arrived moments ago
-        // may not be in the store yet, so the ancestry walk reads this first and
-        // falls back to the store only where it has nothing.
-        const parents = new Map<string, string>()
-
-        const sync = (sessionID: string): void => {
-            if (synced.has(sessionID)) return
-            synced.add(sessionID)
-            // Fire and forget: the repaint this triggers is the whole point, so
-            // there is nothing useful to do with either promise. A child that
-            // fails to load leaves its row absent rather than breaking the panel.
-            void Promise.resolve(context.data.session.sync(sessionID)).catch(() => {})
-            void Promise.resolve(context.data.session.message.sync(sessionID)).catch(() => {})
-        }
-
-        const family = (sessionID: string): string[] => {
-            try {
-                const ids = context.data.session.family(sessionID)
-                return Array.isArray(ids) && ids.length > 0 ? ids : [sessionID]
-            } catch {
-                return [sessionID]
-            }
-        }
-
-        // Whether a session sits somewhere under the one on screen. The seen set
-        // is what keeps a parent cycle from looping forever.
-        const belongs = (root: string, sessionID: string): boolean => {
-            const seen = new Set<string>()
-            let current = sessionID
-            while (current !== root && !seen.has(current)) {
-                seen.add(current)
-                const parent = parents.get(current) ?? optional(String(record(context.data.session.get(current)).parentID ?? ""))
-                if (parent === undefined) return false
-                current = parent
-            }
-            return current === root
-        }
-
-        // Called from inside render, because the session on screen is only known
-        // there. Every repaint re-asks, which is what picks up a child the store
-        // has since learned about; sync() is what keeps that from refetching.
-        const track = (sessionID: string | undefined): string[] => {
-            if (!sessionID) return []
-            if (sessionID !== shown) {
-                shown = sessionID
-                synced.clear()
-                parents.clear()
-            }
-            const ids = family(sessionID)
-            for (const id of ids) sync(id)
-            return ids
-        }
+        const tracker = createSessionTracker(context.data.session)
 
         const startedAt = (sessionID: string): number => {
             const info = record(context.data.session.get(sessionID))
@@ -1100,8 +1043,8 @@ export default Plugin.define({
         }
 
         const read = (sessionID: string | undefined): View => {
+            const ids = tracker.track(sessionID)
             if (!sessionID) return { rows: [], agents: [], children: 0, models: 0, live: undefined }
-            const ids = track(sessionID)
             const session = context.data.session.get(sessionID)
             const models = context.data.location.model.list(session?.location) ?? []
             const find = (providerID: string, modelID: string) => models.find((model) => matchesModel(model, providerID, modelID))
@@ -1162,12 +1105,12 @@ export default Plugin.define({
             return split(context.data.session.message.list(sessionID) ?? [])
         }
 
-        context.ui.slot({
+        const stopLive = context.ui.slot({
             append: "prompt.footer.status",
             render: (props) => <Live live={read(props.sessionID).live} surface={context.theme} />,
         })
 
-        context.ui.slot({
+        const stopTokens = context.ui.slot({
             append: "sidebar.content",
             render: (props) => (
                 <Panel
@@ -1184,7 +1127,7 @@ export default Plugin.define({
 
         // Registered after Tokens so the section lands directly below it.
         // Several claims can share one slot, and each owns its own disclosure.
-        context.ui.slot({
+        const stopContext = context.ui.slot({
             append: "sidebar.content",
             render: (props) => (
                 <ContextPanel
@@ -1204,8 +1147,7 @@ export default Plugin.define({
         const stopCreated = context.data.on("session.created", (event) => {
             const id = optional(event.data.sessionID) ?? ""
             if (id === "") return
-            if (event.data.parentID !== undefined) parents.set(id, event.data.parentID)
-            if (shown !== undefined && belongs(shown, id)) sync(id)
+            tracker.created(id, event.data.parentID)
         })
 
         // A deleted child must leave the tally, or it keeps contributing a label
@@ -1213,13 +1155,16 @@ export default Plugin.define({
         const stopDeleted = context.data.on("session.deleted", (event) => {
             const id = optional(event.data.sessionID) ?? ""
             if (id === "") return
-            parents.delete(id)
-            synced.delete(id)
+            tracker.deleted(id)
         })
 
         return () => {
+            tracker.dispose()
             stopCreated()
             stopDeleted()
+            stopLive()
+            stopTokens()
+            stopContext()
         }
     },
 })

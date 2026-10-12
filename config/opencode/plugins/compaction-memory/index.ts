@@ -110,27 +110,37 @@ export default Plugin.define({
         })
 
         // Lazy prune so a long-lived server does not accumulate notes forever.
+        let stopped = false
+        let pruning = false
         const prune = setInterval(() => {
+            if (stopped || pruning) return
+            pruning = true
             void (async () => {
-                const page = await ctx.storage.scan({ prefix: "session/", limit: 200 })
                 const cutoff = Date.now() - STALE_MS
-                for (const entry of page.entries) {
-                    const note = record(entry.value)
-                    if (typeof note.updated === "number" && note.updated < cutoff) {
-                        await ctx.storage.remove(entry.key)
+                let after: string | undefined
+                do {
+                    const page = await ctx.storage.scan({ prefix: "session/", limit: 200, after })
+                    if (stopped) return
+                    for (const entry of page.entries) {
+                        if (stopped) return
+                        const note = record(entry.value)
+                        if (typeof note.updated === "number" && note.updated < cutoff) {
+                            await ctx.storage.remove(entry.key)
+                        }
                     }
-                }
-            })().catch(() => {})
+                    after = page.next
+                } while (after !== undefined && !stopped)
+            })().catch(() => {}).finally(() => { pruning = false })
         }, 6 * 60 * 60 * 1000)
         // unref exists on Bun's Timer but not under a DOM/ES lib, where this
         // handle types as a number. The optional call keeps the interval from
         // holding the process open without needing either runtime's types.
         ;(prune as { unref?: () => void }).unref?.()
 
-        return () => {
+        return async () => {
+            stopped = true
             clearInterval(prune)
-            void promptHook.dispose()
-            void compactionHook.dispose()
+            await Promise.all([promptHook.dispose(), compactionHook.dispose()])
         }
     },
 })
