@@ -43,9 +43,19 @@ endif
 filetype plugin on
 filetype indent on
 syntax enable
+
+" Prefer 24-bit colour when the terminal advertises it. Must be set before
+" the colorscheme loads, otherwise cterm colours win and the theme's
+" guifg/guibg values are ignored. Inside tmux this relies on the
+" tmux-256color default-terminal plus the RGB terminal-features entry.
+if has('termguicolors')
+    set termguicolors
+else
+    set t_Co=256
+endif
+
 colorscheme dracula
 
-set t_Co=256
 set clipboard=unnamedplus
 set noswapfile
 
