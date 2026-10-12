@@ -881,7 +881,7 @@ const Panel = (props: {
                     {props.view.children > 0 && (
                         <box flexDirection="column" gap={0}>
                             <box flexDirection="row" flexShrink={0}>
-                                <text>{`subagents (${props.view.children})`}</text>
+                                <text>{`${props.view.children} subagent${props.view.children === 1 ? "" : "s"}`}</text>
                             </box>
                             <ModelRows
                                 rows={props.view.agents}
@@ -1127,7 +1127,7 @@ export default Plugin.define({
             const rows = build(sessionID, undefined)
 
             // Children in the order they were created, so two runs of the same
-            // agent come out as "explore" and "explore ·2" in that order rather
+            // agent come out as "explore" and "explore (2)" in that order rather
             // than in whatever order the store happened to hand them over.
             const tally = new Map<string, number>()
             const agents = ids
@@ -1137,7 +1137,7 @@ export default Plugin.define({
                     const name = agentLabel(id)
                     const seen = (tally.get(name) ?? 0) + 1
                     tally.set(name, seen)
-                    return build(id, seen === 1 ? name : `${name} ·${seen}`)
+                    return build(id, seen === 1 ? name : `${name} (${seen})`)
                 })
 
             // Everything, newest first. The live line reports the head of this,
