@@ -130,7 +130,7 @@ export default Plugin.define({
                                     onMouseDown={toggle(section.key)}
                                     onMouseUp={(e: MouseEvent) => e.stopPropagation()}
                                 >
-                                    <text>{`${collapsed ? "▸" : "▾"} ${section.label}`}</text>
+                                    <text>{`${collapsed ? "▶" : "▼"} ${section.label}`}</text>
                                     <text fg={context.theme.text.muted}>{` (${entries.length})`}</text>
                                 </box>
                                 {!collapsed &&

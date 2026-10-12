@@ -274,6 +274,21 @@ answers a different question — what is filling the window — by splitting the
 prompt by data type (`sys+tools`, `summary`, `reasoning`, `tool output`,
 `tool call`, `answer`, `prompt`, `files`), largest first.
 
+**Tokens covers the session family, Context does not.** A subagent runs as a
+session of its own, with its own message list and its own bill, so the Tokens
+panel walks the whole family: one block per model for the session itself, then a
+`subagents (N)` group with one block per model per child, each labelled with the
+agent that spent it and disambiguated when the same agent ran more than once. The
+live line follows whichever agent produced the most recent message. The model
+count in the heading is distinct models across the family, not blocks, because a
+session and its subagents routinely share one. Context stays on the session
+alone — a child's prompt was assembled from its own history and billed against
+its own window, so folding it in would describe a context the model never had.
+Children reach the panel through `data.session.family()` plus an explicit
+`session.sync()` and `message.sync()`, because the TUI store only holds the
+sessions it has been told to load; `session.created` covers the child that is
+spawned after the paint that asked for it.
+
 The total is exact, because opencode reports the prompt size of each assistant
 message. The split is estimated from character counts at roughly four characters
 per token, because the CLI plugin runtime ships no tokenizer; rows are scaled to

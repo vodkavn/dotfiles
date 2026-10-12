@@ -30,8 +30,12 @@ import { Plugin } from "@opencode/plugin/tui"
 // session-wide rather than per model, because a prompt is assembled from the
 // whole history regardless of which model produced which turn.
 //
-// Only the session handed to the slot is counted. Child sessions started by
-// the task tool keep their own message lists and are not folded in here.
+// A subagent is a session of its own, with its own message list, its own
+// context window, and its own bill. Tokens therefore cover the whole family the
+// session spawned: one row per model for the session itself, then one row per
+// model for each child, under a subagent heading. The context breakdown stays on
+// the session alone, because a child's prompt was never part of this window and
+// folding it in would describe a window that does not exist.
 //
 // Two rules govern every row in both panels, and both were learned the hard way:
 //
@@ -65,8 +69,14 @@ type Tokens = {
 }
 
 type Row = {
-    key: string
+    // providerID/modelID#variant. This, not the label, is what the "N models"
+    // heading counts: the session and a subagent routinely share a model, and
+    // one child may have used two.
+    model: string
     label: string
+    // The agent that ran the child session this row came from. Absent for a row
+    // belonging to the session the panel is showing, and shown in the label.
+    scope?: string
     messages: number
     tokens: Tokens
     cost: number
@@ -77,6 +87,20 @@ type Row = {
     // in opencode's registry, which the model dialog then says outright rather
     // than showing an empty box.
     info?: ModelSummary
+}
+
+// What the Tokens panel draws for one session: the session's own rows, the rows
+// of every child session it spawned, and the single row standing for whatever
+// ran most recently across both — which is what the live line reports, so a
+// subagent mid-turn takes the footer over rather than going unmentioned.
+type View = {
+    rows: Row[]
+    agents: Row[]
+    // Child sessions represented in agents, which is not the same as agents
+    // themselves: one child that used two models still counts once.
+    children: number
+    models: number
+    live: Row | undefined
 }
 
 // The slice of opencode's ModelInfo this panel reads. Declared locally, like
@@ -139,11 +163,11 @@ const collect = (
         const providerID = optional(String(model.providerID ?? "")) ?? "?"
         const modelID = optional(String(model.id ?? "")) ?? "?"
         const variant = optional(String(model.variant ?? "")) ?? ""
-        const key = `${providerID}/${modelID}#${variant}`
-        let row = rows.get(key)
+        const identity = `${providerID}/${modelID}#${variant}`
+        let row = rows.get(identity)
         if (!row) {
             row = {
-                key,
+                model: identity,
                 label: label(providerID, modelID, variant),
                 providerID,
                 modelID,
@@ -154,7 +178,7 @@ const collect = (
                 generatedMs: 0,
                 lastAt: 0,
             }
-            rows.set(key, row)
+            rows.set(identity, row)
         }
         row.messages += 1
         row.tokens.input += count(usage.input)
@@ -744,19 +768,73 @@ const contextLines = (value: Split): ContextLine[] => {
     }))
 }
 
-const Live = (props: { rows: readonly Row[]; surface: Surface }) => {
+const Live = (props: { live: Row | undefined; surface: Surface }) => {
     // As with Panel, no prop may be read in the body; see the note there.
     const surface = props.surface
     return (
         <box flexDirection="row" flexShrink={0}>
-            <text fg={surface.text.base}>{perSecond(props.rows[0])}</text>
-            {props.rows[0] !== undefined && <text fg={surface.text.muted}>{` · cache ${hitRate(props.rows[0])}`}</text>}
+            <text fg={surface.text.base}>{perSecond(props.live)}</text>
+            {props.live !== undefined && <text fg={surface.text.muted}>{` · cache ${hitRate(props.live)}`}</text>}
+        </box>
+    )
+}
+
+// One model row: the bullet and its label, then the four stat lines. Used for
+// the session's own models and for every child session's, so a subagent's spend
+// reads exactly like the session's own rather than as some separate kind of thing.
+//
+// highlight marks the row behind the most recent message. It is on for the
+// session's own rows only: pointing at the newest child would put the bullet on
+// the wrong side of the subagent heading.
+const ModelRows = (props: {
+    rows: readonly Row[]
+    surface: Surface
+    highlight: boolean
+    stop: (event: MouseEvent) => void
+    explain: (pair: Pair, model: string) => (event: MouseEvent) => void
+    describe: (row: Row) => (event: MouseEvent) => void
+}) => {
+    const surface = props.surface
+    return (
+        <box flexDirection="column" gap={0}>
+            {props.rows.map((row, index) => (
+                <box flexDirection="column">
+                    <box
+                        flexDirection="row"
+                        flexShrink={1}
+                        minWidth={0}
+                        onMouseDown={props.stop}
+                        onMouseUp={props.describe(row)}
+                    >
+                        <text fg={props.highlight && index === 0 ? surface.text.feedback.success.base : surface.text.muted}>
+                            {"•"}
+                        </text>
+                        <text
+                            fg={props.highlight && index === 0 ? surface.text.base : surface.text.muted}
+                            wrapMode="none"
+                            truncate={true}
+                            flexShrink={1}
+                            minWidth={0}
+                        >{` ${row.label}`}</text>
+                    </box>
+                    {statLines(row).map((line) => (
+                        <box
+                            flexDirection="row"
+                            flexShrink={0}
+                            onMouseDown={props.stop}
+                            onMouseUp={props.explain(line.pair, row.label)}
+                        >
+                            <text fg={surface.text.muted} wrapMode="none" truncate={true}>{line.text}</text>
+                        </box>
+                    ))}
+                </box>
+            ))}
         </box>
     )
 }
 
 const Panel = (props: {
-    rows: readonly Row[]
+    view: View
     surface: Surface
     open: boolean
     toggle: (event: MouseEvent) => void
@@ -777,48 +855,46 @@ const Panel = (props: {
     return (
         <box flexDirection="column" gap={0}>
             <box flexDirection="row" flexShrink={0} onMouseDown={props.toggle} onMouseUp={props.stop}>
-                <text fg={surface.text.base}>{`${props.open ? "▾" : "▸"} Tokens`}</text>
-                {props.rows.length > 0 && (
+                <text fg={surface.text.base}>{`${props.open ? "▼" : "▶"} Tokens`}</text>
+                {props.view.models > 0 && (
                     <text fg={surface.text.muted}>
                         {props.open
-                            ? ` (${props.rows.length} model${props.rows.length === 1 ? "" : "s"})`
-                            : ` (${perSecond(props.rows[0])} · ${hitRate(props.rows[0])})`}
+                            ? ` (${props.view.models} model${props.view.models === 1 ? "" : "s"}${
+                                  props.view.children > 0
+                                      ? ` · ${props.view.children} subagent${props.view.children === 1 ? "" : "s"}`
+                                      : ""
+                              })`
+                            : ` (${perSecond(props.view.live)} · ${hitRate(props.view.live)})`}
                     </text>
                 )}
             </box>
-            {props.open &&
-                props.rows.map((row, index) => (
-                    <box flexDirection="column">
-                        <box
-                            flexDirection="row"
-                            flexShrink={1}
-                            minWidth={0}
-                            onMouseDown={props.stop}
-                            onMouseUp={props.describe(row)}
-                        >
-                            <text fg={index === 0 ? surface.text.feedback.success.base : surface.text.muted}>
-                                {"•"}
-                            </text>
-                            <text
-                                fg={index === 0 ? surface.text.base : surface.text.muted}
-                                wrapMode="none"
-                                truncate={true}
-                                flexShrink={1}
-                                minWidth={0}
-                            >{` ${row.label}`}</text>
-                        </box>
-                        {statLines(row).map((line) => (
-                            <box
-                                flexDirection="row"
-                                flexShrink={0}
-                                onMouseDown={props.stop}
-                                onMouseUp={props.explain(line.pair, row.label)}
-                            >
-                                <text fg={surface.text.muted} wrapMode="none" truncate={true}>{line.text}</text>
+            {props.open && (
+                <box flexDirection="column" gap={1}>
+                    <ModelRows
+                        rows={props.view.rows}
+                        surface={surface}
+                        highlight={true}
+                        stop={props.stop}
+                        explain={props.explain}
+                        describe={props.describe}
+                    />
+                    {props.view.children > 0 && (
+                        <box flexDirection="column" gap={0}>
+                            <box flexDirection="row" flexShrink={0}>
+                                <text>{`subagents (${props.view.children})`}</text>
                             </box>
-                        ))}
-                    </box>
-                ))}
+                            <ModelRows
+                                rows={props.view.agents}
+                                surface={surface}
+                                highlight={true}
+                                stop={props.stop}
+                                explain={props.explain}
+                                describe={props.describe}
+                            />
+                        </box>
+                    )}
+                </box>
+            )}
         </box>
     )
 }
@@ -827,6 +903,11 @@ const Panel = (props: {
 // section only expands when the answer to "what is eating my window" needs more
 // than one glance. Expanded, it shows the whole split. Every row is also a
 // click target that explains what that category is.
+//
+// This panel describes one context window, so it reads the session alone even
+// though the Tokens panel above it covers the family. A subagent's prompt was
+// assembled from its own history and billed against its own window; adding it
+// here would produce a breakdown of a context the model never had.
 const ContextPanel = (props: {
     split: Split
     surface: Surface
@@ -847,7 +928,7 @@ const ContextPanel = (props: {
     return (
         <box flexDirection="column" gap={0}>
             <box flexDirection="row" flexShrink={0} onMouseDown={props.toggle} onMouseUp={props.stop}>
-                <text fg={surface.text.base}>{`${props.open ? "▾" : "▸"} Context`}</text>
+                <text fg={surface.text.base}>{`${props.open ? "▼" : "▶"} Context`}</text>
                 {props.split.total > 0 && <text fg={surface.text.muted}>{headline()}</text>}
             </box>
             {props.open &&
@@ -921,9 +1002,106 @@ export default Plugin.define({
             })
         }
 
-        const read = (sessionID: string | undefined): Row[] => {
+        // ------------------------------------------------------------------
+        // Sessions, and the children they spawned
+        // ------------------------------------------------------------------
+        //
+        // A subagent runs as a session of its own, so its messages live in their
+        // own list and reach this plugin only once that session has been pulled
+        // into the TUI's stores. Three things make that happen, and all three
+        // are needed:
+        //
+        //   family()    names the children of the session on screen. Without it
+        //                there is nothing to ask for, because the session handed
+        //                to the slot knows only about itself.
+        //   sync()      is what actually loads a child, and it is one-shot per
+        //                session, so which sessions have been pulled in is
+        //                remembered here rather than re-requested every repaint.
+        //   the events  cover the child created after this render. A render
+        //                cannot know about it yet, so session.created is what
+        //                closes the gap between two paints.
+
+        const synced = new Set<string>()
+
+        // The session the panel is currently showing. A child is only interesting
+        // while its parent is on screen, and switching sessions must not leave
+        // one session's bookkeeping behind to label another's children.
+        let shown: string | undefined
+
+        // Parent links seen on session.created. A child that arrived moments ago
+        // may not be in the store yet, so the ancestry walk reads this first and
+        // falls back to the store only where it has nothing.
+        const parents = new Map<string, string>()
+
+        const sync = (sessionID: string): void => {
+            if (synced.has(sessionID)) return
+            synced.add(sessionID)
+            // Fire and forget: the repaint this triggers is the whole point, so
+            // there is nothing useful to do with either promise. A child that
+            // fails to load leaves its row absent rather than breaking the panel.
+            void Promise.resolve(context.data.session.sync(sessionID)).catch(() => {})
+            void Promise.resolve(context.data.session.message.sync(sessionID)).catch(() => {})
+        }
+
+        const family = (sessionID: string): string[] => {
+            try {
+                const ids = context.data.session.family(sessionID)
+                return Array.isArray(ids) && ids.length > 0 ? ids : [sessionID]
+            } catch {
+                return [sessionID]
+            }
+        }
+
+        // Whether a session sits somewhere under the one on screen. The seen set
+        // is what keeps a parent cycle from looping forever.
+        const belongs = (root: string, sessionID: string): boolean => {
+            const seen = new Set<string>()
+            let current = sessionID
+            while (current !== root && !seen.has(current)) {
+                seen.add(current)
+                const parent = parents.get(current) ?? optional(String(record(context.data.session.get(current)).parentID ?? ""))
+                if (parent === undefined) return false
+                current = parent
+            }
+            return current === root
+        }
+
+        // Called from inside render, because the session on screen is only known
+        // there. Every repaint re-asks, which is what picks up a child the store
+        // has since learned about; sync() is what keeps that from refetching.
+        const track = (sessionID: string | undefined): string[] => {
             if (!sessionID) return []
-            const messages = context.data.session.message.list(sessionID) ?? []
+            if (sessionID !== shown) {
+                shown = sessionID
+                synced.clear()
+                parents.clear()
+            }
+            const ids = family(sessionID)
+            for (const id of ids) sync(id)
+            return ids
+        }
+
+        const startedAt = (sessionID: string): number => {
+            const info = record(context.data.session.get(sessionID))
+            return count(record(info.time).created)
+        }
+
+        // What to call a child session. opencode records the agent that ran it
+        // and that name is short and stable. The title is the task text written
+        // for it, which is far too long for a 38 column panel, so it is only a
+        // fallback, clipped to roughly a third of the width.
+        const agentLabel = (sessionID: string): string => {
+            const info = record(context.data.session.get(sessionID))
+            return (
+                optional(String(info.agent ?? "")) ??
+                optional(String(info.title ?? ""))?.slice(0, 12).trim() ??
+                "subagent"
+            )
+        }
+
+        const read = (sessionID: string | undefined): View => {
+            if (!sessionID) return { rows: [], agents: [], children: 0, models: 0, live: undefined }
+            const ids = track(sessionID)
             const session = context.data.session.get(sessionID)
             const models = context.data.location.model.list(session?.location) ?? []
             const find = (providerID: string, modelID: string) => models.find((model) => matchesModel(model, providerID, modelID))
@@ -932,12 +1110,51 @@ export default Plugin.define({
                 const base = optional(String(entry.name ?? "")) ?? `${providerID}/${modelID}`
                 return variant === "" || variant === "default" ? base : `${base} (${variant})`
             }
-            // Attached after the walk, so one lookup serves both the label and
-            // the dialog and collect() stays a pure function of the messages.
-            return collect(messages, label).map((row) => ({
-                ...row,
-                info: summary(find(row.providerID, row.modelID)),
-            }))
+            const build = (id: string, scope: string | undefined): Row[] =>
+                // The registry lookup is attached after the walk, so one lookup
+                // serves both the label and the dialog and collect() stays a pure
+                // function of the messages.
+                collect(context.data.session.message.list(id) ?? [], label).map((row) => ({
+                    ...row,
+                    // A child row leads with the agent that spent the tokens. The
+                    // model behind it is usually the one already listed for the
+                    // session itself, so leading with it would say less.
+                    label: scope === undefined ? row.label : `${scope}\n ${row.label}`,
+                    scope,
+                    info: summary(find(row.providerID, row.modelID)),
+                }))
+
+            const rows = build(sessionID, undefined)
+
+            // Children in the order they were created, so two runs of the same
+            // agent come out as "explore" and "explore ·2" in that order rather
+            // than in whatever order the store happened to hand them over.
+            const tally = new Map<string, number>()
+            const agents = ids
+                .filter((id) => id !== sessionID)
+                .sort((a, b) => startedAt(a) - startedAt(b))
+                .flatMap((id) => {
+                    const name = agentLabel(id)
+                    const seen = (tally.get(name) ?? 0) + 1
+                    tally.set(name, seen)
+                    return build(id, seen === 1 ? name : `${name} ·${seen}`)
+                })
+
+            // Everything, newest first. The live line reports the head of this,
+            // so a subagent mid-turn takes the footer over from the session that
+            // spawned it instead of going unmentioned.
+            const all = [...rows, ...agents].sort((a, b) => b.lastAt - a.lastAt)
+            return {
+                rows,
+                agents,
+                // Scoped labels, so this counts runs rather than rows: a child
+                // that used two models is still one subagent.
+                children: new Set(agents.map((row) => row.scope)).size,
+                // Distinct models across the family, not rows: the session and a
+                // subagent routinely share one.
+                models: new Set(all.map((row) => row.model)).size,
+                live: all[0],
+            }
         }
 
         const readContext = (sessionID: string | undefined): Split => {
@@ -947,14 +1164,14 @@ export default Plugin.define({
 
         context.ui.slot({
             append: "prompt.footer.status",
-            render: (props) => <Live rows={read(props.sessionID)} surface={context.theme} />,
+            render: (props) => <Live live={read(props.sessionID).live} surface={context.theme} />,
         })
 
         context.ui.slot({
             append: "sidebar.content",
             render: (props) => (
                 <Panel
-                    rows={read(props.sessionID)}
+                    view={read(props.sessionID)}
                     surface={context.theme}
                     open={state.open}
                     toggle={toggle("open")}
@@ -980,5 +1197,29 @@ export default Plugin.define({
                 />
             ),
         })
+
+        // The last gap in the family: a subagent spawned after the paint that
+        // asked for it. Loading it here is what makes its tokens appear without
+        // waiting for something else to change the store.
+        const stopCreated = context.data.on("session.created", (event) => {
+            const id = optional(event.data.sessionID) ?? ""
+            if (id === "") return
+            if (event.data.parentID !== undefined) parents.set(id, event.data.parentID)
+            if (shown !== undefined && belongs(shown, id)) sync(id)
+        })
+
+        // A deleted child must leave the tally, or it keeps contributing a label
+        // that nothing will ever fill in again.
+        const stopDeleted = context.data.on("session.deleted", (event) => {
+            const id = optional(event.data.sessionID) ?? ""
+            if (id === "") return
+            parents.delete(id)
+            synced.delete(id)
+        })
+
+        return () => {
+            stopCreated()
+            stopDeleted()
+        }
     },
 })
