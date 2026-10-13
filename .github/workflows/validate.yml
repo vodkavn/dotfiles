@@ -74,6 +74,18 @@ jobs:
           sudo install -m 0755 /tmp/sc/shellcheck /usr/local/bin/shellcheck
           shellcheck --version | sed -n '2p'
 
+      - name: Assert Node for the plugin tests
+        # check.sh *skips* the opencode plugin tests when Node is unusable rather
+        # than blocking, because locally Node comes from the contributor's own
+        # nvm toolchain and not from a package this workflow installs. That is
+        # the right default here and the wrong one on the runner: a skip would
+        # let those tests rot unnoticed, which is how they were left orphaned in
+        # the first place. So the runner asserts the precondition instead.
+        run: |
+          command -v node
+          node --version
+          node -e 'process.exit(require("node:module").stripTypeScriptTypes ? 0 : 1)'
+
       - name: Report tool versions
         run: |
           bash --version | head -1

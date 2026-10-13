@@ -5,6 +5,10 @@
 # never run install.sh, never touch the network, and never mutate anything
 # outside a private mktemp tree.
 #
+# The Bash cases below are the whole of this file's scope. tests/*.test.mjs
+# holds the opencode plugin tests; those need Node's test runner and are driven
+# by scripts/check.sh, which is why nothing here mentions them.
+#
 # Usage:  bash tests/run.sh
 #
 # Exit codes:
@@ -891,11 +895,78 @@ case_ai_config_link_discovery() {
     return 0
 }
 
+# Deleting a plugin from config/opencode/ must not leave a dangling symlink
+# behind in ~/.config/opencode/plugins/, which opencode still scans at startup.
+# install.sh only visits paths in its link list, so it needed an explicit prune
+# of links pointing back into this checkout whose source is gone.
+#
+# install.sh is not executed here for the same reason as above. This replays
+# the prune loop against a synthetic tree so the rule is pinned without any
+# blast radius, and so the "leave community plugins alone" half is pinned too:
+# `opencode plugin add` installs real directories in the same place.
+case_ai_stale_link_prune() {
+    local src="$CASE_DIR/dotfiles/config/opencode"
+    local global="$CASE_DIR/home/.config/opencode"
+    mkdir -p -- "$src/plugins/alpha" "$src/plugins/beta" \
+        "$global/plugins/community" "$global/commands"
+    : > "$src/plugins/alpha/index.ts"
+    : > "$src/plugins/beta/index.ts"
+    : > "$global/plugins/community/index.ts"
+
+    link() { ln -s -- "$src/$1" "$global/$2"; }
+    link plugins/alpha plugins/alpha
+    link plugins/beta plugins/beta
+    link plugins/alpha commands/alpha-link
+    # The deleted plugin: its link points into the checkout, but the source
+    # directory is gone, so the link dangles.
+    link plugins/tokens plugins/tokens
+
+    assert_absent "$src/plugins/tokens"
+    assert_eq "$(find "$global" -xtype l | wc -l)" '1' "fixture must have exactly one dangling link"
+
+    # The loop, as install.sh runs it.
+    local ai_src=$src ai_global=$global ai_link_list existing target relative
+    ai_link_list=$(
+        cd "$ai_src" 2>/dev/null || exit 0
+        {
+            find . -mindepth 1 -maxdepth 1 -type f -name '*.json' -printf '%P\n'
+            find . -mindepth 2 -maxdepth 2 -type d -path './plugins/*' -printf '%P\n'
+            find . -mindepth 1 -maxdepth 1 -type d ! -name plugins -printf '%P\n'
+        } | LC_ALL=C sort
+    )
+    while IFS= read -r existing; do
+        [ -n "$existing" ] || continue
+        target=$(readlink "$existing")
+        case "$target" in
+            "$ai_src"/*) ;;
+            *) continue ;;
+        esac
+        relative=${target#"$ai_src"/}
+        if ! printf '%s\n' "$ai_link_list" | grep -qxF -- "$relative"; then
+            rm -f "$existing"
+        fi
+    done < <(find "$ai_global" -type l 2>/dev/null)
+
+    # The dangling link is gone.
+    assert_absent "$global/plugins/tokens"
+    assert_eq "$(find "$global" -xtype l | wc -l)" '0' "prune must leave no dangling link"
+    # Everything with a live source is untouched.
+    assert_exists "$global/plugins/alpha"
+    assert_exists "$global/plugins/beta"
+    assert_exists "$global/commands/alpha-link"
+    # A real directory from `opencode plugin add` is never a link, so the prune
+    # cannot see it and must not touch it.
+    assert_exists "$global/plugins/community"
+    [ -L "$global/plugins/community" ] && die "community plugin was replaced by a symlink"
+    return 0
+}
+
 # =============================================================================
 # Run
 # =============================================================================
 
 run_case ai_config_link_discovery case_ai_config_link_discovery
+run_case ai_stale_link_prune case_ai_stale_link_prune
 run_case ai_alias_gates case_ai_alias_gates
 run_case opencode_completion_gate case_opencode_completion_gate
 run_case startup_reload_spaced_home case_startup_reload_spaced_home

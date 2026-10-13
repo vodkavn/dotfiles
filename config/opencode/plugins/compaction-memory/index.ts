@@ -24,8 +24,18 @@ import { Plugin } from "@opencode/plugin"
 //     plugin reload and a restart. Old sessions are pruned lazily to keep the
 //     store bounded.
 //
-// This complements, and does not replace, the experimental compaction hook: the
-// goal here is continuity of intent, not a custom summarizer.
+// How the note reaches the model.
+//
+// ctx.session.hook("compaction") runs immediately before the summary call, with
+// the transcript in event.messages. Putting the note in event.system therefore
+// hands it to the summariser, which is what makes the original task survive into
+// the summary instead of being summarised away as a side quest. It is a nudge
+// to the summariser, not a guarantee: if the summary still drops the task, the
+// user still re-explains. The durable copy in storage is what the next prompt
+// can fall back on.
+//
+// This is not a custom summariser — event.result is left unset, so opencode
+// performs the compaction itself and this plugin only shapes what it reads.
 
 // Exported for testing; opencode only reads the default export.
 export type Note = {
@@ -50,6 +60,10 @@ const TASK_LIMIT = 400
 const FILES_LIMIT = 20
 // Sessions older than this are dropped on the next prompt we touch.
 const STALE_MS = 14 * 24 * 60 * 60 * 1000
+// Upper bound on pages walked in one prune pass, so a store with more sessions
+// than expected costs one pass and resumes on the next tick rather than holding
+// storage busy. At 200 per page this covers 20k sessions per pass.
+const MAX_PRUNE_PAGES = 100
 
 // Exported for testing; opencode only reads the default export.
 export const render = (note: Note): string =>
@@ -100,13 +114,22 @@ export default Plugin.define({
             const sessionID = event.sessionID
             if (!sessionID) return
 
-            const note = record(await ctx.storage.get(key(sessionID)))
-            if (typeof note.task !== "string" || note.task === "") return
+            // Storage is durable and shared across plugin versions, so the note
+            // is re-validated here rather than trusted. The prompt hook above
+            // guards its own read the same way; without this a note whose
+            // "files" is not an array makes render() throw mid-compaction.
+            const stored = record(await ctx.storage.get(key(sessionID)))
+            if (typeof stored.task !== "string" || stored.task === "") return
+            const note: Note = {
+                task: stored.task,
+                files: (Array.isArray(stored.files) ? stored.files : []).map(String).slice(0, FILES_LIMIT),
+                updated: typeof stored.updated === "number" ? stored.updated : 0,
+            }
 
             // System parts, not messages: this is standing context for the next
             // model call, not a fabricated turn in the conversation.
             const system = event.system ?? (event.system = [])
-            system.push({ type: "text", text: render(note as Note) })
+            system.push({ type: "text", text: render(note) })
         })
 
         // Lazy prune so a long-lived server does not accumulate notes forever.
@@ -118,9 +141,20 @@ export default Plugin.define({
             void (async () => {
                 const cutoff = Date.now() - STALE_MS
                 let after: string | undefined
+                let pages = 0
                 do {
                     const page = await ctx.storage.scan({ prefix: "session/", limit: 200, after })
                     if (stopped) return
+
+                    // The loop is driven by the store's own cursor, so a cursor
+                    // that fails to advance would spin here forever -- inside a
+                    // timer, in a long-lived daemon, hammering storage. A real
+                    // ordered store always moves forward, but "always" is a
+                    // property worth not depending on for termination. Bailing
+                    // costs nothing: the next tick restarts the scan.
+                    if (page.next === after) return
+                    if (++pages > MAX_PRUNE_PAGES) return
+
                     for (const entry of page.entries) {
                         if (stopped) return
                         const note = record(entry.value)

@@ -238,13 +238,23 @@ replaces re-spelling `sudo *` as a permission rule in each project config and
 rejects with a reason the model reads instead of a silent permission prompt.
 
 It matches **command position**, not substrings, by tokenising the command and
-testing each command's first word. `grep -r curl src/` and `echo 'use curl
+testing each command's command word. `grep -r curl src/` and `echo 'use curl
 later'` are allowed; `echo hi && sudo rm -rf /` is not.
 
-It is a guardrail, not a sandbox: `bash -c 'sudo ls'`, `xargs sudo`, and
-`node -e 'child_process…'` all bypass it, because it matches strings rather
-than intercepting execution. To tighten or loosen it, edit the `BLOCKED` map at
-the top of `index.ts`.
+It resolves rather than pattern-matches the ways a blocked word is normally
+hidden, borrowing the approach from [cc-safety-net](https://github.com/kenryu42/cc-safety-net)
+without adopting its shell parser. Peeling transparent wrappers (`env`, `nohup`,
+`time`, `nice`, `timeout`, `xargs`, …) reaches the real command; shell keywords
+and brace groups (`for …; do`, `if …; then`, `{ …; }`) are skipped; command
+substitution (`` `sudo id` ``, `"$(sudo id)"`) and a shell's own script
+(`bash -c 'sudo id'`) or `find -exec` predicate are recursed into. A heredoc body
+is read as data, so writing a note that *mentions* `sudo` still works.
+
+It remains a guardrail, not a sandbox, because it reads text rather than
+intercepting execution. `eval "$CMD"`, a wrapper it cannot resolve, and a
+blocked word held in a variable (`S=sudo; $S id`) all pass. Nesting stops at
+depth 4. Treat a pass as "no obvious foot-gun", never as "proven safe". To
+tighten or loosen the list, edit the `BLOCKED` map at the top of `index.ts`.
 
 ### `compaction-memory` (server)
 
@@ -253,7 +263,12 @@ attached — and re-injects it as system context on every compaction, so the
 reason a session started survives summarisation. It is captured on the first
 prompt only and never rewritten, so a summary claiming the goal changed cannot
 overwrite the original ask. State lives in durable plugin storage keyed by
-session and is pruned lazily after 14 days.
+session and is pruned lazily after 14 days. Because that storage is durable and
+shared across plugin versions, the note is re-validated on read rather than
+trusted: a note whose `files` is not an array is dropped, not rendered.
+
+`event.result` is left unset, so this is not a custom summariser — opencode
+performs the compaction and this plugin only shapes what the summariser reads.
 
 ### `inspector` (CLI)
 
@@ -261,6 +276,10 @@ Renders what opencode actually loaded at the current location into
 `sidebar.content`: agents, slash commands, and skills, each a section that
 starts collapsed and toggles on **mouse click**. MCP servers are deliberately
 absent — opencode already shows those itself.
+
+The location is resolved per render from the session on screen, and `sync()` is
+issued when it changes, so switching project or worktree repoints the panel
+rather than leaving it listing whatever was loaded at startup.
 
 Plugin-authoring constraints worth knowing before editing the TUI plugin: no
 comment may sit inside a JSX expression (opencode's transform compiles one into

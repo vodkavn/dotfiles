@@ -115,7 +115,10 @@ done
 # Plugins installed with `opencode plugin add` are real directories rather than
 # symlinks, so the "unchanged" test below never matches them and they are left
 # in place. Only an entry that is already a symlink into this checkout, or a
-# file this repository is meant to own, is ever replaced.
+# file this repository is meant to own, is ever replaced. The prune ahead of the
+# link loop is narrower still: it removes only links pointing back into this
+# checkout whose source is gone, so deleting a plugin here cannot leave a
+# dangling entry in ~/.config/opencode/plugins/ for opencode to trip over.
 #
 # opencode merges two layers, global first and project second:
 #   $HOME/.config/opencode/      global; applies to every project
@@ -155,6 +158,26 @@ if command -v opencode >/dev/null 2>&1; then
     if [ -z "$ai_link_list" ]; then
         echo "--> No global AI configuration found in $ai_src, skipped"
     fi
+
+    # Remove links this checkout owns that no longer have a source. The loop
+    # below only visits paths in $ai_link_list, so a plugin deleted from the
+    # repo would otherwise leave a dangling symlink in ~/.config/opencode/ that
+    # opencode still scans at startup. Only links resolving into $ai_src are
+    # considered, so plugins from `opencode plugin add` are never touched.
+    while IFS= read -r existing; do
+        [ -n "$existing" ] || continue
+        target=$(readlink "$existing")
+        case "$target" in
+            "$ai_src"/*) ;;
+            *) continue ;;
+        esac
+        relative=${target#"$ai_src"/}
+        if ! printf '%s\n' "$ai_link_list" | grep -qxF -- "$relative"; then
+            echo "--> Removing stale .config/opencode/$relative (no source in $ai_src)"
+            rm -f "$existing"
+        fi
+    done < <(find "$ai_global" -type l 2>/dev/null)
+
     for file in $ai_link_list
     do
         src=$ai_src/$file

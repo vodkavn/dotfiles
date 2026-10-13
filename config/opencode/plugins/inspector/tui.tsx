@@ -70,18 +70,49 @@ const group = (entries: readonly unknown[]): [string, unknown[]][] => {
 export default Plugin.define({
     id: "dotfiles.inspector.tui",
     setup(context) {
-        const location = context.location ?? context.data.location.default()
+        // The panel lives in the sidebar for as long as the TUI does, so the
+        // location is resolved per render from the session on screen rather
+        // than captured once during setup. Capturing it left the panel listing
+        // the agents, commands, and skills of whichever project happened to be
+        // open at startup, for the rest of the session, after a switch.
+        //
+        // context.location is deliberately not in this chain. It is a plain
+        // property of the setup context, so it is the value captured at setup
+        // -- the very thing this replaces -- and keeping it as a fallback
+        // would reintroduce the staleness whenever the session store has not
+        // caught up. data.location.default() is the live default instead.
+        const location = (sessionID: string | undefined) => {
+            const session = sessionID === undefined ? undefined : context.data.session.get(sessionID)
+            return session?.location ?? context.data.location.default()
+        }
 
-        void Promise.all([
-            context.data.location.agent.sync(location),
-            context.data.location.command.sync(location),
-            context.data.location.skill.sync(location),
-        ])
+        // sync() is one-shot per store, so it is issued when the resolved
+        // location changes rather than on every repaint. Rejections are
+        // swallowed: the client can be pointed at a remote server, and an
+        // unhandled rejection here would take the whole TUI down over a list
+        // that is allowed to be empty until the store syncs. The location is
+        // only marked synced once the calls settle, so a failed attempt is
+        // retried on the next render rather than being lost for the session.
+        let synced = ""
+        const syncing = new Set<string>()
+        const sync = (at: unknown) => {
+            const key = JSON.stringify(at ?? null)
+            if (key === synced || syncing.has(key)) return
+            syncing.add(key)
+            void Promise.all([
+                context.data.location.agent.sync(at),
+                context.data.location.command.sync(at),
+                context.data.location.skill.sync(at),
+            ]).then(
+                () => { synced = key },
+                () => {},
+            ).finally(() => { syncing.delete(key) })
+        }
 
         const sections: {
             key: Section
             label: string
-            read: () => readonly unknown[]
+            read: (at: unknown) => readonly unknown[]
             split?: boolean
         }[] = [
             {
@@ -89,18 +120,18 @@ export default Plugin.define({
                 label: "Agents",
                 // Filtered at the source so the section header counts only the
                 // agents actually listed underneath it.
-                read: () => (context.data.location.agent.list(location) ?? []).filter(listed),
+                read: (at) => (context.data.location.agent.list(at) ?? []).filter(listed),
                 split: true,
             },
             {
                 key: "commands",
                 label: "Commands",
-                read: () => context.data.location.command.list(location) ?? [],
+                read: (at) => context.data.location.command.list(at) ?? [],
             },
             {
                 key: "skills",
                 label: "Skills",
-                read: () => context.data.location.skill.list(location) ?? [],
+                read: (at) => context.data.location.skill.list(at) ?? [],
             },
         ]
 
@@ -118,40 +149,45 @@ export default Plugin.define({
 
         return context.ui.slot({
             append: "sidebar.content",
-            render: () => (
-                <box flexDirection="column" gap={1}>
-                    {sections.map((section) => {
-                        const entries = section.read()
-                        const collapsed = state[section.key]
-                        return (
-                            <box flexDirection="column">
-                                <box
-                                    flexDirection="row"
-                                    onMouseDown={toggle(section.key)}
-                                    onMouseUp={(e: MouseEvent) => e.stopPropagation()}
-                                >
-                                    <text>{`${collapsed ? "▶" : "▼"} ${section.label}`}</text>
-                                    <text fg={context.theme.text.muted}>{` (${entries.length})`}</text>
-                                </box>
-                                {!collapsed &&
-                                    (section.split ? (
-                                        group(entries).map(([name, members]) => (
-                                            <box key={name} flexDirection="column">
-                                                <box flexDirection="row">
-                                                    <text>{`  ${name}`}</text>
-                                                    <text fg={context.theme.text.muted}>{` (${members.length})`}</text>
+            render: (current) => {
+                const at = location(current.sessionID)
+                sync(at)
+
+                return (
+                    <box flexDirection="column" gap={1}>
+                        {sections.map((section) => {
+                            const entries = section.read(at)
+                            const collapsed = state[section.key]
+                            return (
+                                <box flexDirection="column">
+                                    <box
+                                        flexDirection="row"
+                                        onMouseDown={toggle(section.key)}
+                                        onMouseUp={(e: MouseEvent) => e.stopPropagation()}
+                                    >
+                                        <text>{`${collapsed ? "▶" : "▼"} ${section.label}`}</text>
+                                        <text fg={context.theme.text.muted}>{` (${entries.length})`}</text>
+                                    </box>
+                                    {!collapsed &&
+                                        (section.split ? (
+                                            group(entries).map(([name, members]) => (
+                                                <box key={name} flexDirection="column">
+                                                    <box flexDirection="row">
+                                                        <text>{`  ${name}`}</text>
+                                                        <text fg={context.theme.text.muted}>{` (${members.length})`}</text>
+                                                    </box>
+                                                    {members.map((entry) => <text>{`    • ${label(entry)}`}</text>)}
                                                 </box>
-                                                {members.map((entry) => <text>{`    • ${label(entry)}`}</text>)}
-                                            </box>
-                                        ))
-                                    ) : (
-                                        entries.map((entry) => <text>{`  • ${label(entry)}`}</text>)
-                                    ))}
-                            </box>
-                        )
-                    })}
-                </box>
-            ),
+                                            ))
+                                        ) : (
+                                            entries.map((entry) => <text>{`  • ${label(entry)}`}</text>)
+                                        ))}
+                                </box>
+                            )
+                        })}
+                    </box>
+                )
+            },
         })
     },
 })

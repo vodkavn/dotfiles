@@ -8,7 +8,7 @@ case "${1:-}" in
     --no-lint) mode=no-lint ;;
     --help|-h)
         printf 'Usage: bash scripts/check.sh [--syntax-only|--no-lint]\n'
-        printf 'Default: Bash syntax, isolated regression tests, validation-script lint, agent JSON config, Git whitespace.\n'
+        printf 'Default: Bash syntax, isolated regression tests, opencode plugin tests, validation-script lint, agent JSON config, Git whitespace.\n'
         printf 'Exit codes: 0 = selected checks passed; 1 = failure; 2 = missing prerequisite or invalid usage.\n'
         exit 0
         ;;
@@ -44,6 +44,7 @@ meta_files=("$root"/.opencode/commands/*.md "$root"/.opencode/agents/*.md \
     "$root"/config/opencode/skills/*/SKILL.md)
 failures=0
 blocked=0
+skipped=0
 syntax_errors=0
 checked=()
 
@@ -79,6 +80,36 @@ if [[ $mode != syntax ]]; then
         elif (( status )); then
             failures=$((failures + 1))
         fi
+    fi
+
+    # The opencode plugins under config/opencode/plugins/ are TypeScript with no
+    # build step, so their logic is exercised by loading the source into a vm
+    # with stubbed host APIs and calling the exports. Node's built-in test
+    # runner drives that; there is no framework to install, and no live
+    # opencode service is contacted.
+    #
+    # Node is skipped rather than blocked when unusable: it comes from the
+    # contributor's own nvm toolchain, not from a package this repository
+    # installs, and the Bash suite above stays the hard gate. CI asserts Node is
+    # present, so the skip cannot quietly hide a rot there.
+    # module.stripTypeScriptTypes landed in Node v22.13.0 / v23.2.0 (per
+    # nodejs.org/api/module), and the test file imports it by name, so an older
+    # Node fails to even link. Test the API rather than the version number, so
+    # this cannot drift again when Node moves.
+    plugin_tests=("$root"/tests/*.test.mjs)
+    if (( ${#plugin_tests[@]} == 0 )); then
+        printf 'SKIP: no tests/*.test.mjs found; opencode plugins are untested\n'
+        skipped=$((skipped + 1))
+    elif ! command -v node >/dev/null 2>&1 || ! node_bin=$(type -P node); then
+        printf 'SKIP: node unavailable (nvm toolchain); opencode plugin tests not run\n'
+        skipped=$((skipped + 1))
+    elif ! "$node_bin" -e 'process.exit(require("node:module").stripTypeScriptTypes ? 0 : 1)' 2>/dev/null; then
+        printf 'SKIP: this node lacks module.stripTypeScriptTypes (needs >= 22.13); plugin tests not run\n'
+        skipped=$((skipped + 1))
+    elif "$node_bin" --test "${plugin_tests[@]}"; then
+        printf 'PASS: opencode plugin tests (%s file(s))\n' "${#plugin_tests[@]}"
+    else
+        failures=$((failures + 1))
     fi
 
     if [[ $mode == no-lint ]]; then
@@ -188,4 +219,11 @@ elif (( blocked )); then
     printf '\nINCOMPLETE: %s check group(s) blocked; full validation did not pass.\n' "$blocked" >&2
     exit 2
 fi
-printf '\nPASS: all selected checks (%s).\n' "$mode"
+# A skipped group is not a pass. Saying "full" after one was skipped is exactly
+# how a stage can rot unnoticed, which is what happened to the plugin tests
+# before they were wired in here.
+if (( skipped )); then
+    printf '\nPASS: all selected checks (%s), with %s group(s) skipped above.\n' "$mode" "$skipped"
+else
+    printf '\nPASS: all selected checks (%s).\n' "$mode"
+fi
