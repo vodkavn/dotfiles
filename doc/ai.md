@@ -14,7 +14,7 @@ are linked into `$HOME` by `install.sh`.
     config/opencode/skills/                global: requirement-doc, design-review,
                                            test-scenario, deliverable-trace,
                                            release-rollback, workspace-hygiene
-    config/opencode/plugins/               global: inspector (TUI)
+    config/opencode/plugins/               global: inspector, session-vitals (TUI)
                                            shell-guard, tool-guard,
                                            compaction-memory (server)
     .opencode/opencode.json                 project: permissions, watcher, worktree
@@ -218,9 +218,9 @@ Enable it per project where table normalisation is actually wanted, with
 
 ## Plugins
 
-Four plugins in `config/opencode/plugins/`, all global. `inspector` is a CLI
-plugin that draws; `shell-guard` and `compaction-memory` are server plugins that
-only change behaviour.
+Five plugins in `config/opencode/plugins/`, all global. `inspector` and
+`session-vitals` are CLI plugins that draw; `shell-guard`, `tool-guard` and
+`compaction-memory` are server plugins that only change behaviour.
 
 Community packages are a separate mechanism: `opencode plugin add <pkg>`
 installs into the same directory as real directories the installer leaves alone
@@ -270,6 +270,48 @@ trusted: a note whose `files` is not an array is dropped, not rendered.
 
 `event.result` is left unset, so this is not a custom summariser — opencode
 performs the compaction and this plugin only shapes what the summariser reads.
+
+It also warns the agent **once per compaction, after the fact**. The trigger is
+the count of `compaction` markers already in `event.messages` — a fact — rather
+than a token estimate, which would be a guess about a number the hook is not
+given. Once a transcript has demonstrably been summarised, the agent is told
+that anything it decided but did not write down is gone, and to write decisions
+into the transcript as it goes. The warning map is capped at 16 sessions.
+
+### `session-vitals` (CLI)
+
+Three facts about the running session that the transcript does not show:
+
+- **context percentage** — how close the session is to needing a compaction. A
+  session that suddenly forgets detail otherwise looks arbitrary. Derived the way
+  opencode derives its own: the last assistant message's `tokens.total` against
+  the model's `limit.context`. Both are exact, so this is a real figure rather
+  than an estimate of a number the stores never expose. Turns the warning colour
+  at 85%, which is the point at which compaction-memory's after-the-fact warning
+  stops being too late.
+- **subagents** — only the *live* ones, by `session.status()`: `running · <agent>
+  · <age>`, or `retrying` with the provider's reason underneath when the status
+  is a retry. A finished subagent is history and is not listed at all; "3
+  subagents" after the fact tells the user nothing they can act on. Age is
+  deliberately coarse past an hour (`1h+`, capped at `2h+`), because a subagent
+  running that long is stuck rather than slow. Status is read on **every** render,
+  not cached, so a subagent that starts or finishes appears and disappears
+  without switching sessions.
+
+  Cost is absent on purpose: `session.cost()` returns a *currency* figure, not
+  tokens, and a child's token total is not reachable without reading its whole
+  message list. A number with the wrong unit is worse than no number.
+- **permission prompts waiting** — a prompt blocks the agent until answered, and
+  nothing in the UI says one is outstanding. Counted with
+  `session.permission.{sync,list}`.
+
+All three are reads. Nothing accumulates; the one cache holds a single session key.
+
+This is deliberately **not** a denial log. opencode does not tell plugins about
+configured denies: `permission.hook("evaluate")` is documented as firing for
+`allow` and `ask` only, because an explicit configured deny is final and does not
+invoke the hook. So "which rule refused this" is not obtainable. The outstanding
+prompt is the friction you can actually do something about.
 
 ### `tool-guard` (server)
 

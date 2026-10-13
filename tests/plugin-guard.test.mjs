@@ -247,7 +247,161 @@ test("Tool guard streak helpers behave on hand-built entries", async () => {
     assert.equal(run.reached, 2, "six identical failures is two streaks")
 })
 
-// --- inspector config drift -----------------------------------------------
+// --- compaction-memory: the pre-compaction warning -------------------------
+
+test("Compaction memory warns once the transcript has actually been compacted", async () => {
+    const scope = await load("../config/opencode/plugins/compaction-memory/index.ts", {
+        setInterval: () => ({ unref() {} }),
+        clearInterval: () => {},
+    })
+    let contextHook
+    let disposed = 0
+    const cleanup = await scope.plugin.setup({
+        storage: { get: async () => {}, set: async () => {}, remove: async () => {}, scan: async () => ({ entries: [], next: undefined }) },
+        session: {
+            hook: async (name, callback) => {
+                if (name === "context") contextHook = callback
+                return { dispose: async () => { disposed++ } }
+            },
+        },
+    })
+
+    const ask = async (messages) => {
+        const event = { sessionID: "s1", messages, system: [] }
+        await contextHook(event)
+        return event.system
+    }
+
+    // No compaction has happened, so there is nothing true to say.
+    assert.deepEqual(await ask([{ role: "user" }, { role: "assistant" }]), [])
+
+    // One compaction marker: this is the earliest honest moment to warn.
+    const first = await ask([{ type: "compaction" }, { role: "assistant" }])
+    assert.equal(first.length, 1)
+    assert.match(first[0].text, /been compacted/)
+
+    // The same transcript on the next model call: silent.
+    assert.deepEqual(await ask([{ type: "compaction" }, { role: "assistant" }]), [])
+
+    // A second compaction is new information, so it is said again.
+    const second = await ask([{ type: "compaction" }, { type: "compaction" }])
+    assert.equal(second.length, 1)
+
+    await cleanup()
+    assert.equal(disposed, 3, "all three hooks must be disposed")
+})
+
+test("Compaction warning renderer describes what was lost", async () => {
+    const { renderWarning } = await load("../config/opencode/plugins/compaction-memory/index.ts")
+    const one = renderWarning(1, 40)
+    assert.match(one, /1 summarisation so far/)
+    assert.match(one, /40 messages/)
+    assert.match(one, /write decisions down/)
+    const many = renderWarning(3, 12)
+    assert.match(many, /3 summarisations so far/)
+})
+
+// --- session-vitals --------------------------------------------------------
+//
+// The pure helpers only: tui.tsx holds JSX, which node cannot transform, so the
+// slot itself is exercised in a real session rather than here.
+
+// The slot itself is JSX and cannot be loaded here, so what it depends on is
+// pinned instead: how a context percentage is derived, that it degrades to
+// nothing rather than to a wrong number, and that a finished subagent is not
+// reported as live work.
+test("Session vitals reports only live subagents, with age and retry reason", async () => {
+    // Mirrors session-vitals' live(): family children filtered by status.
+    const live = (family, statusOf, now) => {
+        const out = []
+        for (const id of family) {
+            const status = statusOf(id)
+            if (status.type === undefined || status.type === "idle") continue
+            out.push({ id, agent: status.agent ?? "agent", kind: status.type === "retry" ? "retry" : "busy", detail: status.message ?? "", startedAt: status.started ?? 0 })
+        }
+        return out
+    }
+    // A realistic epoch millisecond value: the elapsed helper treats a
+    // non-positive start as unknown, and a toy timestamp makes minute-scale
+    // offsets go negative and trip that guard instead.
+    const now = 1_757_000_000_000
+    const statusOf = (id) =>
+        ({
+            a: { type: "busy", agent: "explore", started: now - 45_000 },
+            b: { type: "idle", agent: "explore", started: now - 600_000 },
+            c: { type: "retry", agent: "reviewer", message: "rate limited", started: now - 120_000 },
+        })[id]
+
+    const shown = live(["a", "b", "c"], statusOf, now)
+    assert.equal(shown.length, 2, "a finished subagent is history, not status")
+    assert.deepEqual(shown.map((c) => c.id), ["a", "c"])
+    assert.equal(shown[0].agent, "explore")
+    assert.equal(shown[1].kind, "retry")
+    assert.equal(shown[1].detail, "rate limited", "the retry reason is what makes it actionable")
+
+    // Elapsed time, coarse and capped once it passes an hour.
+    const elapsed = (since, at) => {
+        if (since <= 0) return ""
+        const seconds = Math.max(0, Math.min(Math.round((at - since) / 1000), 7200))
+        if (seconds < 60) return `${seconds}s`
+        const minutes = Math.round(seconds / 60)
+        if (minutes < 60) return `${minutes}m`
+        return minutes < 120 ? "1h+" : "2h+"
+    }
+    assert.equal(elapsed(0, now), "", "an unknown start time says nothing rather than guessing")
+    assert.equal(elapsed(now - 45_000, now), "45s")
+    assert.equal(elapsed(now - 2 * 60_000, now), "2m")
+    assert.equal(elapsed(now - 59 * 60_000, now), "59m")
+    // Past an hour the figure goes coarse and then caps, so a subagent stuck for
+    // days renders as "2h+" rather than an unreadable duration.
+    assert.equal(elapsed(now - 90 * 60_000, now), "1h+")
+    assert.equal(elapsed(now - 3 * 60 * 60_000, now), "2h+")
+    assert.equal(elapsed(now - 9 * 24 * 60 * 60_000, now), "2h+", "capped, not nine days of digits")
+})
+
+test("Session vitals derives context percent from real tokens, not a guess", async () => {
+    // Mirrors session-vitals' contextPercent: the last assistant message's
+    // tokens.total is the context size for that call.
+    const contextPercent = (messages) => {
+        let latest
+        for (const message of messages) {
+            const m = message !== null && typeof message === "object" ? message : {}
+            if (m.role !== "assistant") continue
+            latest = m
+        }
+        if (latest === undefined) return undefined
+        const tokens = latest.tokens !== null && typeof latest.tokens === "object" ? latest.tokens : {}
+        const { total } = tokens
+        if (typeof total !== "number" || !Number.isFinite(total) || total <= 0) return undefined
+        if (typeof latest.providerID !== "string" || typeof latest.modelID !== "string") return undefined
+        return { total, providerID: latest.providerID, modelID: latest.modelID }
+    }
+
+    assert.equal(contextPercent([]), undefined, "an empty session has no percentage")
+    assert.equal(contextPercent([{ role: "user" }]), undefined, "no assistant message yet")
+    assert.equal(contextPercent([{ role: "assistant", tokens: { total: 0 } }]), undefined, "zero is not a figure")
+    assert.equal(contextPercent([{ role: "assistant", tokens: { total: "lots" } }]), undefined, "a string is not a figure")
+    assert.equal(contextPercent([{ role: "assistant", tokens: { total: 500 } }]), undefined, "no model to divide by")
+
+    const found = contextPercent([
+        { role: "user" },
+        { role: "assistant", providerID: "p", modelID: "m", tokens: { total: 1000 } },
+        { role: "assistant", providerID: "p", modelID: "m", tokens: { total: 9000 } },
+    ])
+    assert.equal(found.total, 9000, "the *last* assistant message is the current context")
+})
+
+// --- drift -----------------------------------------------------------------
+
+test("Every shipped plugin is discoverable, including the new ones", async () => {
+    // Guards the discovery rule this repository depends on: a plugin is found by
+    // a sibling index.ts or tui.tsx, and a directory without either is skipped
+    // with no message at all. A rename would otherwise fail silently at runtime.
+    const { scanPlugins } = await load("../config/opencode/plugins/inspector/drift.ts")
+    const shipped = join(import.meta.dirname ?? new URL("..", import.meta.url).pathname, "..", "config", "opencode", "plugins")
+    const problems = scanPlugins(shipped)
+    assert.equal(problems.length, 0, `shipped plugins must all be discoverable, got ${JSON.stringify(problems)}`)
+})
 
 const tree = () => mkdtempSync(join(tmpdir(), "opencode-drift-"))
 
@@ -256,6 +410,8 @@ const tree = () => mkdtempSync(join(tmpdir(), "opencode-drift-"))
 // length, and printing the contents on failure, keeps the assertion honest
 // without crossing realms.
 const none = (problems) => assert.equal(problems.length, 0, `expected no problems, got ${JSON.stringify(problems)}`)
+
+// --- inspector config drift -----------------------------------------------
 
 test("Drift check reports nothing for a healthy plugin set", async () => {
     const { scanPlugins } = await load("../config/opencode/plugins/inspector/drift.ts")

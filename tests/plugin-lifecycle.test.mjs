@@ -66,7 +66,8 @@ test("Compaction memory prunes beyond the first page of fresh notes", async () =
     assert.deepEqual(removed, ["session/stale"])
     await fixture.cleanup()
     assert.equal(fixture.cleared(), true)
-    assert.equal(fixture.disposed(), 2)
+    // prompt, compaction, and the pre-compaction context warning.
+    assert.equal(fixture.disposed(), 3)
 })
 
 test("Compaction memory prevents overlapping scans and stops on unload", async () => {

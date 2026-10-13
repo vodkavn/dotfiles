@@ -64,6 +64,10 @@ const STALE_MS = 14 * 24 * 60 * 60 * 1000
 // than expected costs one pass and resumes on the next tick rather than holding
 // storage busy. At 200 per page this covers 20k sessions per pass.
 const MAX_PRUNE_PAGES = 100
+// How many sessions the pre-compaction warning remembers having warned. Bounded
+// for the same reason the tokens plugin leaked: this map is fed by a hook that
+// fires for every model call in every session the server sees.
+const MAX_WARNED_SESSIONS = 16
 
 // Exported for testing; opencode only reads the default export.
 export const render = (note: Note): string =>
@@ -79,6 +83,23 @@ export const render = (note: Note): string =>
     ]
         .filter((line) => line !== "")
         .join("\n")
+
+// Exported for testing; opencode only reads the default export.
+// Said once per compaction, after the fact: the transcript is already a summary,
+// so the point is to change what the agent does from here on, not to restore
+// what is gone.
+export const renderWarning = (compactions: number, messages: number): string =>
+    [
+        "## This session has been compacted",
+        "",
+        `The transcript above is a summary of ${compactions} summarisation${compactions === 1 ? "" : "s"} so far,`,
+        `and it now holds ${messages} messages. Anything decided before the first compaction that`,
+        "was not written into the transcript is gone, and will not be recovered.",
+        "",
+        "So from here, write decisions down as you make them, in the transcript",
+        "itself: what you chose, and what you ruled out and why. A short written",
+        "note survives the next compaction; something you merely concluded does not.",
+    ].join("\n")
 
 export default Plugin.define({
     id: "dotfiles.compaction-memory",
@@ -108,6 +129,45 @@ export default Plugin.define({
                 files: files.slice(0, FILES_LIMIT),
                 updated: Date.now(),
             } satisfies Note)
+        })
+
+        // A session that has already been compacted has demonstrably lost detail
+        // once. From that point on the agent is reasoning over a summary, and
+        // anything it decided but did not write down is gone. This says so once
+        // per compaction, which is the earliest honest moment to say it.
+        //
+        // The trigger is the count of compaction markers already in the
+        // transcript, not a token estimate. Tokens would be a guess about a
+        // number no hook here is given; a compaction marker is a fact.
+        //
+        // State is a capped map, not a durable one: this only needs to remember
+        // what it last said in this process, and must not grow with the number
+        // of sessions a long-lived server sees.
+        const warned = new Map<string, number>()
+
+        const warnHook = await ctx.session.hook("context", (event) => {
+            const sessionID = event.sessionID
+            if (!sessionID) return
+
+            let compactions = 0
+            for (const message of event.messages ?? []) {
+                if (record(message).type === "compaction") compactions++
+            }
+            // Nothing has been lost yet, so there is nothing true to say.
+            if (compactions === 0) return
+            if (warned.get(sessionID) === compactions) return
+
+            // Re-insert to move to the end, so the oldest is the first key.
+            warned.delete(sessionID)
+            warned.set(sessionID, compactions)
+            while (warned.size > MAX_WARNED_SESSIONS) {
+                const oldest = warned.keys().next()
+                if (oldest.done) break
+                warned.delete(oldest.value)
+            }
+
+            const system = event.system ?? (event.system = [])
+            system.push({ type: "text", text: renderWarning(compactions, (event.messages ?? []).length) })
         })
 
         const compactionHook = await ctx.session.hook("compaction", async (event) => {
@@ -173,8 +233,9 @@ export default Plugin.define({
 
         return async () => {
             stopped = true
+            warned.clear()
             clearInterval(prune)
-            await Promise.all([promptHook.dispose(), compactionHook.dispose()])
+            await Promise.all([promptHook.dispose(), compactionHook.dispose(), warnHook.dispose()])
         }
     },
 })
