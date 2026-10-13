@@ -212,8 +212,14 @@ export default Plugin.define({
                     // ordered store always moves forward, but "always" is a
                     // property worth not depending on for termination. Bailing
                     // costs nothing: the next tick restarts the scan.
-                    if (page.next === after) return
+                    //
+                    // Only from the second page. On the first pass `after` is
+                    // undefined, and a store holding everything in one page also
+                    // reports next as undefined -- so comparing them would match
+                    // and abort before a single note was examined, which is the
+                    // common case and the one that most needs pruning.
                     if (++pages > MAX_PRUNE_PAGES) return
+                    if (pages > 1 && page.next === after) return
 
                     for (const entry of page.entries) {
                         if (stopped) return

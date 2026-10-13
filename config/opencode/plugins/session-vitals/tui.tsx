@@ -7,7 +7,9 @@ import { Plugin } from "@opencode/plugin/tui"
 // `limit.context`. Neither is an estimate, so this is a real percentage and not a
 // guess at one. Messages without a modelID, and models without a limit, simply
 // yield no percentage rather than a fabricated one.
-const contextPercent = (messages: readonly unknown[]): number | undefined => {
+const contextPercent = (
+    messages: readonly unknown[],
+): { total: number; providerID: string; modelID: string } | undefined => {
     let latest: Record<string, unknown> | undefined
     for (const message of messages) {
         if (record(message).role !== "assistant") continue
@@ -103,26 +105,30 @@ export default Plugin.define({
         let family: readonly string[] = []
         let used: number | undefined
         let limit: number | undefined
-        let waiting = 0
 
         const refresh = (sessionID: string | undefined) => {
             if (sessionID === undefined) {
                 family = []
                 used = undefined
                 limit = undefined
-                waiting = 0
+                // Cleared with everything else. Leaving it set means that
+                // returning to a session you just left -- home screen, then
+                // back -- matches this guard and early-returns, so the panel
+                // stays blank for a session it demonstrably knows how to read,
+                // for the rest of the TUI's life.
+                synced = ""
                 return
             }
             if (sessionID === synced) return
-            synced = sessionID
 
-            // A store that has not caught up is normal on a cold server, and the
-            // docs say a first query can come back empty. Swallowing the failure
-            // shows nothing rather than taking the TUI down over a count.
+            // Committed only once the reads below have settled. Marking it
+            // synchronously would mean a rejection is swallowed with the
+            // session already marked done, and no later render ever retries.
             void (async () => {
                 const ids = context.data.session.family(sessionID)
                 family = Array.isArray(ids) ? ids.filter((id) => id !== sessionID) : []
 
+                await context.data.session.message.sync(sessionID)
                 const latest = contextPercent(context.data.session.message.list(sessionID) ?? [])
                 used = latest?.total
                 limit = undefined
@@ -138,8 +144,19 @@ export default Plugin.define({
                 }
 
                 await context.data.session.permission.sync(sessionID)
-                waiting = context.data.session.permission.list(sessionID)?.length ?? 0
+                synced = sessionID
             })().catch(() => {})
+        }
+
+        // Read fresh every render: a subagent that starts or finishes has to
+        // show up and disappear without the user switching sessions. The same
+        // is true of pending permission prompts -- a prompt arriving while you
+        // are looking at the session is the entire case this line exists for,
+        // so it cannot be frozen at session-switch time. It is a local store
+        // read, like the status read above.
+        const pending = (sessionID: string | undefined): number => {
+            if (sessionID === undefined) return 0
+            return context.data.session.permission.list(sessionID)?.length ?? 0
         }
 
         // Read fresh every render: a subagent that starts or finishes has to
@@ -172,6 +189,7 @@ export default Plugin.define({
             render: (current) => {
                 refresh(current.sessionID)
                 const children = live()
+                const waiting = pending(current.sessionID)
 
                 const ratio = used !== undefined && limit !== undefined ? used / limit : undefined
                 const percent = ratio === undefined ? undefined : Math.min(100, Math.round(ratio * 100))

@@ -91,21 +91,33 @@ export default Plugin.define({
         // location changes rather than on every repaint. Rejections are
         // swallowed: the client can be pointed at a remote server, and an
         // unhandled rejection here would take the whole TUI down over a list
-        // that is allowed to be empty until the store syncs. The location is
-        // only marked synced once the calls settle, so a failed attempt is
+        // that is allowed to be empty until the store syncs. A failed attempt is
         // retried on the next render rather than being lost for the session.
-        let synced = ""
+        //
+        // Recently synced locations, not just the last one. A single-slot cache
+        // thrashes the moment the user alternates between two projects: every
+        // render misses and re-issues all three syncs, so switching tabs becomes
+        // a network call per frame. Bounded so it cannot grow with the number of
+        // projects a long-lived server ever sees.
+        const SYNC_HISTORY = 8
+        const synced = new Set<string>()
         const syncing = new Set<string>()
         const sync = (at: unknown) => {
             const key = JSON.stringify(at ?? null)
-            if (key === synced || syncing.has(key)) return
+            if (synced.has(key) || syncing.has(key)) return
             syncing.add(key)
             void Promise.all([
                 context.data.location.agent.sync(at),
                 context.data.location.command.sync(at),
                 context.data.location.skill.sync(at),
             ]).then(
-                () => { synced = key },
+                () => {
+                    synced.add(key)
+                    if (synced.size > SYNC_HISTORY) {
+                        const oldest = synced.values().next()
+                        if (!oldest.done) synced.delete(oldest.value)
+                    }
+                },
                 () => {},
             ).finally(() => { syncing.delete(key) })
         }
@@ -141,16 +153,39 @@ export default Plugin.define({
         })
 
         // Walking the filesystem on every repaint would be wasteful, and the
-        // answer only changes when a plugin is added or removed. It is cached
-        // per project directory and re-read when that changes, which is the
+        // answer only changes when a plugin is added or removed. Cached per
+        // project directory and re-read when that changes, which is the
         // same trigger the registry sync above uses.
-        let scanned = ""
+        //
+        // Several directories, not just the last, for the same reason the sync
+        // history is: a single-slot cache re-walks the filesystem on every
+        // render the moment two projects alternate. Bounded for the same
+        // reason too. Re-inserting on a hit keeps the oldest key evictable,
+        // because Map iterates in insertion order.
+        const DRIFT_HISTORY = 8
+        const DRIFT_MAX_AGE = 30_000
+        const scanned = new Map<string, { problems: Problem[]; at: number }>()
         let problems: Problem[] = []
         const check = (directory: string | undefined) => {
             const key = directory ?? ""
-            if (key === scanned) return
-            scanned = key
-            problems = driftProblems(directory)
+            const hit = scanned.get(key)
+            // Age-bounded as well as size-bounded. A pure size cache would serve
+            // the answer it computed at startup for as long as the TUI lives,
+            // which is exactly the failure this panel exists to report: add a
+            // plugin, break a link, and the badge keeps saying all is well.
+            if (hit !== undefined && Date.now() - hit.at < DRIFT_MAX_AGE) {
+                scanned.delete(key)
+                scanned.set(key, hit)
+                problems = hit.problems
+                return
+            }
+            const found = driftProblems(directory)
+            scanned.set(key, { problems: found, at: Date.now() })
+            if (scanned.size > DRIFT_HISTORY) {
+                const oldest = scanned.keys().next()
+                if (!oldest.done) scanned.delete(oldest.value)
+            }
+            problems = found
         }
 
         const toggle = (key: Section) => (event: MouseEvent) => {
