@@ -91,8 +91,8 @@ done
 # is not resolved.
 #
 # inspector draws in the sidebar, so it has an index.ts plus a tui.tsx.
-# shell-guard and compaction-memory only change behaviour, so each is index.ts
-# alone.
+# shell-guard, tool-guard and compaction-memory only change behaviour, so each is
+# index.ts alone.
 #
 # Skills under .opencode/skills/ stay project-scoped: that directory belongs to
 # this repository, not to the global layer, and is never linked here. Global

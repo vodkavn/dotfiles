@@ -890,8 +890,8 @@ case_ai_config_link_discovery() {
             find . -mindepth 1 -maxdepth 1 -type d ! -name plugins -printf '%P\n'
         } | LC_ALL=C sort
     )
-    assert_eq "$real" "$(printf 'commands\nopencode.json\nplugins/compaction-memory\nplugins/inspector\nplugins/shell-guard\nskills')" \
-        "the shipped global config must discover its three plugins, commands, and skills"
+    assert_eq "$real" "$(printf 'commands\nopencode.json\nplugins/compaction-memory\nplugins/inspector\nplugins/shell-guard\nplugins/tool-guard\nskills')" \
+        "the shipped global config must discover its four plugins, commands, and skills"
     return 0
 }
 

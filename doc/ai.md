@@ -15,7 +15,8 @@ are linked into `$HOME` by `install.sh`.
                                            test-scenario, deliverable-trace,
                                            release-rollback, workspace-hygiene
     config/opencode/plugins/               global: inspector (TUI)
-                                           shell-guard, compaction-memory (server)
+                                           shell-guard, tool-guard,
+                                           compaction-memory (server)
     .opencode/opencode.json                 project: permissions, watcher, worktree
     .opencode/commands/*.md                 slash commands
     .opencode/agents/reviewer.md            read-only review subagent
@@ -217,7 +218,7 @@ Enable it per project where table normalisation is actually wanted, with
 
 ## Plugins
 
-Three plugins in `config/opencode/plugins/`, all global. `inspector` is a CLI
+Four plugins in `config/opencode/plugins/`, all global. `inspector` is a CLI
 plugin that draws; `shell-guard` and `compaction-memory` are server plugins that
 only change behaviour.
 
@@ -270,6 +271,33 @@ trusted: a note whose `files` is not an array is dropped, not rendered.
 `event.result` is left unset, so this is not a custom summariser — opencode
 performs the compaction and this plugin only shapes what the summariser reads.
 
+### `tool-guard` (server)
+
+Notices when the agent is repeating a failing tool call, and says so once in the
+system context of the next model call. A tool that fails does not end a run: the
+model sees the error, retries, sees it again. That loop fills the transcript with
+near-identical errors while nothing raises, so it is invisible from outside.
+
+It fires only on a *streak*: the same tool, the same normalised error (digits
+collapsed, so a changing exit code or line number is still one error), three
+times running with no success of that tool in between. Three different errors is
+exploration, and is left alone. A success from the same tool clears the streak.
+
+It never blocks. Blocking a tool the agent is retrying would remove the very
+signal that would let it recover. The nudge is announced once per distinct loop,
+and again only if that loop grows by another three.
+
+**Its state is bounded, which is the whole design constraint.** The removed
+`tokens` plugin leaked a per-session map fed by global server events. This one
+tracks at most 16 sessions (least recently used evicted) and at most 8 failures
+each, and a read never creates an entry — otherwise every model call for a
+session it has nothing to say about would grow the map. A test asserts the
+retained count under a flood of 5,000 sessions.
+
+What it does not detect: a loop where every call succeeds but makes no progress,
+and a stall with no tool calls at all. Both need a progress signal the agent does
+not currently emit.
+
 ### `inspector` (CLI)
 
 Renders what opencode actually loaded at the current location into
@@ -280,6 +308,20 @@ absent — opencode already shows those itself.
 The location is resolved per render from the session on screen, and `sync()` is
 issued when it changes, so switching project or worktree repoints the panel
 rather than leaving it listing whatever was loaded at startup.
+
+It also renders a **Config** block at the top of the panel, and only when
+something is actually wrong, for two failures that are otherwise silent:
+
+- a plugin symlink whose target no longer exists — opencode still walks the
+  directory it lives in, so a plugin deleted from this repository left a dangling
+  `~/.config/opencode/plugins/<name>` behind until install.sh learned to prune it
+- a plugin directory with no sibling `index.ts` or `tui.tsx`, which the
+  discovery rule skips *without a message*
+
+The scan reads the filesystem (`inspector/drift.ts`) rather than
+`ctx.client.plugin.list()`, because the reported list says what loaded, not what
+was meant to — a silently-skipped plugin is invisible in it. It is cached per
+project directory, so it does not re-walk on every repaint.
 
 Plugin-authoring constraints worth knowing before editing the TUI plugin: no
 comment may sit inside a JSX expression (opencode's transform compiles one into

@@ -1,8 +1,9 @@
 import { Plugin } from "@opencode/plugin/tui"
+import { driftProblems, type Problem } from "./drift"
 
 // Sidebar inspector: shows the agents, slash commands, and skills opencode
-// actually loaded at this location. MCP servers are deliberately omitted;
-// opencode already surfaces those itself.
+// actually loaded at this location, plus any plugin that failed to load at all.
+// MCP servers are deliberately omitted; opencode already surfaces those itself.
 //
 // The agent list is split by Agent.Info.mode, which opencode defines as
 // "primary", "subagent", or "all". A primary agent is what the prompt itself
@@ -25,7 +26,7 @@ import { Plugin } from "@opencode/plugin/tui"
 // Every list is read inside render(), never captured in setup(), so the panel
 // repaints when sync() resolves and when opencode reloads its config.
 
-type Section = "agents" | "commands" | "skills"
+type Section = "agents" | "commands" | "skills" | "drift"
 
 type MouseEvent = { stopPropagation(): void; preventDefault(): void }
 
@@ -136,8 +137,21 @@ export default Plugin.define({
         ]
 
         const [state, setState] = context.storage.memory("collapse", {
-            initial: { agents: true, commands: true, skills: true },
+            initial: { agents: true, commands: true, skills: true, drift: true },
         })
+
+        // Walking the filesystem on every repaint would be wasteful, and the
+        // answer only changes when a plugin is added or removed. It is cached
+        // per project directory and re-read when that changes, which is the
+        // same trigger the registry sync above uses.
+        let scanned = ""
+        let problems: Problem[] = []
+        const check = (directory: string | undefined) => {
+            const key = directory ?? ""
+            if (key === scanned) return
+            scanned = key
+            problems = driftProblems(directory)
+        }
 
         const toggle = (key: Section) => (event: MouseEvent) => {
             event.stopPropagation()
@@ -152,9 +166,41 @@ export default Plugin.define({
             render: (current) => {
                 const at = location(current.sessionID)
                 sync(at)
+                const directory = (at as { directory?: unknown } | undefined)?.directory
+                check(typeof directory === "string" ? directory : undefined)
 
+                // The Config block is only drawn when something is wrong. A panel
+                // that always renders a "Config ok" row teaches the eye to skip
+                // it, which is the opposite of what it is for. The comment lives
+                // here rather than in the JSX below, because opencode's transform
+                // can compile a comment inside a JSX expression into a text node
+                // and fail the whole region with "Orphan text error".
                 return (
                     <box flexDirection="column" gap={1}>
+                        {problems.length > 0 && (
+                            <box flexDirection="column">
+                                <box flexDirection="row" onMouseDown={toggle("drift")} onMouseUp={(e: MouseEvent) => e.stopPropagation()}>
+                                    <text fg={context.theme.text.feedback.error.base}>
+                                        {`${state.drift ? "▶" : "▼"} Config`}
+                                    </text>
+                                    <text fg={context.theme.text.muted}>{` (${problems.length})`}</text>
+                                </box>
+                                {!state.drift &&
+                                    problems.map((problem) => (
+                                        <box key={problem.text} flexDirection="column">
+                                            <text
+                                                fg={
+                                                    problem.severity === "error"
+                                                        ? context.theme.text.feedback.error.base
+                                                        : context.theme.text.feedback.warning.base
+                                                }
+                                            >
+                                                {`  ${problem.severity === "error" ? "✗" : "⚠"} ${problem.text}`}
+                                            </text>
+                                        </box>
+                                    ))}
+                            </box>
+                        )}
                         {sections.map((section) => {
                             const entries = section.read(at)
                             const collapsed = state[section.key]
