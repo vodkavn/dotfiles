@@ -16,101 +16,10 @@ const load = async (path, globals = {}) => {
     return scope
 }
 
-const trackerFixture = async () => {
-    const maps = []
-    const sets = []
-    const scope = await load("../config/opencode/plugins/tokens/session-tracker.ts", {
-        Map: class extends Map {
-            constructor(...args) { super(...args); maps.push(this) }
-        },
-        Set: class extends Set {
-            constructor(...args) { super(...args); sets.push(this) }
-        },
-    })
-    const syncs = []
-    const messages = []
-    const info = new Map()
-    const tracker = vm.runInContext("createSessionTracker", scope)({
-        family: (id) => [id],
-        get: (id) => info.get(id),
-        sync: (id) => syncs.push(id),
-        message: { sync: (id) => messages.push(id) },
-    })
-    return { tracker, parents: maps[0], synced: sets[0], syncs, messages, info }
-}
-
 // Drain the fire-and-forget promise chains without wall-clock sleeps.
 const flush = async () => {
     for (let i = 0; i < 20; i++) await Promise.resolve()
 }
-
-test("Tokens does not retain unrelated child-session events", async () => {
-    const { tracker, parents, synced, syncs } = await trackerFixture()
-    for (let i = 0; i < 10_000; i++) tracker.created(`hidden-${i}`, "other")
-    assert.equal(parents.size, 0)
-    tracker.track("root")
-    for (let i = 0; i < 10_000; i++) tracker.created(`unrelated-${i}`, "other")
-    await flush()
-    assert.equal(parents.size, 0)
-    assert.equal(synced.size, 1)
-    assert.deepEqual(syncs, ["root"])
-})
-
-test("Tokens loads nested children once and releases state on home/unload", async () => {
-    const { tracker, parents, synced, syncs, messages } = await trackerFixture()
-    tracker.track("root")
-    tracker.created("child", "root")
-    tracker.created("grandchild", "child")
-    tracker.created("child", "root")
-    tracker.track("root")
-    await flush()
-    assert.deepEqual(syncs, ["root", "child", "grandchild"])
-    assert.deepEqual(messages, syncs)
-    tracker.track(undefined)
-    assert.equal(parents.size, 0)
-    assert.equal(synced.size, 0)
-    tracker.created("hidden", "root")
-    assert.equal(parents.size, 0)
-    tracker.track("next")
-    tracker.dispose()
-    tracker.created("late", "next")
-    tracker.track("next")
-    await flush()
-    assert.equal(parents.size, 0)
-    assert.equal(synced.size, 0)
-    assert.deepEqual(syncs, ["root", "child", "grandchild"])
-})
-
-test("Tokens clears switched/deleted families and handles cyclic ancestry", async () => {
-    const { tracker, parents, synced, info } = await trackerFixture()
-    tracker.track("root")
-    tracker.created("child", "root")
-    tracker.created("grandchild", "child")
-    tracker.deleted("child")
-    assert.equal(parents.size, 0)
-    assert.equal(synced.size, 1)
-    info.set("a", { parentID: "b" })
-    info.set("b", { parentID: "a" })
-    tracker.created("cycle", "a")
-    assert.equal(parents.size, 0)
-    tracker.created("child", "root")
-    tracker.track("next")
-    assert.equal(parents.size, 0)
-    assert.equal(synced.size, 1)
-    tracker.deleted("next")
-    assert.equal(synced.size, 0)
-    await flush()
-})
-
-test("Tokens cancels queued syncs across rapid session switches", async () => {
-    const { tracker, syncs, messages } = await trackerFixture()
-    tracker.track("a")
-    tracker.track("b")
-    tracker.track("a")
-    await flush()
-    assert.deepEqual(syncs, ["a"])
-    assert.deepEqual(messages, ["a"])
-})
 
 const memoryFixture = async (storage) => {
     let tick

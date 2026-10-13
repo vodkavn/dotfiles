@@ -90,9 +90,9 @@ done
 # loads fine as a server-only plugin. A nested src/ directory or a package.json
 # is not resolved.
 #
-# inspector and tokens draw in the sidebar, so each has an index.ts plus a
-# tui.tsx. shell-guard and compaction-memory only change behaviour, so each is
-# index.ts alone.
+# inspector draws in the sidebar, so it has an index.ts plus a tui.tsx.
+# shell-guard and compaction-memory only change behaviour, so each is index.ts
+# alone.
 #
 # Skills under .opencode/skills/ stay project-scoped: that directory belongs to
 # this repository, not to the global layer, and is never linked here. Global

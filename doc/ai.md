@@ -14,7 +14,7 @@ are linked into `$HOME` by `install.sh`.
     config/opencode/skills/                global: requirement-doc, design-review,
                                            test-scenario, deliverable-trace,
                                            release-rollback, workspace-hygiene
-    config/opencode/plugins/               global: inspector, tokens (TUI)
+    config/opencode/plugins/               global: inspector (TUI)
                                            shell-guard, compaction-memory (server)
     .opencode/opencode.json                 project: permissions, watcher, worktree
     .opencode/commands/*.md                 slash commands
@@ -217,9 +217,9 @@ Enable it per project where table normalisation is actually wanted, with
 
 ## Plugins
 
-Four plugins in `config/opencode/plugins/`, all global. `inspector` and `tokens`
-are CLI plugins that draw; `shell-guard` and `compaction-memory` are server
-plugins that only change behaviour.
+Three plugins in `config/opencode/plugins/`, all global. `inspector` is a CLI
+plugin that draws; `shell-guard` and `compaction-memory` are server plugins that
+only change behaviour.
 
 Community packages are a separate mechanism: `opencode plugin add <pkg>`
 installs into the same directory as real directories the installer leaves alone
@@ -262,40 +262,7 @@ Renders what opencode actually loaded at the current location into
 starts collapsed and toggles on **mouse click**. MCP servers are deliberately
 absent — opencode already shows those itself.
 
-### `tokens` (CLI)
-
-Adds two collapsible sections to `sidebar.content` plus one live line in
-`prompt.footer.status`. Blocks are per model, so a mid-run model switch shows up
-separately instead of as one blended average. Each stat line is a click target
-that opens a dialog explaining both numbers, what moves them, and what is
-normal; the model name opens a dialog built from opencode's registry entry
-(modalities, limits, pricing, variants) rather than from the session. **Context**
-answers a different question — what is filling the window — by splitting the
-prompt by data type (`sys+tools`, `summary`, `reasoning`, `tool output`,
-`tool call`, `answer`, `prompt`, `files`), largest first.
-
-**Tokens covers the session family, Context does not.** A subagent runs as a
-session of its own, with its own message list and its own bill, so the Tokens
-panel walks the whole family: one block per model for the session itself, then a
-`subagents (N)` group with one block per model per child, each labelled with the
-agent that spent it and disambiguated when the same agent ran more than once. The
-live line follows whichever agent produced the most recent message. The model
-count in the heading is distinct models across the family, not blocks, because a
-session and its subagents routinely share one. Context stays on the session
-alone — a child's prompt was assembled from its own history and billed against
-its own window, so folding it in would describe a context the model never had.
-Children reach the panel through `data.session.family()` plus an explicit
-`session.sync()` and `message.sync()`, because the TUI store only holds the
-sessions it has been told to load; `session.created` covers the child that is
-spawned after the paint that asked for it.
-
-The total is exact, because opencode reports the prompt size of each assistant
-message. The split is estimated from character counts at roughly four characters
-per token, because the CLI plugin runtime ships no tokenizer; rows are scaled to
-add up to the reported total. `sys+tools` is a residual — the agent system
-prompt, instruction files, and tool schemas — and is usually the largest slice.
-
-Plugin-authoring constraints worth knowing before editing either TUI plugin: no
+Plugin-authoring constraints worth knowing before editing the TUI plugin: no
 comment may sit inside a JSX expression (opencode's transform compiles one into
 a text node and OpenTUI rejects the region with `Orphan text error`), and click
 targets act on pointer release rather than pointer press.
