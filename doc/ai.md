@@ -14,7 +14,7 @@ are linked into `$HOME` by `install.sh`.
     config/opencode/skills/                global: requirement-doc, design-review,
                                            test-scenario, deliverable-trace,
                                            release-rollback, workspace-hygiene
-    config/opencode/plugins/               global: inspector, session-vitals (TUI)
+    config/opencode/plugins/               global: inspector, subagent-watch (TUI)
                                            shell-guard, tool-guard,
                                            compaction-memory (server)
     .opencode/opencode.json                 project: permissions, watcher, worktree
@@ -219,8 +219,10 @@ Enable it per project where table normalisation is actually wanted, with
 ## Plugins
 
 Five plugins in `config/opencode/plugins/`, all global. `inspector` and
-`session-vitals` are CLI plugins that draw; `shell-guard`, `tool-guard` and
-`compaction-memory` are server plugins that only change behaviour.
+`subagent-watch` are CLI plugins that draw; `shell-guard`, `tool-guard` and
+`compaction-memory` are server plugins that only change behaviour. The CLI ones
+still ship a server entry: discovery needs `index.ts` beside `tui.tsx`, and it is
+what carries the plugin id into the storage namespace.
 
 Community packages are a separate mechanism: `opencode plugin add <pkg>`
 installs into the same directory as real directories the installer leaves alone
@@ -233,23 +235,32 @@ with `index.ts` plus `tui.tsx` also gets a terminal half.
 
 ### `shell-guard` (server)
 
-Denies `sudo`, `doas`, `su`, `curl`, `wget`, and `apt*` before the shell runs
-them, in every project, via the v2 `shell.hook("create.before")` hook. This
-replaces re-spelling `sudo *` as a permission rule in each project config and
-rejects with a reason the model reads instead of a silent permission prompt.
+Denies `sudo`, `doas`, `su`, `curl`, `wget`, `apt`, `apt-get`, and `aptitude`
+before the shell runs them, in every project, via the v2
+`shell.hook("create.before")` hook. This replaces re-spelling `sudo *` as a
+permission rule in each project config and rejects with a reason the model reads
+instead of a silent permission prompt.
 
 It matches **command position**, not substrings, by tokenising the command and
 testing each command's command word. `grep -r curl src/` and `echo 'use curl
-later'` are allowed; `echo hi && sudo rm -rf /` is not.
+later'` are allowed; `echo hi && sudo rm -rf /` is not. Only the three package
+entry points above are blocked, so `apt-cache`, `apt-mark` and `dpkg` still run —
+reading package state is not the same act as changing the system.
 
 It resolves rather than pattern-matches the ways a blocked word is normally
 hidden, borrowing the approach from [cc-safety-net](https://github.com/kenryu42/cc-safety-net)
 without adopting its shell parser. Peeling transparent wrappers (`env`, `nohup`,
-`time`, `nice`, `timeout`, `xargs`, …) reaches the real command; shell keywords
+`time`, `nice`, `timeout`, …) reaches the real command; shell keywords
 and brace groups (`for …; do`, `if …; then`, `{ …; }`) are skipped; command
 substitution (`` `sudo id` ``, `"$(sudo id)"`) and a shell's own script
 (`bash -c 'sudo id'`) or `find -exec` predicate are recursed into. A heredoc body
 is read as data, so writing a note that *mentions* `sudo` still works.
+
+`xargs` is the wrapper that breaks the pattern: its operand is substituted rather
+than named, so `xargs sudo id` is caught but **`xargs -I {} sudo id` is not** —
+`{}` is read as the command and the real one is never reached. The same applies
+to `xargs -I {} sh -c '…'`. This is the plugin's own stated limit, not an
+oversight, but it is the case most likely to come up in practice.
 
 It remains a guardrail, not a sandbox, because it reads text rather than
 intercepting execution. `eval "$CMD"`, a wrapper it cannot resolve, and a
@@ -261,12 +272,15 @@ tighten or loosen the list, edit the `BLOCKED` map at the top of `index.ts`.
 
 Keeps a small per-session note — the original task and any files the user
 attached — and re-injects it as system context on every compaction, so the
-reason a session started survives summarisation. It is captured on the first
-prompt only and never rewritten, so a summary claiming the goal changed cannot
-overwrite the original ask. State lives in durable plugin storage keyed by
+reason a session started survives summarisation. The **task** is captured on the
+first prompt only and never rewritten, so a summary claiming the goal changed
+cannot overwrite the original ask; the **file list** accumulates across prompts
+instead, deduplicated and capped. State lives in durable plugin storage keyed by
 session and is pruned lazily after 14 days. Because that storage is durable and
 shared across plugin versions, the note is re-validated on read rather than
-trusted: a note whose `files` is not an array is dropped, not rendered.
+trusted: a `files` that is not an array is replaced with an empty list and a note
+with no task is dropped, so a note written by an older version is rendered
+degraded rather than throwing mid-compaction.
 
 `event.result` is left unset, so this is not a custom summariser — opencode
 performs the compaction and this plugin only shapes what the summariser reads.
@@ -278,40 +292,80 @@ given. Once a transcript has demonstrably been summarised, the agent is told
 that anything it decided but did not write down is gone, and to write decisions
 into the transcript as it goes. The warning map is capped at 16 sessions.
 
-### `session-vitals` (CLI)
+### `subagent-watch` (CLI)
 
-Three facts about the running session that the transcript does not show:
+A **Subagents** section in `sidebar.content`: one row per subagent of the session
+on screen, and clicking a row focuses that subagent.
 
-- **context percentage** — how close the session is to needing a compaction. A
-  session that suddenly forgets detail otherwise looks arbitrary. Derived the way
-  opencode derives its own: the last assistant message's `tokens.total` against
-  the model's `limit.context`. Both are exact, so this is a real figure rather
-  than an estimate of a number the stores never expose. Turns the warning colour
-  at 85%, which is the point at which compaction-memory's after-the-fact warning
-  stops being too late.
-- **subagents** — only the *live* ones, by `session.status()`: `running · <agent>
-  · <age>`, or `retrying` with the provider's reason underneath when the status
-  is a retry. A finished subagent is history and is not listed at all; "3
-  subagents" after the fact tells the user nothing they can act on. Age is
-  deliberately coarse past an hour (`1h+`, capped at `2h+`), because a subagent
-  running that long is stuck rather than slow. Status is read on **every** render,
-  not cached, so a subagent that starts or finishes appears and disappears
-  without switching sessions.
+opencode's own subagent list lives in the composer, behind a keybind, and
+disappears the moment you act on it. Delegated work is the one thing the
+transcript cannot show — a subagent runs as a session of its own, so its
+messages never appear in the one on screen and a long-running one looks exactly
+like a hang. This puts the list in permanent chrome instead.
 
-  Cost is absent on purpose: `session.cost()` returns a *currency* figure, not
-  tokens, and a child's token total is not reachable without reading its whole
-  message list. A number with the wrong unit is worse than no number.
-- **permission prompts waiting** — a prompt blocks the agent until answered, and
-  nothing in the UI says one is outstanding. Counted with
-  `session.permission.{sync,list}`.
+**Finished subagents are kept, not filtered out.** A finished subagent is history
+in the session list but is still the only way to read what it actually did, and a
+list that empties itself the moment a subagent completes cannot be navigated.
+Newest is on top, so the one just delegated is the one you have not read.
 
-All three are reads. Nothing accumulates; the one cache holds a single session key.
+Each row is **two lines**: the head carries state, agent and age
+(`  ● general 4m`), the body carries the task, indented under it. Split rather
+than truncated into one line because a single line spends its budget on the
+title, which is the one field you do not scan for. A row with no title is one
+line.
 
-This is deliberately **not** a denial log. opencode does not tell plugins about
-configured denies: `permission.hook("evaluate")` is documented as firing for
-`allow` and `ask` only, because an explicit configured deny is final and does not
-invoke the hook. So "which rule refused this" is not obtainable. The outstanding
-prompt is the friction you can actually do something about.
+Line width is the one place this plugin depends on a host constant. The sidebar
+is a fixed 42-column box with 2 columns of padding either side, and the box that
+carries the `sidebar.content` slot adds one more on the right, so a line gets 37.
+That is not exposed to the slot — its input carries only `sessionID` — so
+`panel.ts` holds it as `WIDTH`, and a test pins the arithmetic. It is a
+preference rather than a correctness requirement because the text elements are
+given `wrapMode="none"`: a stale constant costs the ellipsis, where wrapping
+would turn every two-line row into three and push the section off the bottom.
+
+What is listed is the subtree *below* the session on screen, linked on
+`parentID`. opencode's own list is `family(sessionID)` minus the session, which
+only holds while the session is the root of its family — once you have clicked
+into a subagent, the same subtraction reports the *parent* as a child. Linking
+instead stays correct at any depth. It therefore draws nothing inside a subagent
+that has none, which is also why there is no sibling view to hop back out with.
+
+Things the implementation is explicit about:
+
+- **Nothing is drawn when there are no subagents.** A permanent `Subagents (0)`
+  row teaches the eye to skip the section, which is the opposite of what it is
+  for — the same reasoning the inspector's Config block uses.
+- **`session.status()` returns a status *name*** (`"running"` / `"idle"`), not
+  the status object the server's `session.status` event carries. Reading `.type`
+  off a string yields `undefined`, indistinguishable from "no status", so both
+  shapes are accepted. An absent status yields `""` rather than throwing: a
+  `TypeError` raised in this read is thrown from inside the render loop and takes
+  the whole sidebar down, not just this section.
+- **The sync window is bounded at 64 keys**, evicting oldest-first. A set that
+  only grew would hold one key per session ever opened; a single-slot cache would
+  re-sync on every switch. A key is removed on rejection, so a failed sync is
+  retried by a later render rather than costing that session its list for the
+  life of the TUI.
+- **Two mechanisms populate the family map**, and only one is this plugin's job.
+  The store re-families on its own when a session is created under another, which
+  is how a subagent delegated after this plugin looked still appears;
+  `sync(id, { children: true })` pulls the children of a session the store has not
+  otherwise fetched, which is the cold-start case. The second argument is not in
+  the published docs and is verified against v2.0.28 — if a future host ignores
+  it, the failure is a thinner list rather than an empty one.
+- **The caller does not read the store inside the sort comparator.** The walk is
+  one pass to link `parentID`, one to read each sort key, one to describe each
+  row; a comparator calling `session.get()` would add ~2n·log2(n) reads per
+  repaint. A test counts the reads rather than timing them, so it pins the
+  property instead of the machine.
+
+Clicking calls `context.ui.router.navigate({ type: "session", sessionID })`,
+which is what opencode's own subagent row calls and what its tab layer calls
+under the hood, so it both switches session and focuses the tab when session tabs
+are enabled. The action is on `onMouseUp` and `onMouseDown` only stops
+propagation; the release counts only when it lands on the row that was pressed,
+so a press-and-drag-away cancels instead of opening a session you did not click.
+
 
 ### `tool-guard` (server)
 

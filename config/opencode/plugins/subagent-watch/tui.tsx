@@ -1,0 +1,224 @@
+import { Plugin } from "@opencode/plugin/tui"
+import { buildRows, childrenOf, isRunning, rowBody, rowHead, type Source, type Tree } from "./panel"
+
+// A **Subagents** section in the sidebar: one row per subagent of the session
+// on screen, clickable to open it.
+//
+// opencode already has a subagent list, but it lives in the composer, it is
+// hidden behind a keybind, and it disappears the moment you act on it. Delegated
+// work is the one thing you cannot see from the transcript -- a subagent runs as
+// a session of its own, so its messages never appear in the one on screen and a
+// long-running one looks exactly like a hang. This puts the list in permanent
+// chrome, next to the session it belongs to.
+//
+// Unlike session-vitals, which reports only what is live, this keeps finished
+// subagents. The reason is the click: a finished subagent is history in the
+// session list but is still the only way to read what it actually did, and a
+// list that empties itself the moment a subagent completes cannot be navigated.
+//
+// What is drawn is the subtree *below* the session on screen, linked on
+// parentID. opencode's own list is `family(sessionID)` minus the session, which
+// only holds while the session is the root of its family; once you have clicked
+// into a subagent the same subtraction reports the parent. Linking instead stays
+// correct at any depth, and means the section reads as "this session's
+// subagents" rather than "everything in a family that happens to include this".
+//
+// Nothing is drawn when there are no subagents. A permanent "Subagents (0)" row
+// teaches the eye to skip the section, which is the opposite of what it is for --
+// the same reasoning session-vitals and the inspector's Config block use.
+//
+// Every list is read inside render(), never captured in setup(). Status is a
+// local store read on top of that: caching it would freeze a row on "running"
+// long after the subagent finished, which is the bug this is meant to replace.
+
+type MouseEvent = { stopPropagation(): void; preventDefault(): void }
+
+// Not a session id. The header shares the press/release guard with the rows, so
+// it needs an identity that cannot collide with one.
+const HEADER = ""
+
+// How many levels below the session on screen to *fetch*. opencode's own event
+// handling syncs direct children only; a subagent is not supposed to delegate
+// further, but the tree does not forbid it, so one extra level is fetched.
+//
+// The cap is on fetching only. The walk in panel.ts draws whatever the family
+// links imply, at whatever depth, because a row that is missing is worse than a
+// row drawn at the clamped indent from a store entry already in hand.
+const DEPTH = 1
+
+export default Plugin.define({
+    id: "dotfiles.subagent-watch.tui",
+    setup(context) {
+        // The *values*, not the key, are what differ from the inspector's store
+        // of the same name: its keys are section names and a `true` means
+        // collapsed, so a `true` under this one would read as "the section is
+        // on" to anyone copying from that file. Named for what it holds instead.
+        //
+        // Starts expanded -- the point of this section is to be read without a
+        // click. Memory storage, so it survives a plugin reload and resets when
+        // the TUI exits.
+        const [state, setState] = context.storage.memory("collapse", { initial: { collapsed: false } })
+
+        const tree = (current: string | undefined): Tree => ({
+            current,
+            family: current === undefined ? [] : context.data.session.family(current) ?? [],
+            info: (id) => context.data.session.get(id),
+        })
+
+        // Normalised in panel.ts rather than here, because this is the one
+        // function that can throw on a status shape, and panel.ts is the file
+        // the tests can load.
+        const runningOf = (id: string): boolean => isRunning(context.data.session.status(id))
+
+        // Two mechanisms put a session in the store's family map, and the panel
+        // leans on both:
+        //
+        //   * the store re-families on its own when a session is created under
+        //     another, which is how a subagent delegated *after* this plugin
+        //     looked still appears with no help from here;
+        //   * sync(id, {children: true}) pulls the children of a session the
+        //     store has not otherwise fetched -- the cold-start case, where
+        //     nothing has been created under it this run.
+        //
+        // Only the second is this plugin's job. The second argument is not in the
+        // published docs; it is verified against v2.0.28. If a future host
+        // ignores it the first mechanism still carries the section, so the
+        // failure is a thinner list rather than an empty one.
+        //
+        // Bounded, and bounded in insertion order. A set that only ever grew
+        // would hold one key per session ever opened, which is a slow leak in a
+        // TUI that is never restarted. A single-slot cache is not the answer
+        // either: it thrashes the moment you alternate between two sessions.
+        const SYNC_WINDOW = 64
+        const requested = new Set<string>()
+        const request = (id: string, depth: number) => {
+            if (depth > DEPTH) return
+            const key = `${depth}:${id}`
+            if (requested.has(key)) return
+            requested.add(key)
+            if (requested.size > SYNC_WINDOW) {
+                const oldest = requested.values().next()
+                if (!oldest.done) requested.delete(oldest.value)
+            }
+            // Fire and forget: a rejected sync must not take the TUI down over a
+            // list that is allowed to be empty until the store catches up.
+            //
+            // The key leaves the window on rejection rather than staying marked,
+            // so a later render retries. Marking it permanently would mean one
+            // failed request costs this session its subagent list for the rest
+            // of the TUI's life: the store does not retry on its own, and the
+            // `synced` guard below never re-enters the same session.
+            void Promise.resolve(context.data.session.sync(id, { children: true }))
+                .then(() => {
+                    if (depth >= DEPTH) return
+                    for (const child of childrenOf(tree(id), id)) request(child, depth + 1)
+                })
+                .catch(() => requested.delete(key))
+        }
+
+        let synced = ""
+        const sync = (current: string | undefined) => {
+            if (current === undefined) {
+                synced = ""
+                return
+            }
+            // Without this, every render of the same session would re-enter the
+            // walk, and the walk is what issues the requests.
+            if (current === synced) return
+            synced = current
+            request(current, 0)
+        }
+
+        const open = (sessionID: string) => {
+            // router.navigate is what opencode's own subagent row calls, and
+            // what its tab layer calls under the hood, so this both switches
+            // session and focuses the tab when session tabs are enabled.
+            context.ui.router.navigate({ type: "session", sessionID })
+        }
+
+        return context.ui.slot({
+            append: "sidebar.content",
+            render: (current) => {
+                sync(current.sessionID)
+
+                const source: Source = { ...tree(current.sessionID), running: runningOf }
+                const rows = buildRows(source)
+                if (rows.length === 0) return null
+
+                const collapsed = state.collapsed
+                const muted = context.theme.text.muted
+                const base = context.theme.text.base
+                const now = Date.now()
+
+                // Both lines are composed here rather than inside the JSX.
+                // panel.ts exists so the render holds no decisions, and that only
+                // stays true if the text it draws is finished before this point.
+                const lines = rows.map((row) => ({
+                    id: row.id,
+                    running: row.running,
+                    head: rowHead(row, now),
+                    body: rowBody(row),
+                }))
+
+                // The action is on the release, and the release only counts when it
+                // lands on the row that was pressed. Mouse-up is delivered to
+                // whatever is under the cursor, so without this, pressing one row
+                // and releasing over another opens the one you did not click --
+                // and acting on the press instead makes a held button read as a
+                // stuck panel. Every handler stops propagation because the host
+                // binds the sidebar itself.
+                //
+                // `pressed` is per render, not per plugin, which is correct here
+                // because a press and its release are always inside one repaint's
+                // element tree. It is a guard, not state: nothing reads it after
+                // the release clears it.
+                let pressed: string | undefined
+                const press = (id: string) => (event: MouseEvent) => {
+                    pressed = id
+                    event.stopPropagation()
+                }
+                const release = (id: string) => (event: MouseEvent) => {
+                    const armed = pressed
+                    pressed = undefined
+                    event.stopPropagation()
+                    event.preventDefault()
+                    if (armed !== id) return
+                    if (id === HEADER) {
+                        setState((draft) => {
+                            draft.collapsed = !draft.collapsed
+                        })
+                        return
+                    }
+                    open(id)
+                }
+
+                return (
+                    <box flexDirection="column" gap={0}>
+                        <box flexDirection="row" onMouseDown={press(HEADER)} onMouseUp={release(HEADER)}>
+                            <text wrapMode="none" fg={base}>{`${collapsed ? "▶" : "▼"} Subagents`}</text>
+                            <text wrapMode="none" fg={muted}>{` (${rows.length})`}</text>
+                        </box>
+                        {!collapsed &&
+                            lines.map((line) => (
+                                <box
+                                    key={line.id}
+                                    flexDirection="column"
+                                    onMouseDown={press(line.id)}
+                                    onMouseUp={release(line.id)}
+                                >
+                                    <text wrapMode="none" fg={line.running ? base : muted}>
+                                        {line.head}
+                                    </text>
+                                    {line.body !== "" && (
+                                        <text wrapMode="none" fg={muted}>
+                                            {line.body}
+                                        </text>
+                                    )}
+                                </box>
+                            ))}
+                    </box>
+                )
+            },
+        })
+    },
+})
