@@ -14,7 +14,8 @@ are linked into `$HOME` by `install.sh`.
     config/opencode/skills/                global: requirement-doc, design-review,
                                            test-scenario, deliverable-trace,
                                            release-rollback, workspace-hygiene
-    config/opencode/plugins/               global: inspector, subagent-watch (TUI)
+    config/opencode/plugins/               global: inspector, subagent-watch,
+                                           provider-usage (TUI)
                                            shell-guard, tool-guard,
                                            compaction-memory (server)
     .opencode/opencode.json                 project: permissions, watcher, worktree
@@ -218,11 +219,12 @@ Enable it per project where table normalisation is actually wanted, with
 
 ## Plugins
 
-Five plugins in `config/opencode/plugins/`, all global. `inspector` and
-`subagent-watch` are CLI plugins that draw; `shell-guard`, `tool-guard` and
-`compaction-memory` are server plugins that only change behaviour. The CLI ones
-still ship a server entry: discovery needs `index.ts` beside `tui.tsx`, and it is
-what carries the plugin id into the storage namespace.
+Six plugins in `config/opencode/plugins/`, all global. `inspector`,
+`subagent-watch` and `provider-usage` are CLI plugins that draw; `shell-guard`,
+`tool-guard` and `compaction-memory` are server plugins that only change
+behaviour. The CLI ones still ship a server entry: discovery needs `index.ts`
+beside `tui.tsx`, and it is what carries the plugin id into the storage
+namespace.
 
 Community packages are a separate mechanism: `opencode plugin add <pkg>`
 installs into the same directory as real directories the installer leaves alone
@@ -423,6 +425,46 @@ Plugin-authoring constraints worth knowing before editing the TUI plugin: no
 comment may sit inside a JSX expression (opencode's transform compiles one into
 a text node and OpenTUI rejects the region with `Orphan text error`), and click
 targets act on pointer release rather than pointer press.
+
+### `provider-usage` (CLI)
+
+A **Usage** section in `sidebar.content` showing what is left of each provider
+plan this machine is connected to, as a percentage per quota window with the
+reset countdown beside it — or, for a pay-as-you-go account, a money balance —
+refetched on a timer and on a click of the **⟳ refresh** row. It reads the key
+from opencode's own credential store (`client.credential.list()`), so there is
+no second copy on disk.
+
+**Only connected providers are shown.** The adapter registry is a superset;
+the drawn set is its intersection with opencode's connected accounts, so a
+provider with no active key is left out rather than drawn as "not connected".
+
+Provider knowledge is isolated in `provider-usage/providers.ts`, the only file
+that names a provider — adding one is an edit there alone. Each adapter declares
+a path and a parser, not a full URL: the host is taken from the provider's own
+`settings.baseURL` in opencode, so a region variant (`api.minimax.io` vs
+`api.minimaxi.com`) or a proxy needs no second declaration. Two response shapes
+are supported — `windows` (percent per window) and `credit` (a money balance):
+
+- **MiniMax Coding Plan** — `GET {origin}/v1/token_plan/remains`, which reports
+  the percent *remaining* and answers HTTP 200 even for a rejected key, so
+  `base_resp.status_code` is the real success signal
+- **OpenCode Go** — `GET {origin}/zen/go/v1/usage`, whose `zen/` path is URL
+  namespacing for the Go ("lite") plan; it reports the percent *used*, so the
+  panel subtracts it
+- **DeepSeek** — `GET {origin}/user/balance`, a prepaid balance rather than a
+  window
+
+There is **no universal usage endpoint** in opencode or models.dev to pull from:
+those carry models, pricing, and context limits, not per-provider billing, and
+each provider's quota API is its own. Only the credential store and the base
+URL are inherited; the path and parser are declared per provider.
+
+Every route is first-party but not stable API surface, so each field is read
+defensively and a window that does not decode is skipped rather than allowed to
+fail the panel; a connected provider whose fetch fails is drawn with the reason.
+The presentation and freshness policy live in `provider-usage/panel.ts`, so
+`tests/plugin-usage.test.mjs` exercises them without a live service.
 
 `.opencode/skills/opencode-plugin-dev/` is the opencode v2 plugin development
 guide, including which builtin plugins already exist. It stays project-scoped
