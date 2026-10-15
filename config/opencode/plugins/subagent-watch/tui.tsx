@@ -1,8 +1,8 @@
 import { Plugin } from "@opencode/plugin/tui"
-import { buildRows, childrenOf, isRunning, rowBody, rowHead, type Source, type Tree } from "./panel"
+import { buildRows, childrenOf, isRunning, rowBody, rowHead, runningRows, type Source, type Tree } from "./panel"
 
-// A **Subagents** section in the sidebar: one row per subagent of the session
-// on screen, clickable to open it.
+// A **Subagents** section in the sidebar: one row per *running* subagent of the
+// session on screen, clickable to open it.
 //
 // opencode already has a subagent list, but it lives in the composer, it is
 // hidden behind a keybind, and it disappears the moment you act on it. Delegated
@@ -11,10 +11,12 @@ import { buildRows, childrenOf, isRunning, rowBody, rowHead, type Source, type T
 // long-running one looks exactly like a hang. This puts the list in permanent
 // chrome, next to the session it belongs to.
 //
-// Unlike session-vitals, which reports only what is live, this keeps finished
-// subagents. The reason is the click: a finished subagent is history in the
-// session list but is still the only way to read what it actually did, and a
-// list that empties itself the moment a subagent completes cannot be navigated.
+// Only subagents that are still running are drawn, which is what separates this
+// from the session list rather than a duplicate of it: a finished subagent is
+// history, already readable there, and leaving it here pushed the live ones down
+// the sidebar and filled the section with rows that never changed again. So the
+// section grows while work is delegated and shrinks back to nothing as that work
+// completes -- the same shape session-vitals has.
 //
 // What is drawn is the subtree *below* the session on screen, linked on
 // parentID. opencode's own list is `family(sessionID)` minus the session, which
@@ -23,7 +25,7 @@ import { buildRows, childrenOf, isRunning, rowBody, rowHead, type Source, type T
 // correct at any depth, and means the section reads as "this session's
 // subagents" rather than "everything in a family that happens to include this".
 //
-// Nothing is drawn when there are no subagents. A permanent "Subagents (0)" row
+// Nothing is drawn when no subagent is running. A permanent "Subagents (0)" row
 // teaches the eye to skip the section, which is the opposite of what it is for --
 // the same reasoning session-vitals and the inspector's Config block use.
 //
@@ -142,7 +144,10 @@ export default Plugin.define({
                 sync(current.sessionID)
 
                 const source: Source = { ...tree(current.sessionID), running: runningOf }
-                const rows = buildRows(source)
+                // Filtered after the walk, not inside it, so a running subagent
+                // under a finished parent still draws. runningRows in panel.ts
+                // carries the reasoning.
+                const rows = runningRows(buildRows(source))
                 if (rows.length === 0) return null
 
                 const collapsed = state.collapsed
@@ -153,9 +158,11 @@ export default Plugin.define({
                 // Both lines are composed here rather than inside the JSX.
                 // panel.ts exists so the render holds no decisions, and that only
                 // stays true if the text it draws is finished before this point.
+                //
+                // No `running` field is carried: every row that reaches this point
+                // is running, which is what runningRows guarantees.
                 const lines = rows.map((row) => ({
                     id: row.id,
-                    running: row.running,
                     head: rowHead(row, now),
                     body: rowBody(row),
                 }))
@@ -206,7 +213,7 @@ export default Plugin.define({
                                     onMouseDown={press(line.id)}
                                     onMouseUp={release(line.id)}
                                 >
-                                    <text wrapMode="none" fg={line.running ? base : muted}>
+                                    <text wrapMode="none" fg={base}>
                                         {line.head}
                                     </text>
                                     {line.body !== "" && (

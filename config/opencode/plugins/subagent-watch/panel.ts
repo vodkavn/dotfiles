@@ -165,6 +165,21 @@ export const buildRows = (source: Source): Row[] => {
     return rows
 }
 
+// Only the subagents that are still going.
+//
+// The section is a monitor, not a transcript. A finished subagent is history you
+// read in the session list; what this list is for is answering "what is running
+// right now, and for how long". Keeping the finished rows pushed the live ones
+// down the sidebar and filled the section with `○` lines that never changed
+// again, so the one row worth watching was the one hardest to find.
+//
+// The filter is applied to the rows, not to the walk: a running subagent whose
+// parent has finished is still drawn, because dropping the subtree under a
+// stopped parent would hide work that is genuinely in flight. Its indent is
+// then deeper than anything visible above it, which is the lesser oddity -- a
+// missing row is worse than one drawn at the wrong depth.
+export const runningRows = (rows: readonly Row[]): Row[] => rows.filter((row) => row.running)
+
 // How long something has been going, at the coarsest unit that still says
 // something. Sub-second is noise; past an hour it is stuck rather than slow,
 // and "2h+" says that in four characters where "2h 14m" reads like a duration

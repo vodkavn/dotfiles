@@ -8,9 +8,9 @@ import vm from "node:vm"
 //
 // tui.tsx is absent by construction: JSX needs opencode's transform, so the
 // decisions a row makes -- which sessions are subagents of which, in what order,
-// how long ago, what a status name is, how wide a line may get -- live in
-// panel.ts and are exercised here. See plugin-layout.test.mjs for the rule that
-// keeps them there.
+// which of them are still running, how long ago, what a status name is, how wide
+// a line may get -- live in panel.ts and are exercised here. See
+// plugin-layout.test.mjs for the rule that keeps them there.
 
 const load = async (path) => {
     const source = await readFile(new URL(path, import.meta.url), "utf8")
@@ -28,7 +28,7 @@ const load = async (path) => {
     return scope.exports
 }
 
-const { buildRows, childrenOf, elapsed, isRunning, rowBody, rowHead, statusName } = await load(
+const { buildRows, childrenOf, elapsed, isRunning, rowBody, rowHead, runningRows, statusName } = await load(
     "../config/opencode/plugins/subagent-watch/panel.ts",
 )
 
@@ -175,6 +175,38 @@ test("A running subagent reports time since it started, a finished one its durat
     assert.equal(live.running, true)
     assert.equal(elapsed(live, AT + 12_000), "12s")
     assert.equal(elapsed(done, AT + 10 * MINUTE), "1h+")
+})
+
+test("Only running subagents are listed, so a finished one disappears", () => {
+    // buildRows still describes the whole tree; runningRows is the section's
+    // filter, applied after the walk rather than inside it.
+    const source = tree(
+        "ses_root",
+        [session("ses_root", undefined), session("ses_live", "ses_root"), session("ses_done", "ses_root")],
+        ["ses_live"],
+    )
+    assert.deepEqual(ids(source), ["ses_live", "ses_done"])
+    assert.deepEqual(Array.from(runningRows(buildRows(source)), (row) => row.id), ["ses_live"])
+})
+
+test("A running subagent under a finished parent is still listed", () => {
+    // Dropping the subtree under a stopped parent would hide work that is
+    // genuinely in flight, so the grandchild is kept at its own depth.
+    const source = tree(
+        "ses_root",
+        [
+            session("ses_root", undefined),
+            session("ses_a", "ses_root"),
+            session("ses_c", "ses_a", { time: { created: AT + MINUTE, updated: AT } }),
+        ],
+        ["ses_c"],
+    )
+    assert.deepEqual(Array.from(runningRows(buildRows(source)), (row) => [row.id, row.depth]), [["ses_c", 2]])
+})
+
+test("No running subagent leaves the section with nothing to draw", () => {
+    const source = tree("ses_root", [session("ses_root", undefined), session("ses_done", "ses_root")])
+    assert.equal(runningRows(buildRows(source)).length, 0)
 })
 
 test("Age goes coarse and caps, so a stuck subagent is four characters", () => {
