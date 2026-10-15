@@ -128,7 +128,12 @@ export const describeThrown = (error: unknown): string =>
     error instanceof Error && error.message !== "" ? error.message : String(error)
 
 // How long a fetched answer is trusted before the panel refetches it on its own.
-export const TTL_MS = 120_000
+//
+// Also the auto-refresh period: tui.tsx runs its timer at this interval and
+// refetches whatever has lapsed, so the two are equal by construction rather
+// than by two constants agreeing. Five minutes keeps a quota reading current
+// without spending a request per provider every couple of minutes.
+export const TTL_MS = 300_000
 
 // Whether a fetch last attempted at `at` is old enough to try again. Attempt
 // time, not success time: a provider that keeps failing would otherwise be
