@@ -15,7 +15,7 @@ are linked into `$HOME` by `install.sh`.
                                            test-scenario, deliverable-trace,
                                            release-rollback, workspace-hygiene
     config/opencode/plugins/               global: inspector, subagent-watch,
-                                           provider-usage (TUI)
+                                           provider-usage, tui-shortcuts (TUI);
                                            shell-guard, tool-guard,
                                            compaction-memory (server)
     .opencode/opencode.json                 project: permissions, watcher, worktree
@@ -219,11 +219,11 @@ Enable it per project where table normalisation is actually wanted, with
 
 ## Plugins
 
-Six plugins in `config/opencode/plugins/`, all global. `inspector`,
-`subagent-watch` and `provider-usage` are CLI plugins that draw; `shell-guard`,
-`tool-guard` and `compaction-memory` are server plugins that only change
-behaviour. The CLI ones still ship a server entry: discovery needs `index.ts`
-beside `tui.tsx`, and it is what carries the plugin id into the storage
+Seven plugins in `config/opencode/plugins/`, all global. `inspector`,
+`subagent-watch`, `provider-usage` and `tui-shortcuts` are CLI plugins that
+draw; `shell-guard`, `tool-guard` and `compaction-memory` are server plugins that
+only change behaviour. The CLI ones still ship a server entry: discovery needs
+`index.ts` beside `tui.tsx`, and it is what carries the plugin id into the storage
 namespace.
 
 Community packages are a separate mechanism: `opencode plugin add <pkg>`
@@ -481,6 +481,54 @@ The presentation and freshness policy live in `provider-usage/panel.ts`, so
 `.opencode/skills/opencode-plugin-dev/` is the opencode v2 plugin development
 guide, including which builtin plugins already exist. It stays project-scoped
 with the rest of this repository's opencode configuration.
+
+### `tui-shortcuts` (CLI)
+
+Clickable shortcuts in the prompt footer: the agent opens the agent dialog, the
+model opens the model dialog. Named for the surface rather than for the two things
+it currently carries, so the next shortcut belongs here instead of in a new plugin.
+
+opencode draws those names itself and a plugin cannot make host-rendered text
+clickable — it can only fill the regions it is given. So the footer gains two
+shortcuts of its own beside those readouts, rather than the existing names becoming
+buttons, and each names **the action it performs** — `◆ switch agent` and
+`◇ switch model` — instead of repeating a value the host already draws. Both are
+registered on `prompt.footer.status`.
+
+The placement is **`after`, not `append`**. The host's child inside that region is
+a box with `flexGrow: 1`, and while a turn runs it draws a second one holding the
+spinner and the interrupt hint; appending lands inside that boundary, after the
+greedy child, so a shortcut there collapses to zero width for the whole of a turn
+and only returns once idle. `after` makes it a sibling of the status box, where
+the greedy child cannot reach it.
+
+Each shortcut **dispatches opencode's own command** — `agent.list` and
+`model.list`, the `<leader>a` and `<leader>m` commands — instead of opening a
+picker built here. A local picker would have to reproduce search, favourites,
+variants, and provider grouping, and would drift from them the first time the host
+changed. Dispatch is also what opencode's own clickable footer rows do.
+
+They are **two separate contributions, not one row of two boxes**: the verified
+layout finding here is that a clickable row has to be one box holding one text,
+and a second box beside it either stacks or needs a nesting level that stops the
+region painting. The host composes that footer from several contributions already,
+so two contributions is the shape it handles. Registration order is display order,
+so the agent is registered first.
+
+Each shortcut is **muted at rest and lights up under the pointer** (`onMouseOver` /
+`onMouseOut`), the pair opencode's own secondary action uses: muted so the footer
+still reads as chrome, the body colour on hover so the label reads as a target.
+
+Naming the action rather than the value is the design, not a limitation worked
+around. The model *could* be read the way the host reads it —
+`context.ui.model.current()` — but the agent could not, and a footer where one
+shortcut tracks and the other goes stale is worse than one where neither claims to.
+The plugin context exposes `ui.model` and **no `ui.agent`** (the context's own keys
+are `sessionTabs`, `model`, `slot`, `dialog`, `toast` and `format`, verified against
+v2.0.32), the live selection lives in the host's local store, and the
+`session.agent.selected` event arrives when opencode *applies* a switch rather than
+when you cycle one. A caption that cannot be wrong is worth more than a second copy
+of a name that can.
 
 ## Shell integration
 
