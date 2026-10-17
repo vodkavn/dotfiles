@@ -1,5 +1,5 @@
 import { Plugin } from "@opencode/plugin/tui"
-import { buildRows, childrenOf, isRunning, rowBody, rowHead, runningRows, type Source, type Tree } from "./panel"
+import { buildRows, childrenOf, isRunning, rowBody, rowHead, runningRows, SPIN_MS, type Source, type Tree } from "./panel"
 
 // A **Subagents** section in the sidebar: one row per *running* subagent of the
 // session on screen, clickable to open it.
@@ -60,6 +60,21 @@ export default Plugin.define({
         // click. Memory storage, so it survives a plugin reload and resets when
         // the TUI exits.
         const [state, setState] = context.storage.memory("collapse", { initial: { collapsed: false } })
+
+        // The repaint clock for the spinner.
+        //
+        // A running subagent can be quiet for minutes -- no store change, no
+        // repaint -- while its glyph is expected to keep turning, so the
+        // animation needs a tick of its own. These values are not read: bumping
+        // one is what repaints the slot, and the frame that gets drawn is derived
+        // from the clock in panel.ts. Separate from the collapse store above so
+        // that store keeps meaning only "is the section folded".
+        const [spin, setSpin] = context.storage.memory("spin", { initial: { tick: 0 } })
+
+        // Whether the last paint drew a row carrying a spinner. Written by the
+        // render below and read by the interval at the end of setup, which is
+        // what keeps an idle or folded section from asking for repaints.
+        let animating = false
 
         const tree = (current: string | undefined): Tree => ({
             current,
@@ -138,19 +153,26 @@ export default Plugin.define({
             context.ui.router.navigate({ type: "session", sessionID })
         }
 
-        return context.ui.slot({
+        const dispose = context.ui.slot({
             append: "sidebar.content",
             render: (current) => {
                 sync(current.sessionID)
+                // Reading the tick is what subscribes this render to the bump the
+                // spinner's interval makes; the value itself is never drawn.
+                void spin.tick
 
                 const source: Source = { ...tree(current.sessionID), running: runningOf }
                 // Filtered after the walk, not inside it, so a running subagent
                 // under a finished parent still draws. runningRows in panel.ts
                 // carries the reasoning.
                 const rows = runningRows(buildRows(source))
+                const collapsed = state.collapsed
+                // Set before the empty return, so a section that has gone quiet --
+                // every subagent finished, or the list folded away -- stops asking
+                // for repaints.
+                animating = rows.length > 0 && !collapsed
                 if (rows.length === 0) return null
 
-                const collapsed = state.collapsed
                 const muted = context.theme.text.muted
                 const base = context.theme.text.base
                 const now = Date.now()
@@ -227,5 +249,26 @@ export default Plugin.define({
                 )
             },
         })
+
+        // Created last, and only once the slot is registered: if registration
+        // throws then setup throws, this cleanup is never handed back, and a
+        // timer started before it would run for the life of the process.
+        // `unref` keeps it from holding the TUI's event loop open on its own.
+        //
+        // Clearing the interval on the way out is what makes a guard inside the
+        // callback unnecessary: no tick outlives disposal, so nothing here has to
+        // ask whether this generation is still the live one.
+        const spinner = setInterval(() => {
+            if (!animating) return
+            setSpin((draft) => {
+                draft.tick++
+            })
+        }, SPIN_MS)
+        ;(spinner as { unref?: () => void }).unref?.()
+
+        return () => {
+            clearInterval(spinner)
+            dispose?.()
+        }
     },
 })

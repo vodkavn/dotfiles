@@ -217,6 +217,29 @@ export const isRunning = (value: unknown): boolean => {
     return name !== "" && name !== "idle"
 }
 
+// The spinner that stands in for a running subagent's bullet.
+//
+// The same braille set provider-usage turns, repeated here rather than imported:
+// opencode bundles a plugin directory's sibling files into one scope, and one
+// directory's constants are not another's to reach for.
+export const SPIN_FRAMES: readonly string[] = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+
+// One frame per SPIN_MS of wall clock, which is also the period tui.tsx repaints
+// at while a row is on screen.
+//
+// The frame is picked from the clock rather than from a counter of repaints, so
+// a coalesced or dropped repaint skips a frame instead of desyncing the
+// animation from real time, and every row in one paint shows the same frame.
+export const SPIN_MS = 120
+
+// The frame due at `now`. A clock that is not a real instant yields the first
+// frame rather than the string "undefined": this is called from the render path,
+// where a wrong glyph is survivable and a throw is not.
+export const spinFrame = (now: number): string => {
+    if (!Number.isFinite(now) || now < 0) return SPIN_FRAMES[0]
+    return SPIN_FRAMES[Math.floor(now / SPIN_MS) % SPIN_FRAMES.length]
+}
+
 // The row, as two lines.
 //
 // Line one carries identity -- state, agent, age -- and line two carries what
@@ -224,17 +247,23 @@ export const isRunning = (value: unknown): boolean => {
 // truncating to a sidebar width spends its budget on the title, which is the
 // one field you do not scan for, and drops the two you do.
 //
-// depth is 1-based and every row is indented at least once, matching the other
-// sections in this sidebar. The clamp stops a deep tree from pushing the text
-// off the side of a narrow sidebar.
-const indentOf = (row: Row): string => "  ".repeat(Math.max(1, Math.min(row.depth, 4)))
+// depth is 1-based, and the top level draws flush with the section header's
+// marker: the spinner is that row's bullet rather than a thing indented under a
+// label, so nesting is what adds indentation and depth 1 adds none. The clamp
+// stops a deep tree from pushing the text off the side of a narrow sidebar, and
+// it is the same ceiling as before the base indent was removed.
+const indentOf = (row: Row): string => "  ".repeat(Math.max(0, Math.min(row.depth - 1, 4)))
 
-// Line one: a filled glyph while the subagent is running, hollow once it is
-// finished, then the agent and the age. The glyph is drawn in the row's colour
+// Line one: a spinner frame while the subagent is running, a hollow mark once it
+// is finished, then the agent and the age. The glyph is drawn in the row's colour
 // rather than as a cell of its own, because a clickable row has to be a single
 // box holding a single text for the whole line to be one target.
+//
+// The frame comes from `now` rather than from state: tui.tsx repaints on the
+// spinner's clock while a row is drawn, so reading the clock here is what makes
+// the glyph turn, and there is no frame variable anyone can forget to advance.
 export const rowHead = (row: Row, now: number): string => {
-    const head = `${indentOf(row)}${row.running ? "●" : "○"} ${row.agent}`
+    const head = `${indentOf(row)}${row.running ? spinFrame(now) : "○"} ${row.agent}`
     const age = elapsed(row, now)
     const line = age === "" ? head : `${head} ${age}`
     return size(line) > WIDTH ? `${clip(line, Math.max(0, WIDTH - 1)).trimEnd()}${ELLIPSIS}` : line

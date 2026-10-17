@@ -28,7 +28,7 @@ const load = async (path) => {
     return scope.exports
 }
 
-const { buildRows, childrenOf, elapsed, isRunning, rowBody, rowHead, runningRows, statusName } = await load(
+const { buildRows, childrenOf, elapsed, isRunning, rowBody, rowHead, runningRows, spinFrame, SPIN_FRAMES, SPIN_MS, statusName } = await load(
     "../config/opencode/plugins/subagent-watch/panel.ts",
 )
 
@@ -265,8 +265,10 @@ test("The head line names the agent and the age, the body line the task", () => 
     const body = rowBody(row)
 
     // The two fields you scan for are on the line the title cannot crowd out.
-    assert.equal(head, "  ● general 5m")
-    assert.equal(body, "    Investigate the deeply nested co…")
+    // The head carries a spinner frame rather than a bullet, and the title sits
+    // one step in, under the agent name rather than under the glyph.
+    assert.equal(head, `${spinFrame(AT + 5 * MINUTE)} general 5m`)
+    assert.equal(body, "  Investigate the deeply nested conf…")
     assert.ok(Array.from(head).length <= WIDTH, head)
     assert.ok(Array.from(body).length <= WIDTH, body)
 })
@@ -277,21 +279,54 @@ test("A row with no title is one line, and a nameless agent falls back", () => {
         session("ses_a", "ses_root", { agent: "", title: "", time: { created: AT, updated: AT } }),
     ])
     const row = buildRows(source)[0]
-    assert.equal(rowHead(row, AT), "  ○ agent")
+    assert.equal(rowHead(row, AT), "○ agent")
     assert.equal(rowBody(row), "", "no title means no second line, not a blank one")
 })
 
 test("A row with no age draws its head alone, with no trailing space", () => {
     const row = { depth: 1, id: "x", agent: "general", title: "", running: false, startedAt: 0, finishedAt: 0 }
     const head = rowHead(row, AT)
-    assert.equal(head, "  ○ general")
+    assert.equal(head, "○ general")
     assert.equal(head, head.trimEnd(), "an unknown age must not leave a dangling space")
 })
 
 test("A nested row is indented, and a deep one stops indenting", () => {
+    // Depth 1 is flush with the section marker, so the indent a row shows is one
+    // step per level of nesting below it.
     const row = { depth: 9, id: "x", agent: "general", title: "", running: true, startedAt: 0, finishedAt: 0 }
-    assert.equal(rowHead(row, AT), "        ● general")
-    assert.equal(rowHead({ ...row, depth: 2 }, AT), "    ● general")
+    assert.equal(rowHead(row, AT), `        ${spinFrame(AT)} general`)
+    assert.equal(rowHead({ ...row, depth: 2 }, AT), `  ${spinFrame(AT)} general`)
+    assert.equal(rowHead({ ...row, depth: 1 }, AT), `${spinFrame(AT)} general`)
+})
+
+test("A running subagent turns a spinner frame instead of a bullet", () => {
+    const source = tree(
+        "ses_root",
+        [session("ses_root", undefined), session("ses_a", "ses_root", { title: "" })],
+        ["ses_a"],
+    )
+    const head = rowHead(buildRows(source)[0], AT)
+    assert.equal(head, `${spinFrame(AT)} reviewer`)
+    assert.ok(SPIN_FRAMES.includes(head[0]), `expected a frame, got ${head[0]}`)
+})
+
+test("The spinner advances on its own clock and wraps", () => {
+    // A counter would keep the animation smooth across a dropped repaint; a
+    // clock keeps it honest, which is why the same instant always draws the same
+    // frame and one frame period later it does not.
+    assert.notEqual(spinFrame(AT), spinFrame(AT + SPIN_MS))
+    assert.equal(spinFrame(AT), spinFrame(AT + SPIN_MS * SPIN_FRAMES.length))
+    for (let step = 0; step < SPIN_FRAMES.length * 3; step++) {
+        assert.ok(SPIN_FRAMES.includes(spinFrame(AT + step * SPIN_MS)), `step ${step}`)
+    }
+})
+
+test("A clock that is not an instant still yields a frame rather than undefined", () => {
+    // spinFrame is on the render path, where a wrong glyph is survivable and a
+    // throw is not.
+    assert.equal(spinFrame(Number.NaN), SPIN_FRAMES[0])
+    assert.equal(spinFrame(Number.POSITIVE_INFINITY), SPIN_FRAMES[0])
+    assert.equal(spinFrame(-1), SPIN_FRAMES[0])
 })
 
 test("A long agent name is clipped rather than overflowing the sidebar", () => {
