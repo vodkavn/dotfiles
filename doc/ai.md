@@ -296,8 +296,8 @@ into the transcript as it goes. The warning map is capped at 16 sessions.
 
 ### `subagent-watch` (CLI)
 
-A **Subagents** section in `sidebar.content`: one row per subagent of the session
-on screen, and clicking a row focuses that subagent.
+A **Subagents** section in `sidebar.content`: one row per *running* subagent of
+the session on screen, and clicking a row focuses that subagent.
 
 opencode's own subagent list lives in the composer, behind a keybind, and
 disappears the moment you act on it. Delegated work is the one thing the
@@ -305,16 +305,28 @@ transcript cannot show — a subagent runs as a session of its own, so its
 messages never appear in the one on screen and a long-running one looks exactly
 like a hang. This puts the list in permanent chrome instead.
 
-**Finished subagents are kept, not filtered out.** A finished subagent is history
-in the session list but is still the only way to read what it actually did, and a
-list that empties itself the moment a subagent completes cannot be navigated.
-Newest is on top, so the one just delegated is the one you have not read.
+**Only running subagents are listed.** A finished one is history, already readable
+in the session list; keeping it here pushed the live rows down the sidebar and
+left the section full of rows that never changed again. The section therefore
+shrinks back to nothing as the work it reports completes. Newest is on top, so the
+one just delegated is the one you have not read.
 
-Each row is **two lines**: the head carries state, agent and age
-(`  ● general 4m`), the body carries the task, indented under it. Split rather
-than truncated into one line because a single line spends its budget on the
-title, which is the one field you do not scan for. A row with no title is one
-line.
+The filter is applied to the rows, not to the walk: a running subagent whose
+parent has finished is still listed, because dropping the subtree under a stopped
+parent would hide work that is genuinely in flight.
+
+Each row is **two lines**: the head carries a spinner frame, the agent and the age
+(`⠸ general 5m`), and the body carries the task one step in, under the agent name.
+Split rather than truncated into one line because a single line spends its budget
+on the title, which is the one field you do not scan for. A row with no title is
+one line.
+
+The spinner turns because the plugin repaints on a 120 ms tick while a row is on
+screen: a running subagent can be quiet for minutes, and no store change would
+otherwise arrive to advance the glyph. The frame is derived from the clock rather
+than counted, so a coalesced repaint skips a frame instead of desyncing from real
+time. Depth 1 draws flush with the section header's marker, so the spinner reads
+as that row's bullet and nesting is what adds indentation.
 
 Line width is the one place this plugin depends on a host constant. The sidebar
 is a fixed 42-column box with 2 columns of padding either side, and the box that
