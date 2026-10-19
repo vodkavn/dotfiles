@@ -55,6 +55,46 @@ type MouseEvent = { stopPropagation(): void; preventDefault(): void }
 // one.
 const REQUEST_TIMEOUT_MS = 10_000
 
+// The most a provider's answer may be. These are small JSON documents behind
+// a CDN, so a megabyte is already generous; anything larger is not the answer
+// this panel asked for.
+const MAX_BODY_BYTES = 1_000_000
+
+// The body of a response, read with a cap.
+//
+// response.text() reads whatever the server sends, with no limit, so a server
+// that never stops sending is a way to spend the memory it chose. The stream
+// is read here instead and abandoned once the cap is passed.
+const readBody = async (response: Response): Promise<string> => {
+    const declared = Number(response.headers.get("content-length") ?? "")
+    if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) {
+        throw new Error(`response larger than ${MAX_BODY_BYTES} bytes`)
+    }
+    const body = response.body
+    if (body === null) return await response.text()
+    const reader = body.getReader()
+    const decoder = new TextDecoder()
+    let text = ""
+    let total = 0
+    try {
+        for (;;) {
+            const { done, value } = await reader.read()
+            if (done) break
+            total += value.byteLength
+            if (total > MAX_BODY_BYTES) {
+                await reader.cancel()
+                throw new Error(`response larger than ${MAX_BODY_BYTES} bytes`)
+            }
+            // stream: true, so a character split across two chunks is not
+            // turned into two replacement characters.
+            text += decoder.decode(value, { stream: true })
+        }
+    } finally {
+        reader.releaseLock()
+    }
+    return text + decoder.decode()
+}
+
 // opencode.ai sits behind Cloudflare, which answers error 1010 to a request
 // carrying no User-Agent at all. Any concrete one is served, so this names the
 // caller rather than impersonating a browser.
@@ -131,7 +171,7 @@ export default Plugin.define({
                     },
                     signal: controller.signal,
                 })
-                const body = await response.text()
+                const body = await readBody(response)
                 if (!response.ok) {
                     return { id: provider.id, label: provider.label, error: describeError(body, response.status) }
                 }

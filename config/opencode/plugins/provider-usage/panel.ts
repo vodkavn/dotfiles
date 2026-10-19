@@ -119,6 +119,20 @@ export function connections(
     return { ready, absent }
 }
 
+// A string that is safe to draw in the terminal.
+//
+// The text here comes from a provider's own response, and a response is not
+// trusted the way a provider is: an escape sequence in it would be written
+// straight to the terminal, and a long one would push the panel out of shape.
+// Control characters go, and the rest is cut to a length a sidebar row can
+// hold.
+const MAX_MESSAGE = 120
+
+export const printable = (value: string): string => {
+    const cleaned = value.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim()
+    return cleaned.length > MAX_MESSAGE ? `${cleaned.slice(0, MAX_MESSAGE - 1)}…` : cleaned
+}
+
 // A non-2xx body is usually a JSON error document. Surface its message when it
 // has one — Cloudflare and the Go route both put the useful text in a field —
 // and fall back to the status line otherwise.
@@ -132,13 +146,16 @@ export function describeError(body: string, status: number): string {
     const row = record(data)
     for (const key of ["message", "error", "detail", "title", "status_msg"]) {
         const value = row[key]
-        if (typeof value === "string" && value !== "") return value
+        if (typeof value === "string" && value !== "") {
+            const text = printable(value)
+            if (text !== "") return text
+        }
     }
     return `HTTP ${status}`
 }
 
 export const describeThrown = (error: unknown): string =>
-    error instanceof Error && error.message !== "" ? error.message : String(error)
+    error instanceof Error && error.message !== "" ? printable(error.message) : String(error)
 
 // How long a fetched answer is trusted before the panel refetches it on its own.
 //

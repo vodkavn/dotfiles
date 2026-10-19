@@ -55,6 +55,7 @@ const {
     elapsed,
     LABEL_WIDTH,
     money,
+    printable,
     refreshText,
     resetText,
     retrySoon,
@@ -408,6 +409,30 @@ test("describeError surfaces a JSON message and falls back to the status", () =>
     assert.equal(describeError(JSON.stringify({ detail: "Access denied" }), 403), "Access denied")
     assert.equal(describeError(JSON.stringify({ status_msg: "bad key" }), 200), "bad key")
     assert.equal(describeError("<html>", 502), "HTTP 502")
+})
+
+// The text of an error comes from a provider's response, and a response is
+// not trusted the way a provider is: an escape sequence in it would be written
+// straight to the terminal.
+test("a message from a provider is made safe to draw", () => {
+    // An escape sequence is not text.
+    assert.equal(printable("before\x1b[31mafter"), "before [31mafter")
+    // Neither is a control character.
+    assert.equal(printable("a\x00b\x1fc"), "a b c")
+    // Newlines would break the row out of the sidebar.
+    assert.equal(printable("one\ntwo"), "one two")
+    // A long one is cut rather than allowed to push the panel out of shape.
+    const long = printable("x".repeat(500))
+    assert.ok(long.length <= 120, `expected a capped message, got ${long.length}`)
+    // An ordinary message is left alone.
+    assert.equal(printable("Access denied"), "Access denied")
+})
+
+test("describeError does not draw what a provider sent", () => {
+    const body = JSON.stringify({ message: "\x1b[2Jcleared" })
+    const described = describeError(body, 500)
+    assert.ok(!described.includes("\x1b"), `expected no escape sequence, got ${JSON.stringify(described)}`)
+    assert.equal(described, "[2Jcleared")
 })
 
 // --- freshness -------------------------------------------------------------

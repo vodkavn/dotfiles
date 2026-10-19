@@ -498,6 +498,11 @@ fail the panel; a connected provider whose fetch fails is drawn with the reason.
 The presentation and freshness policy live in `provider-usage/panel.ts`, so
 `tests/plugin-usage.test.mjs` exercises them without a live service.
 
+A provider's answer is read with a cap and drawn through a sanitiser: the body
+is abandoned past a megabyte, and control characters are stripped from the text
+that reaches the sidebar, because a response is not trusted the way a provider
+is.
+
 `.opencode/skills/opencode-plugin-dev/` is the opencode v2 plugin development
 guide, including which builtin plugins already exist. It stays project-scoped
 with the rest of this repository's opencode configuration.
