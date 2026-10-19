@@ -13,6 +13,8 @@ are linked into `$HOME` by `install.sh`.
     config/opencode/AGENTS.md               global: the machine-wide rules, read
                                            in every project
     config/opencode/commands/new-ai.md     global: /new-ai scaffolder
+    config/opencode/commands/shortcut-debt.md
+                                           global: /shortcut-debt deferral ledger
     config/opencode/skills/                global: requirement-doc, design-review,
                                            test-scenario, deliverable-trace,
                                            release-rollback, workspace-hygiene,
@@ -117,11 +119,21 @@ discovery rule and the current set of shipped plugins.
 Global, available in every project:
 
     /new-ai <agent|skill|command>   scaffold one in the current project's .opencode/
+    /shortcut-debt                  list deferred work as a ledger, and flag the
+                                    deferrals that have no trigger to revisit them
 
 `/new-ai` creates **project-level** files relative to the directory you are
 standing in, because an agent scoped to one codebase does not belong in the
 global layer. It writes a skeleton with valid frontmatter, then plans the real
 content before filling it in.
+
+`/shortcut-debt` reads and reports; it changes nothing. It greps the working
+tree for `shortcut:` markers and the usual `TODO`/`FIXME`/`HACK`/`XXX` ones,
+reads each hit to find the limit it names and the trigger that should retire
+it, and reports one row per marker. A marker that names a limit but no trigger
+is tagged `no-trigger` and sorted to the top: that is the deferral that
+quietly becomes permanent. The `shortcut:` convention itself is written by the
+`minimal-change` skill.
 
 Project commands, typed in the opencode TUI:
 
