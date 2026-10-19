@@ -29,15 +29,28 @@ export type Segment = { readonly text: string; readonly tone: Tone }
 // so the colour reads as the gauge rather than tinting the whole row.
 export type Line = { readonly segments: readonly Segment[] }
 
-// The usage URL for one provider, given opencode's base URL for it. Only the
-// host is taken from opencode — the origin of `settings.baseURL` — and the
-// adapter supplies the path, so `api.minimax.io` and `api.minimaxi.com` share
-// one declaration. Falls back to the adapter's own origin when opencode has no
-// base URL, or one that will not parse.
+// The usage URL for one provider, given opencode's base URL for it.
+//
+// The host is the one thing that decides where the provider's raw credential
+// goes, so it is not taken on trust from opencode's `settings.baseURL`.
+// That field is project configuration: a repository's own opencode.json can
+// set it, and a repository is not trusted the way a provider is. A host this
+// repository has not vouched for is refused, and the adapter's own origin is
+// used instead -- the request then fails, which is the correct outcome for a
+// key that was never going to be read by the provider anyway.
+//
+// The path always comes from the adapter, so a base URL can move the endpoint
+// between the provider's own regions (`api.minimax.io` and `api.minimaxi.com`
+// share one declaration) without changing what is asked for.
 export function usageUrl(provider: Provider, baseURL: string | undefined): string {
     if (typeof baseURL === "string" && baseURL !== "") {
         try {
-            return new URL(provider.path, new URL(baseURL).origin).toString()
+            const candidate = new URL(baseURL)
+            // https only, and a host the adapter vouches for. A key sent over
+            // plain http, or to a host nobody checked, is a key handed out.
+            if (candidate.protocol === "https:" && provider.hosts.includes(candidate.hostname.toLowerCase())) {
+                return new URL(provider.path, candidate.origin).toString()
+            }
         } catch {
             // A malformed base URL is not worth failing the panel over.
         }

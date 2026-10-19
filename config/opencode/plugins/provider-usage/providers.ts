@@ -65,6 +65,15 @@ export type Provider = {
     readonly path: string
     /** The origin used when opencode reports no base URL for the provider. */
     readonly origin: string
+    /**
+     * The hosts this provider's usage endpoint may be reached on.
+     *
+     * The panel sends the provider's raw credential to whatever host it ends
+     * up calling, so the host has to be one this file vouches for. opencode's
+     * own `settings.baseURL` is *not* that: a project's own opencode.json can
+     * set it, and a repository is not trusted the way a provider is.
+     */
+    readonly hosts: readonly string[]
     /** The reading, or a thrown Error when the body does not decode. */
     readonly parse: (body: string) => Reading
 }
@@ -176,6 +185,8 @@ export const PROVIDERS: readonly Provider[] = [
         label: "MiniMax Coding Plan",
         path: "/v1/token_plan/remains",
         origin: "https://api.minimax.io",
+        // The two regions the plan is sold in. Nothing else may carry the key.
+        hosts: ["api.minimax.io", "api.minimaxi.com"],
         parse: (body) => ({ kind: "windows", windows: parseMinimax(body) }),
     },
     {
@@ -183,6 +194,7 @@ export const PROVIDERS: readonly Provider[] = [
         label: "OpenCode Go",
         path: "/zen/go/v1/usage",
         origin: "https://opencode.ai",
+        hosts: ["opencode.ai"],
         parse: (body) => ({ kind: "windows", windows: parseOpencodeGo(body) }),
     },
     {
@@ -190,6 +202,7 @@ export const PROVIDERS: readonly Provider[] = [
         label: "DeepSeek",
         path: "/user/balance",
         origin: "https://api.deepseek.com",
+        hosts: ["api.deepseek.com"],
         parse: (body) => ({ kind: "credit", credit: parseDeepseek(body) }),
     },
 ]

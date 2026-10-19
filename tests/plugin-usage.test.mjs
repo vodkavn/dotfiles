@@ -190,8 +190,8 @@ test("DeepSeek decodes its prepaid balance as a credit", () => {
 
 test("usageUrl takes the host from opencode's base URL and the path from the adapter", () => {
     const minimax = PROVIDERS.find((provider) => provider.id === "minimax-coding-plan")
-    // One declaration covers the global host, its China sibling, and a proxy:
-    // only the origin of opencode's base URL is used.
+    // One declaration covers the global host and its China sibling: only the
+    // origin of opencode's base URL is used.
     assert.equal(usageUrl(minimax, "https://api.minimax.io/anthropic/v1"), "https://api.minimax.io/v1/token_plan/remains")
     assert.equal(usageUrl(minimax, "https://api.minimaxi.com/anthropic/v1"), "https://api.minimaxi.com/v1/token_plan/remains")
     // No base URL, or one that will not parse, falls back to the adapter origin.
@@ -201,6 +201,41 @@ test("usageUrl takes the host from opencode's base URL and the path from the ada
     // is what makes it work without a second hardcoded host.
     const go = PROVIDERS.find((provider) => provider.id === "opencode-go")
     assert.equal(usageUrl(go, "https://opencode.ai/inference/go/v1"), "https://opencode.ai/zen/go/v1/usage")
+})
+
+// The panel sends the provider's raw credential to whatever host it ends up
+// calling, and opencode's settings.baseURL is project configuration: a
+// repository's own opencode.json can set it. A host this repository has not
+// vouched for is therefore refused, and the request fails instead of handing
+// the key to whoever chose the host.
+test("usageUrl refuses a host the adapter does not vouch for", () => {
+    const minimax = PROVIDERS.find((provider) => provider.id === "minimax-coding-plan")
+    const deepseek = PROVIDERS.find((provider) => provider.id === "deepseek")
+    const go = PROVIDERS.find((provider) => provider.id === "opencode-go")
+
+    // The shape a cloned repository ships.
+    for (const provider of [minimax, deepseek, go]) {
+        assert.equal(
+            usageUrl(provider, "https://attacker.example/v1"),
+            usageUrl(provider, undefined),
+            `${provider.id} must not be called on a host it does not know`,
+        )
+    }
+
+    // A host that only looks like the provider's own is still a different host.
+    assert.equal(usageUrl(minimax, "https://api.minimax.io.attacker.example/v1"), "https://api.minimax.io/v1/token_plan/remains")
+    assert.equal(usageUrl(minimax, "https://not-api.minimax.io/v1"), "https://api.minimax.io/v1/token_plan/remains")
+    // A path on the right host cannot move the request to another host.
+    assert.equal(usageUrl(minimax, "https://api.minimax.io@attacker.example/v1"), "https://api.minimax.io/v1/token_plan/remains")
+    // Plain http would carry the key in the clear.
+    assert.equal(usageUrl(minimax, "http://api.minimax.io/v1"), "https://api.minimax.io/v1/token_plan/remains")
+})
+
+test("usageUrl still follows the provider's own hosts", () => {
+    const deepseek = PROVIDERS.find((provider) => provider.id === "deepseek")
+    assert.equal(usageUrl(deepseek, "https://api.deepseek.com/v1"), "https://api.deepseek.com/user/balance")
+    // The host is matched case-insensitively, as hostnames are.
+    assert.equal(usageUrl(deepseek, "https://API.DeepSeek.com/v1"), "https://api.deepseek.com/user/balance")
 })
 
 test("baseURLs keys each provider by its id and its integration id", () => {

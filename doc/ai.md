@@ -453,10 +453,11 @@ provider with no active key is left out rather than drawn as "not connected".
 
 Provider knowledge is isolated in `provider-usage/providers.ts`, the only file
 that names a provider — adding one is an edit there alone. Each adapter declares
-a path and a parser, not a full URL: the host is taken from the provider's own
-`settings.baseURL` in opencode, so a region variant (`api.minimax.io` vs
-`api.minimaxi.com`) or a proxy needs no second declaration. Two response shapes
-are supported — `windows` (percent per window) and `credit` (a money balance):
+a path, a parser, and the **hosts it may be called on**, not a full URL: the
+path is appended to a host the adapter vouches for, so a region variant
+(`api.minimax.io` vs `api.minimaxi.com`) needs no second declaration. Two
+response shapes are supported — `windows` (percent per window) and `credit` (a
+money balance):
 
 - **MiniMax Coding Plan** — `GET {origin}/v1/token_plan/remains`, which reports
   the percent *remaining* and answers HTTP 200 even for a rejected key, so
@@ -467,10 +468,19 @@ are supported — `windows` (percent per window) and `credit` (a money balance):
 - **DeepSeek** — `GET {origin}/user/balance`, a prepaid balance rather than a
   window
 
+**The host is not taken on trust from opencode.** The panel sends the
+provider's *raw* credential to whatever host it ends up calling, and
+`settings.baseURL` is project configuration: a repository's own `opencode.json`
+can set it, and a repository is not trusted the way a provider is. A base URL
+whose host is not on the adapter's list is refused, the request falls back to
+the adapter's own origin, and the row shows the failure — the key is never
+handed to a host nobody checked. Plain `http` is refused for the same reason.
+
 There is **no universal usage endpoint** in opencode or models.dev to pull from:
 those carry models, pricing, and context limits, not per-provider billing, and
 each provider's quota API is its own. Only the credential store and the base
-URL are inherited; the path and parser are declared per provider.
+URL are inherited; the path, the hosts, and the parser are declared per
+provider.
 
 Every route is first-party but not stable API surface, so each field is read
 defensively and a window that does not decode is skipped rather than allowed to
