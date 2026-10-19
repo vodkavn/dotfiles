@@ -1,6 +1,6 @@
 ---
-name: Release Rollback
-description: Decide and plan a rollback safely, in two modes. Preflight before a release proves it can be reverted and names what cannot; execute during an incident produces an ordered plan. Use when the user says "rollback", "revert the release", "can we roll back", or is about to ship.
+name: release-rollback
+description: Decide and plan a rollback safely, in two modes. Preflight before a release proves it can be reverted and names what cannot; execute during an incident produces an ordered plan. Use when the user says "rollback", "revert the release", "can we roll back", or asks whether a shipped change can be undone.
 ---
 
 A rollback is the rarest and most expensive step in a release lifecycle. It

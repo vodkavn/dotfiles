@@ -1,5 +1,5 @@
 ---
-name: Dotfiles Change
+name: dotfiles-change
 description: Use when editing, adding, or reviewing any file in this dotfiles repository, so Bash startup, vendored code, and validation conventions are respected
 ---
 

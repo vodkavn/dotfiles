@@ -1,5 +1,5 @@
 ---
-name: Requirement Document
+name: requirement-doc
 description: Write and revise requirements, user stories, functional specs, and acceptance criteria. Use when the task touches a requirement document, a story, or a customer-facing specification.
 ---
 

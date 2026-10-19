@@ -1,5 +1,5 @@
 ---
-name: OpenCode Plugin Development
+name: opencode-plugin-dev
 description: Use when writing, reviewing, migrating, or debugging an opencode plugin or terminal extension, so the v2 plugin model, discovery rules, and UI extension points are applied correctly
 ---
 

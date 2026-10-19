@@ -1,5 +1,5 @@
 ---
-name: Design Review
+name: design-review
 description: Review or write a technical design, architecture decision, or solution document. Use when the task touches a design doc, an ADR, a technical proposal, or an architecture choice.
 ---
 
@@ -59,4 +59,11 @@ its own review. Keep diagrams to the ones a reader needs; a diagram nobody
 reads is maintenance debt with a picture.
 
 Match the conventions of the repository you are in. Number sections, name
-files, and set the frontmatter the way the surrounding documents do.
+files, and set the frontmatter the way the surrounding documents do. Where the
+repository holds no conventions to match, use the structure above: decision,
+context, alternatives, trade-offs, consequences, verification, scope.
+
+An **architecture decision record** is this skill's document. A README, a
+runbook, and a how-to guide are `tech-doc`'s, and a decision record written to
+the documentation skill's rules loses the alternatives and the consequences
+that are the point of recording it.

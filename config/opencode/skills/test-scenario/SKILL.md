@@ -1,5 +1,5 @@
 ---
-name: Test Scenario
+name: test-scenario
 description: Write test scenarios, test cases, UAT scripts, or a QA catalogue from requirements or designs. Use when the task touches a test scenario, a test plan, UAT, or coverage.
 ---
 

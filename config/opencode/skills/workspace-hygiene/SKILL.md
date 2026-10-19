@@ -1,6 +1,6 @@
 ---
-name: Workspace Hygiene
-description: Keep a repository clean and its documentation current-state. Use when creating files, editing docs, adding comments, or deciding where a note belongs.
+name: workspace-hygiene
+description: Keep a repository clean and its documentation current-state. Use when a note's placement is unclear, when a file looks unnecessary, or when documentation states what used to be true.
 ---
 
 Three rules that keep a repository navigable after months of work: no trash

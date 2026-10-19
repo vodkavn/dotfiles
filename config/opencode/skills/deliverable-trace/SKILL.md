@@ -1,5 +1,5 @@
 ---
-name: Deliverable Trace
+name: deliverable-trace
 description: Audit a deliverable against its sources and back every finding with evidence. Use when reviewing documents, plans, audits, or any list of findings before delivery.
 ---
 

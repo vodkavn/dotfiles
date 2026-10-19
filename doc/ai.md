@@ -142,6 +142,18 @@ A skill is advertised to the model through its `description` and loaded on
 relevance, so a method that only matters for some tasks costs nothing on the
 others. It applies to whichever agent is already running.
 
+A skill's frontmatter `name` is its **id**, and the id is the directory name:
+`deliverable-trace`, not `Deliverable Trace`. The Agent Skills spec requires
+the name to match the directory and to be lowercase-hyphenated, and opencode
+also reads `~/.claude/skills/` and `~/.agents/skills/`, where other tools
+validate it strictly. The id is what the model passes to the skill tool.
+
+Two skills that could claim the same document are divided by an explicit
+boundary rather than by a description that happens to differ. An **architecture
+decision record** is `design-review`'s, because the alternatives and the
+consequences are the point of recording it; a README, a runbook, and a how-to
+guide are `tech-doc`'s.
+
 `tech-doc` carries the documentation method: match the voice and frontmatter
 of the document being edited, and verify every command, flag, and path before
 writing it down. A plausible command that does not exist is the worst output
