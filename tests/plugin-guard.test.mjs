@@ -3,7 +3,7 @@ import { lstatSync, mkdirSync, mkdtempSync, readdirSync, readlinkSync, rmSync, s
 import { readFile } from "node:fs/promises"
 import { stripTypeScriptTypes } from "node:module"
 import { homedir, tmpdir } from "node:os"
-import { join } from "node:path"
+import { join, resolve } from "node:path"
 import test from "node:test"
 import vm from "node:vm"
 
@@ -38,6 +38,7 @@ const load = async (path, globals = {}) => {
         readlinkSync,
         homedir,
         join,
+        resolve,
         ...globals,
     })
     vm.runInContext(code, scope)
@@ -364,6 +365,39 @@ test("Drift check accepts a live plugin symlink", async () => {
         writeFileSync(join(target, "index.ts"), "")
         symlinkSync(target, join(root, "linked"))
         none(scanPlugins(root))
+    } finally {
+        rmSync(root, { recursive: true, force: true })
+    }
+})
+
+test("Drift check resolves a relative symlink against the link's own directory", async () => {
+    // A relative target resolves against the directory the link sits in, not
+    // against the process's working directory. Resolving it against the latter
+    // reported every healthy relative link as broken, and this panel exists to
+    // tell the truth about broken links.
+    const { scanPlugins } = await load("../config/opencode/plugins/inspector/drift.ts")
+    const root = tree()
+    try {
+        const target = join(root, "real-plugin")
+        mkdirSync(target)
+        writeFileSync(join(target, "index.ts"), "")
+        // Relative, and the target is right there.
+        symlinkSync("real-plugin", join(root, "relative"))
+        none(scanPlugins(root))
+    } finally {
+        rmSync(root, { recursive: true, force: true })
+    }
+})
+
+test("Drift check still reports a relative symlink whose target is gone", async () => {
+    const { scanPlugins } = await load("../config/opencode/plugins/inspector/drift.ts")
+    const root = tree()
+    try {
+        symlinkSync("not-here", join(root, "relative"))
+        const problems = scanPlugins(root)
+        assert.equal(problems.length, 1)
+        assert.equal(problems[0].severity, "error")
+        assert.match(problems[0].text, /relative: link target is gone/)
     } finally {
         rmSync(root, { recursive: true, force: true })
     }

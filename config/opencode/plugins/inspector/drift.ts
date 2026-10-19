@@ -1,6 +1,6 @@
 import { lstatSync, readdirSync, readlinkSync } from "node:fs"
 import { homedir } from "node:os"
-import { join } from "node:path"
+import { join, resolve } from "node:path"
 
 // Config drift check for the inspector plugin.
 //
@@ -59,7 +59,11 @@ export const scanPlugins = (directory: string): Problem[] => {
         if (stats.isSymbolicLink()) {
             let broken = false
             try {
-                lstatSync(readlinkSync(path))
+                // A relative target resolves against the link's own directory,
+                // not against the process's working directory. Resolving it
+                // against the latter reported every healthy relative link as
+                // broken, which is the one thing this panel must not do.
+                lstatSync(resolve(directory, readlinkSync(path)))
             } catch {
                 broken = true
             }

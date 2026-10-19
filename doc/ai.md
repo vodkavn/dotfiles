@@ -439,7 +439,9 @@ something is actually wrong, for two failures that are otherwise silent:
 The scan reads the filesystem (`inspector/drift.ts`) rather than
 `ctx.client.plugin.list()`, because the reported list says what loaded, not what
 was meant to — a silently-skipped plugin is invisible in it. It is cached per
-project directory, so it does not re-walk on every repaint.
+project directory, so it does not re-walk on every repaint. A symlink's target
+is resolved against the directory the link sits in, so a relative link is
+judged by the file it actually points at.
 
 Plugin-authoring constraints worth knowing before editing the TUI plugin: no
 comment may sit inside a JSX expression (opencode's transform compiles one into
