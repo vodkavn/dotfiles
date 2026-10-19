@@ -19,7 +19,7 @@ are linked into `$HOME` by `install.sh`.
                                            test-scenario, deliverable-trace,
                                            release-rollback, workspace-hygiene,
                                            tech-doc, minimal-change,
-                                           change-review
+                                           change-review, doc-lookup
     config/opencode/plugins/               global: inspector, subagent-watch,
                                            provider-usage, tui-shortcuts (TUI);
                                            shell-guard, tool-guard,
@@ -166,10 +166,10 @@ plugin enforces them in every project, so these entries are defence in depth.
 
 ## Skills
 
-Nine global working-method skills in `config/opencode/skills/`, one directory
+Ten global working-method skills in `config/opencode/skills/`, one directory
 each: `requirement-doc`, `design-review`, `test-scenario`, `deliverable-trace`,
-`release-rollback`, `workspace-hygiene`, `tech-doc`, `minimal-change`, and
-`change-review`.
+`release-rollback`, `workspace-hygiene`, `tech-doc`, `minimal-change`,
+`change-review`, and `doc-lookup`.
 
 A skill is advertised to the model through its `description` and loaded on
 relevance, so a method that only matters for some tasks costs nothing on the
@@ -206,6 +206,28 @@ case that proves it.
 They are separate skills because they apply at different moments — one before
 the change, one after — and a skill is loaded on relevance, so a session that
 is only writing code never pays for the review method.
+
+`doc-lookup` is the method for a repository that works from documents rather
+than from code: find the index first, search with the changelogs and archives
+excluded, confirm the document is current before quoting it, read the section
+rather than the file, and answer with a `path:line`. The failure it exists to
+prevent is the confident wrong answer — a changelog entry written in the
+present tense about a system that has since changed. It carries a
+`reference/index-template.md` for building the map when the repository has
+none.
+
+A project that works from documents also wants a looser `tool_output` cap
+than the global one: the global 16 KB truncates a long document before the
+model has seen all of it, and the truncated result saves the full output to a
+file the model then has to go and read. The override belongs in the project's
+own `.opencode/opencode.json`, so the rest of the machine keeps the tighter
+cap:
+
+```jsonc
+{
+    "tool_output": { "max_lines": 2000, "max_bytes": 32768 }
+}
+```
 
 **Documentation method is a skill rather than an agent.** An agent is a named
 profile a session switches to — its own system prompt, model, and permissions
