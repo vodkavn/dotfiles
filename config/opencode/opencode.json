@@ -18,6 +18,7 @@
             "extensions": [".mdx"]
         }
     },
+    "lsp": true,
     "references": {},
     "mcp": {
         "servers": {

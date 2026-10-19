@@ -8,7 +8,7 @@ are linked into `$HOME` by `install.sh`.
 ## Layout
 
     config/opencode/opencode.json          global: shell, formatter, compaction,
-                                           websearch, update, references,
+                                           websearch, update, references, lsp,
                                            MCP servers
     config/opencode/commands/new-ai.md     global: /new-ai scaffolder
     config/opencode/skills/                global: requirement-doc, design-review,
@@ -192,6 +192,26 @@ project that owns them:
 Write a relative path as `./docs`, not `docs` — a bare value with no prefix is
 read as a _Git repository_. An unresolvable reference is ignored without
 warning, so confirm the path exists.
+
+### `lsp`
+
+`lsp` is `true`, which enables opencode's built-in language servers. **The key is
+accepted but nothing runs behind it in v2.0.32.** The release carries the
+configuration schema and the `lsp.updated` event, but no server manager: no
+language server starts, and nothing is downloaded. The documentation for the
+feature describes auto-installing a server on first use and feeding its
+diagnostics back to the agent — behaviour that belongs to a release that has not
+shipped, and 2.0.32 is the newest v2 tag.
+
+The setting stays because it is inert, because it is the key a release with the
+runtime would read, and because the servers it would start are chosen per
+project rather than by this file. When it does take effect, a missing server is
+downloaded on first use — `OPENCODE_DISABLE_LSP_DOWNLOAD=true` stops that.
+
+For the same reason `AGENTS.md` remains the place where the agent is told how
+to check its work: `bash -n` and `shellcheck -s bash` for Bash, and the
+`tsc --noEmit` group for the plugins. Those run as ordinary tool calls, which
+is what opencode's own documentation recommends over a language server.
 
 ### `websearch`, `update`, `compaction`
 
