@@ -15,3 +15,7 @@ tmux/resurrect
 
 # Dependencies a local opencode plugin may pull in via `bun install`
 config/opencode/plugins/*/node_modules/
+
+# The npm tree that types the opencode plugins (see package.json)
+node_modules/
+node_modules/

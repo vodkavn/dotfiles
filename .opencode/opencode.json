@@ -16,6 +16,7 @@
         "ignore": [
             ".git/**",
             ".lane/**",
+            "node_modules/**",
             "vim/bundle/**",
             "vim/tmp/**",
             "vim/local/**",

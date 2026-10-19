@@ -19,6 +19,8 @@ are linked into `$HOME` by `install.sh`.
                                            provider-usage, tui-shortcuts (TUI);
                                            shell-guard, tool-guard,
                                            compaction-memory (server)
+    package.json, tsconfig.json            the npm tree and the settings that
+                                           type-check the plugins
     .opencode/opencode.json                 project: permissions, watcher, worktree
     .opencode/commands/*.md                 slash commands
     .opencode/agents/reviewer.md            read-only review subagent
@@ -644,5 +646,18 @@ Agent-facing config is covered by the same suite as the Bash:
 
     bash scripts/check.sh      # includes a JSON group for .opencode/.kilo/.vscode/config
     bash scripts/check.sh --syntax-only
+
+The opencode plugins are TypeScript, and node's type stripping erases types
+without checking them, so the suite also type-checks them against the host's
+own published types:
+
+    npm ci                     # the repository-local tree the type check needs
+    bash scripts/check.sh      # includes the tsc --noEmit group
+
+`check.sh` skips that group when `node_modules/` is absent and says so; CI
+installs the tree, so a skip there means a genuine gap. `package.json` holds
+the tree and `tsconfig.json` the settings — `strict`, `noEmit`, and the host's
+JSX runtime — and the lockfile is committed so CI and a local run resolve the
+same dependency set.
 
 See `AGENTS.md` for exit codes and prerequisites.

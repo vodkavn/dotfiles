@@ -87,6 +87,11 @@ export default Plugin.define({
             return session?.location ?? context.data.location.default()
         }
 
+        // The location the registries are keyed by. Taken from the context
+        // rather than written out, so it cannot drift from what the host
+        // expects to be handed.
+        type Location = Parameters<typeof context.data.location.agent.sync>[0]
+
         // sync() is one-shot per store, so it is issued when the resolved
         // location changes rather than on every repaint. Rejections are
         // swallowed: the client can be pointed at a remote server, and an
@@ -102,7 +107,7 @@ export default Plugin.define({
         const SYNC_HISTORY = 8
         const synced = new Set<string>()
         const syncing = new Set<string>()
-        const sync = (at: unknown) => {
+        const sync = (at: Location) => {
             const key = JSON.stringify(at ?? null)
             if (synced.has(key) || syncing.has(key)) return
             syncing.add(key)
@@ -125,7 +130,7 @@ export default Plugin.define({
         const sections: {
             key: Section
             label: string
-            read: (at: unknown) => readonly unknown[]
+            read: (at: Location) => readonly unknown[]
             split?: boolean
         }[] = [
             {
@@ -222,7 +227,7 @@ export default Plugin.define({
                                 </box>
                                 {!state.drift &&
                                     problems.map((problem) => (
-                                        <box key={problem.text} flexDirection="column">
+                                        <box flexDirection="column">
                                             <text
                                                 fg={
                                                     problem.severity === "error"
@@ -252,7 +257,7 @@ export default Plugin.define({
                                     {!collapsed &&
                                         (section.split ? (
                                             group(entries).map(([name, members]) => (
-                                                <box key={name} flexDirection="column">
+                                                <box flexDirection="column">
                                                     <box flexDirection="row">
                                                         <text>{`  ${name}`}</text>
                                                         <text fg={context.theme.text.muted}>{` (${members.length})`}</text>

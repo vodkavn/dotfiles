@@ -30,6 +30,7 @@ This repository contains personal Linux dotfiles, not an application.
 - On Ubuntu/Debian, common packages are `ripgrep` (`rg`), `fd-find` (`fdfind`), `bat` (`batcat`), `jq` and `shellcheck`. Do not assume `fd` or `bat` exists after apt installation; verify the exact executable required by the workflow.
 - Install structural search with `npm install -g @ast-grep/cli` using user-owned npm tooling. Verify `ast-grep`, not `sg`, which can be an unrelated system command. For GitLab's `glab`, consult upstream installation instructions before suggesting the community WakeMeOps repository; do not assume it is GitLab-owned or hard-code package versions.
 - Node.js: the `sequential-thinking` MCP server runs through `npx`, so `npx` is a prerequisite for it in every project. Ubuntu's archive ships an outdated Node.js; recommend nvm and the current LTS instead, and never `sudo npm install -g`.
+- The opencode plugins are TypeScript and are type-checked against the host's own published types. The npm tree for that lives in `package.json`; install it with `npm ci`, which reads the committed lockfile. It is a repository-local tree, not a global install.
 - `.kilo/suggest-tools.sh` prints optional Ubuntu/Debian toolchain suggestions at the end of installation. It can also be run independently with `bash .kilo/suggest-tools.sh`; it does not install anything.
 
 ## Validation
@@ -37,8 +38,9 @@ This repository contains personal Linux dotfiles, not an application.
 The supported target is Ubuntu 26.x. CI runs `scripts/check.sh` on every push and pull request via `.github/workflows/validate.yml`.
 
 - Run `bash scripts/doctor.sh` for read-only prerequisite and executable-path diagnostics. It does not source personal configuration, inspect credentials, or install tools.
-- Run `bash scripts/check.sh` for syntax, isolated Bash regressions, ShellCheck on `scripts/` and `tests/`, JSON validation of the agent config in `.opencode/`, `.kilo/`, `.vscode/`, and `config/`, workflow YAML validation, and Git whitespace. Legacy configuration and bundled code receive syntax/runtime checks, not a clean-lint claim.
+- Run `bash scripts/check.sh` for syntax, isolated Bash regressions, the opencode plugin tests and their type check, ShellCheck on `scripts/` and `tests/`, JSON validation of the agent config in `.opencode/`, `.kilo/`, `.vscode/`, and `config/`, workflow YAML validation, and Git whitespace. Legacy configuration and bundled code receive syntax/runtime checks, not a clean-lint claim.
 - Exit codes: `0` means selected checks passed, `1` means a check failed, and `2` means validation is incomplete or usage is invalid. Missing ShellCheck, `jq`, or `python3` blocks full validation; suggest `sudo apt install shellcheck jq`, never install them yourself. CI installs its prerequisites itself, so a blocked run there means a genuine gap.
+- The opencode plugin type check needs the npm tree. `check.sh` skips it when `node_modules/` is absent, so run `npm ci` first for it to count; CI installs the tree, so a skip there means a genuine gap.
 - `--syntax-only` selects syntax checks only. `--no-lint` explicitly excludes ShellCheck; report this exclusion rather than claiming full validation passed. Run `bash tests/run.sh` for standalone isolated runtime tests.
 - CI checks out without submodules, because `vim/bundle/` is vendored third-party code that no check reads. A change that only passes with submodules present will fail on the runner.
 

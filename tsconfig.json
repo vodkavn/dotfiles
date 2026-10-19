@@ -1,0 +1,20 @@
+{
+    "$schema": "https://json.schemastore.org/tsconfig",
+    "compilerOptions": {
+        "target": "ESNext",
+        "lib": ["ESNext"],
+        "module": "Preserve",
+        "moduleResolution": "bundler",
+        "moduleDetection": "force",
+        "jsx": "preserve",
+        "jsxImportSource": "@opentui/solid",
+        "strict": true,
+        "noEmit": true,
+        "skipLibCheck": true,
+        "isolatedModules": true,
+        "noUncheckedIndexedAccess": false,
+        "forceConsistentCasingInFileNames": true,
+        "types": ["node"]
+    },
+    "include": ["config/opencode/plugins/**/*.ts", "config/opencode/plugins/**/*.tsx"]
+}

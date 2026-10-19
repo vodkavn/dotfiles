@@ -8,7 +8,7 @@ case "${1:-}" in
     --no-lint) mode=no-lint ;;
     --help|-h)
         printf 'Usage: bash scripts/check.sh [--syntax-only|--no-lint]\n'
-        printf 'Default: Bash syntax, isolated regression tests, opencode plugin tests, validation-script lint, agent JSON config, Git whitespace.\n'
+        printf 'Default: Bash syntax, isolated regression tests, opencode plugin tests, opencode plugin type check, validation-script lint, agent JSON config, Git whitespace.\n'
         printf 'Exit codes: 0 = selected checks passed; 1 = failure; 2 = missing prerequisite or invalid usage.\n'
         exit 0
         ;;
@@ -110,6 +110,27 @@ if [[ $mode != syntax ]]; then
         printf 'PASS: opencode plugin tests (%s file(s))\n' "${#plugin_tests[@]}"
     else
         failures=$((failures + 1))
+    fi
+
+    # The plugins are TypeScript, and node's type stripping erases types
+    # without checking them: the tests above prove the code runs, not that it
+    # calls the host correctly. tsc checks it against the host's own published
+    # types, which is where a plugin that reaches for something the host does
+    # not offer shows up.
+    #
+    # The npm tree is skipped rather than blocked when it is absent: it comes
+    # from the contributor's own `npm ci`, not from a package this repository
+    # installs, and the Bash suite above stays the hard gate. CI installs the
+    # tree and asserts it is present, so the skip cannot quietly hide a rot
+    # there.
+    tsc_bin="$root/node_modules/.bin/tsc"
+    if [[ ! -x $tsc_bin ]]; then
+        printf 'SKIP: npm tree absent (run npm ci); opencode plugin types not checked\n'
+        skipped=$((skipped + 1))
+    elif ! "$tsc_bin" --project "$root/tsconfig.json"; then
+        failures=$((failures + 1))
+    else
+        printf 'PASS: opencode plugin type check (tsc --noEmit)\n'
     fi
 
     if [[ $mode == no-lint ]]; then

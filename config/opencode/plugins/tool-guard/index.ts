@@ -194,12 +194,14 @@ export default Plugin.define({
             const tool = (event as { tool?: unknown }).tool
             if (typeof tool !== "string" || tool === "") return
 
-            const status = (event as { status?: unknown }).status
-            if (status === "completed") {
+            // Narrowed on the event itself rather than on a copy of its status:
+            // the status is the discriminant, so reading it that way is what
+            // gives the error branch its error.
+            if (event.status === "completed") {
                 store.succeed(sessionID, tool)
                 return
             }
-            if (status !== "error") return
+            if (event.status !== "error") return
 
             store.fail(sessionID, tool, normalize(reasonOf(event.error)))
         })

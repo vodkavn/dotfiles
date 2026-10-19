@@ -322,10 +322,10 @@ export default Plugin.define({
                             <text>{`${collapsed ? "▶" : "▼"} Usage`}</text>
                         </box>
                         {!collapsed &&
-                            lines.map((line, index) => (
-                                <box key={index} flexDirection="row">
-                                    {line.segments.map((segment, at) => (
-                                        <text key={at} fg={ink(segment.tone)}>
+                            lines.map((line) => (
+                                <box flexDirection="row">
+                                    {line.segments.map((segment) => (
+                                        <text fg={ink(segment.tone)}>
                                             {segment.text}
                                         </text>
                                     ))}

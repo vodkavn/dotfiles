@@ -130,9 +130,16 @@ export default Plugin.define({
         //     nothing has been created under it this run.
         //
         // Only the second is this plugin's job. The second argument is not in the
-        // published docs; it is verified against v2.0.28. If a future host
+        // published types; it is verified against v2.0.28. If a future host
         // ignores it the first mechanism still carries the section, so the
         // failure is a thinner list rather than an empty one.
+        //
+        // The widened type is what says so in the type system rather than in a
+        // comment alone, and it keeps the call on the host's own object so the
+        // receiver is not lost.
+        const sessions = context.data.session as typeof context.data.session & {
+            sync(sessionID: string, options?: { children?: boolean }): Promise<void>
+        }
         //
         // Bounded, and bounded in insertion order. A set that only ever grew
         // would hold one key per session ever opened, which is a slow leak in a
@@ -157,7 +164,7 @@ export default Plugin.define({
             // failed request costs this session its subagent list for the rest
             // of the TUI's life: the store does not retry on its own, and the
             // `synced` guard below never re-enters the same session.
-            void Promise.resolve(context.data.session.sync(id, { children: true }))
+            void Promise.resolve(sessions.sync(id, { children: true }))
                 .then(() => {
                     if (depth >= DEPTH) return
                     for (const child of childrenOf(tree(id), id)) request(child, depth + 1)
@@ -265,7 +272,6 @@ export default Plugin.define({
                         {!collapsed &&
                             lines.map((line) => (
                                 <box
-                                    key={line.id}
                                     flexDirection="column"
                                     onMouseDown={press(line.id)}
                                     onMouseUp={release(line.id)}

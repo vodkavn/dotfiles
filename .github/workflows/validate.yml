@@ -86,12 +86,28 @@ jobs:
           node --version
           node -e 'process.exit(require("node:module").stripTypeScriptTypes ? 0 : 1)'
 
+      - name: Install the plugin type-check tree
+        # check.sh skips the opencode plugin type check when the npm tree is
+        # absent, for the same reason the plugin tests skip without Node. The
+        # runner installs the tree and asserts it is there, so the skip cannot
+        # quietly hide a type error there.
+        #
+        # `npm ci` rather than `npm install`: the lockfile is the dependency
+        # set, and a check that resolved a different one would not be the same
+        # check the contributor ran.
+        run: |
+          npm ci --no-audit --no-fund
+          test -x node_modules/.bin/tsc
+          node_modules/.bin/tsc --version
+
       - name: Report tool versions
         run: |
           bash --version | head -1
           git --version
           jq --version
           shellcheck --version | sed -n '2p'
+          node --version
+          npm --version
 
       - name: Run checks
         # Exit codes are contractual: 0 passed, 1 failed, 2 blocked or invalid.
