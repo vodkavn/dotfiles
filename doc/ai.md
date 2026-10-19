@@ -9,7 +9,7 @@ are linked into `$HOME` by `install.sh`.
 
     config/opencode/opencode.json          global: shell, formatter, compaction,
                                            websearch, update, references, lsp,
-                                           MCP servers
+                                           tool_output, MCP servers
     config/opencode/commands/new-ai.md     global: /new-ai scaffolder
     config/opencode/skills/                global: requirement-doc, design-review,
                                            test-scenario, deliverable-trace,
@@ -172,10 +172,27 @@ machine this repository is installed on.
 project and advertises each through its `description`, so the agent knows _when_
 to reach for it. Attach one in the client, then ask for what is needed.
 
-**This block is empty.** A document corpus is a per-project fact — the right path
-for a requirements repo is not the right path for a code repo — and a global
-reference wrong for most projects is worse than none. Declare references in the
-project that owns them:
+The global block carries one reference — this repository:
+
+```jsonc
+{
+    "$schema": "https://opencode.ai/config.json",
+    "references": {
+        "dotfiles": {
+            "path": "~/.dotfiles",
+            "description": "The global layer of this machine's dotfiles: AGENTS.md holds the rules that apply in every project, doc/ai.md the opencode configuration, and config/opencode the global plugins.",
+        },
+    },
+}
+```
+
+It is there because `AGENTS.md` is read from the project, so the rules that
+apply on every machine are invisible from a project that is not this
+repository. The reference carries them.
+
+A document corpus is a per-project fact — the right path for a requirements repo
+is not the right path for a code repo — so a corpus belongs in the project that
+owns it:
 
 ```jsonc
 {
@@ -212,6 +229,21 @@ For the same reason `AGENTS.md` remains the place where the agent is told how
 to check its work: `bash -n` and `shellcheck -s bash` for Bash, and the
 `tsc --noEmit` group for the plugins. Those run as ordinary tool calls, which
 is what opencode's own documentation recommends over a language server.
+
+### `tool_output`
+
+`tool_output` caps how much of a tool's output reaches the model. The defaults
+are 2000 lines and 51200 bytes; this repository lowers them to 1000 and 16384.
+
+A 50 KB tool result is roughly twelve thousand tokens, and the compaction
+settings keep fifteen thousand tokens of context — so one large read can fill
+the budget on its own. Truncated output is saved to disk rather than dropped,
+so the agent can still read the rest of it.
+
+    "tool_output": {
+        "max_lines": 1000,
+        "max_bytes": 16384
+    }
 
 ### `websearch`, `update`, `compaction`
 

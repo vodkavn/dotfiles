@@ -19,7 +19,16 @@
         }
     },
     "lsp": true,
-    "references": {},
+    "tool_output": {
+        "max_lines": 1000,
+        "max_bytes": 16384
+    },
+    "references": {
+        "dotfiles": {
+            "path": "~/.dotfiles",
+            "description": "The global layer of this machine's dotfiles: AGENTS.md holds the rules that apply in every project, doc/ai.md the opencode configuration, and config/opencode the global plugins. Read it when a question is about this machine's setup rather than about the project in front of you."
+        }
+    },
     "mcp": {
         "servers": {
             "context7": {
