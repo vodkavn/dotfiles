@@ -16,7 +16,8 @@ are linked into `$HOME` by `install.sh`.
     config/opencode/skills/                global: requirement-doc, design-review,
                                            test-scenario, deliverable-trace,
                                            release-rollback, workspace-hygiene,
-                                           tech-doc
+                                           tech-doc, minimal-change,
+                                           change-review
     config/opencode/plugins/               global: inspector, subagent-watch,
                                            provider-usage, tui-shortcuts (TUI);
                                            shell-guard, tool-guard,
@@ -153,9 +154,10 @@ plugin enforces them in every project, so these entries are defence in depth.
 
 ## Skills
 
-Seven global working-method skills in `config/opencode/skills/`, one directory
+Nine global working-method skills in `config/opencode/skills/`, one directory
 each: `requirement-doc`, `design-review`, `test-scenario`, `deliverable-trace`,
-`release-rollback`, `workspace-hygiene`, and `tech-doc`.
+`release-rollback`, `workspace-hygiene`, `tech-doc`, `minimal-change`, and
+`change-review`.
 
 A skill is advertised to the model through its `description` and loaded on
 relevance, so a method that only matters for some tasks costs nothing on the
@@ -177,6 +179,21 @@ guide are `tech-doc`'s.
 of the document being edited, and verify every command, flag, and path before
 writing it down. A plausible command that does not exist is the worst output
 this can produce.
+
+`minimal-change` and `change-review` are the two halves of one method.
+`minimal-change` is the decision procedure: read the code the change touches,
+then stop at the first rung of the ladder that fully works — does it need to
+exist, is it already in this codebase, does the standard library do it, is it
+an installed dependency, is it one line, otherwise the minimum that works. It
+also names what is never cut, and the `shortcut:` marker for a deliberate
+shortcut with a known limit. `change-review` is the same method turned
+backwards: read the code a change touches rather than only the diff, find the
+load the project actually has, and report the findings ranked, each with the
+case that proves it.
+
+They are separate skills because they apply at different moments — one before
+the change, one after — and a skill is loaded on relevance, so a session that
+is only writing code never pays for the review method.
 
 **Documentation method is a skill rather than an agent.** An agent is a named
 profile a session switches to — its own system prompt, model, and permissions
