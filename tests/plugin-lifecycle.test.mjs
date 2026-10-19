@@ -131,7 +131,7 @@ test("Compaction memory stops pruning when the cursor stops advancing", async ()
     await fixture.cleanup()
 })
 
-// A pass that hits the page ceiling must resume on the next tick rather than
+// A pass that hits a ceiling must resume on the next tick rather than
 // silently give up on everything beyond it.
 test("Compaction memory bounds one prune pass by page count", async () => {
     const removed = []
@@ -148,11 +148,19 @@ test("Compaction memory bounds one prune pass by page count", async () => {
     fixture.tick()
     // One macrotask turn drains the whole microtask chain the loop runs on.
     await settled()
-    // Bounded, not unbounded: the pass stops at the page ceiling instead of
-    // walking an endless store. The exact count is an implementation detail; what
+    // Bounded, not unbounded: the pass stops at a ceiling instead of walking
+    // an endless store. The exact count is an implementation detail; what
     // matters is that it stops, and that it is small.
     assert.ok(scans > 1 && scans <= 101, `expected a bounded pass, scanned ${scans} pages`)
-    assert.equal(removed.length, (scans - 1) * 200, "the page that trips the cap is not processed")
+    // The removal ceiling is the tighter of the two bounds, so it is what ends
+    // this pass: the store is walked a page or two at a time, not in one run.
+    assert.ok(removed.length > 0 && removed.length <= 500, `expected a bounded pass, removed ${removed.length} notes`)
+    // The next tick picks up where this one stopped, rather than the store
+    // being left half-pruned for good.
+    const first = removed.length
+    fixture.tick()
+    await settled()
+    assert.ok(removed.length > first, "the next pass resumes where this one stopped")
     await fixture.cleanup()
 })
 

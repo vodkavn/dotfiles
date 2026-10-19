@@ -64,6 +64,11 @@ const STALE_MS = 14 * 24 * 60 * 60 * 1000
 // than expected costs one pass and resumes on the next tick rather than holding
 // storage busy. At 200 per page this covers 20k sessions per pass.
 const MAX_PRUNE_PAGES = 100
+// Upper bound on the notes one pass removes. The walk is bounded by the page
+// count, but the removals were not: a store holding thousands of stale notes
+// spent the whole pass removing them one at a time, which is a long run of
+// writes for a background chore. The rest is left for the next tick.
+const MAX_PRUNE_REMOVALS = 500
 // How many sessions the pre-compaction warning remembers having warned. Bounded
 // for the same reason the tokens plugin leaked: this map is fed by a hook that
 // fires for every model call in every session the server sees.
@@ -202,6 +207,7 @@ export default Plugin.define({
                 const cutoff = Date.now() - STALE_MS
                 let after: string | undefined
                 let pages = 0
+                let removed = 0
                 do {
                     const page = await ctx.storage.scan({ prefix: "session/", limit: 200, after })
                     if (stopped) return
@@ -223,9 +229,14 @@ export default Plugin.define({
 
                     for (const entry of page.entries) {
                         if (stopped) return
+                        // The pass is bounded by what it removes as well as by
+                        // what it walks: the next tick picks up where this
+                        // one stopped.
+                        if (removed >= MAX_PRUNE_REMOVALS) return
                         const note = record(entry.value)
                         if (typeof note.updated === "number" && note.updated < cutoff) {
                             await ctx.storage.remove(entry.key)
+                            removed++
                         }
                     }
                     after = page.next

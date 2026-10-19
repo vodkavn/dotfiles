@@ -148,12 +148,17 @@ export default Plugin.define({
         // The spinner runs only while busy: an idle pane repainting ten times a
         // second to animate nothing is waste. `bump` is the spinner's frame
         // advance; the glyph itself is derived from the clock in render.
+        //
+        // A collapsed section draws no spinner, so it does not animate either.
+        // Every frame is a repaint of the whole sidebar, and the other panels
+        // in it rebuild their own state on each one, so a spinner nobody can
+        // see is not free.
         const animate = () => {
             if (stopped) return
-            if (busy > 0 && spin === undefined) {
+            if (busy > 0 && !state.collapsed && spin === undefined) {
                 spin = setInterval(bump, SPIN_MS)
                 ;(spin as { unref?: () => void }).unref?.()
-            } else if (busy === 0 && spin !== undefined) {
+            } else if ((busy === 0 || state.collapsed) && spin !== undefined) {
                 clearInterval(spin)
                 spin = undefined
             }
@@ -281,6 +286,9 @@ export default Plugin.define({
                 void state.version
 
                 const collapsed = state.collapsed
+                // The spinner follows the section: opening it while a fetch is
+                // in flight starts the animation, closing it stops it.
+                animate()
                 const lines = buildPanel(results, Date.now(), BAR_WIDTH)
                 if (lines.length === 0) return null
 

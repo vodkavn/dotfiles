@@ -72,9 +72,41 @@ export default Plugin.define({
         const [spin, setSpin] = context.storage.memory("spin", { initial: { tick: 0 } })
 
         // Whether the last paint drew a row carrying a spinner. Written by the
-        // render below and read by the interval at the end of setup, which is
-        // what keeps an idle or folded section from asking for repaints.
+        // render below and read by the clock below, which is what keeps an idle
+        // or folded section from asking for repaints.
         let animating = false
+
+        // The repaint clock for the spinner.
+        //
+        // It exists only while there is a spinner to turn. An interval that
+        // wakes the process eight times a second to animate nothing is waste,
+        // and this panel is idle most of the time -- so the clock is created
+        // when the first spinner appears and cleared when the last one goes.
+        //
+        // Created from the render rather than from setup, which also settles
+        // the order of business: a slot that never renders never starts a
+        // timer, and a registration that throws leaves nothing running.
+        let spinner: ReturnType<typeof setInterval> | undefined
+        const spinClock = () => {
+            if (animating) {
+                if (spinner !== undefined) return
+                spinner = setInterval(() => {
+                    // A guard inside the callback is not needed: the clock is
+                    // cleared on the way out, so no tick outlives it.
+                    if (!animating) return
+                    setSpin((draft) => {
+                        draft.tick++
+                    })
+                }, SPIN_MS)
+                // `unref` keeps it from holding the TUI's event loop open on
+                // its own.
+                ;(spinner as { unref?: () => void }).unref?.()
+                return
+            }
+            if (spinner === undefined) return
+            clearInterval(spinner)
+            spinner = undefined
+        }
 
         const tree = (current: string | undefined): Tree => ({
             current,
@@ -171,6 +203,9 @@ export default Plugin.define({
                 // every subagent finished, or the list folded away -- stops asking
                 // for repaints.
                 animating = rows.length > 0 && !collapsed
+                // The clock follows the panel: it runs while there is a spinner
+                // to turn, and stops as soon as there is not.
+                spinClock()
                 if (rows.length === 0) return null
 
                 const muted = context.theme.text.muted
@@ -250,24 +285,9 @@ export default Plugin.define({
             },
         })
 
-        // Created last, and only once the slot is registered: if registration
-        // throws then setup throws, this cleanup is never handed back, and a
-        // timer started before it would run for the life of the process.
-        // `unref` keeps it from holding the TUI's event loop open on its own.
-        //
-        // Clearing the interval on the way out is what makes a guard inside the
-        // callback unnecessary: no tick outlives disposal, so nothing here has to
-        // ask whether this generation is still the live one.
-        const spinner = setInterval(() => {
-            if (!animating) return
-            setSpin((draft) => {
-                draft.tick++
-            })
-        }, SPIN_MS)
-        ;(spinner as { unref?: () => void }).unref?.()
-
         return () => {
-            clearInterval(spinner)
+            if (spinner !== undefined) clearInterval(spinner)
+            spinner = undefined
             dispose?.()
         }
     },
