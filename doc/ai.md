@@ -8,12 +8,13 @@ are linked into `$HOME` by `install.sh`.
 ## Layout
 
     config/opencode/opencode.json          global: shell, formatter, compaction,
-                                           websearch, update, agents, references,
+                                           websearch, update, references,
                                            MCP servers
     config/opencode/commands/new-ai.md     global: /new-ai scaffolder
     config/opencode/skills/                global: requirement-doc, design-review,
                                            test-scenario, deliverable-trace,
-                                           release-rollback, workspace-hygiene
+                                           release-rollback, workspace-hygiene,
+                                           tech-doc
     config/opencode/plugins/               global: inspector, subagent-watch,
                                            provider-usage, tui-shortcuts (TUI);
                                            shell-guard, tool-guard,
@@ -47,9 +48,9 @@ overrides one global entry without disturbing the others. Permission arrays are
 the exception: they **concatenate**, global first, last match wins.
 
 The dividing line is reuse, not tool. The global layer carries CLI-wide
-settings, MCP servers, agents, the `/new-ai` command, the working-method
-skills, and the plugins. The project layer keeps this repository's own commands
-and every permission rule.
+settings, MCP servers, the `/new-ai` command, the working-method skills, and
+the plugins. The project layer keeps this repository's own commands and every
+permission rule.
 
 Method is portable only when it carries no project-specific assumptions. A
 global skill must survive being read in a repository that shares nothing with
@@ -129,20 +130,39 @@ otherwise only be prose in `AGENTS.md`:
 The `sudo`/`curl`/`wget` rules are repo-agnostic and the global **shell-guard**
 plugin enforces them in every project, so these entries are defence in depth.
 
+## Skills
+
+Seven global working-method skills in `config/opencode/skills/`, one directory
+each: `requirement-doc`, `design-review`, `test-scenario`, `deliverable-trace`,
+`release-rollback`, `workspace-hygiene`, and `tech-doc`.
+
+A skill is advertised to the model through its `description` and loaded on
+relevance, so a method that only matters for some tasks costs nothing on the
+others. It applies to whichever agent is already running.
+
+`tech-doc` carries the documentation method: match the voice and frontmatter
+of the document being edited, and verify every command, flag, and path before
+writing it down. A plausible command that does not exist is the worst output
+this can produce.
+
+**Documentation method is a skill rather than an agent.** An agent is a named
+profile a session switches to — its own system prompt, model, and permissions
+— and selecting one is a manual `/agent` step. That is the wrong shape for
+editorial method: the content needs no identity, no separate model, and no
+permissions of its own, and it is worth more applied to the session that
+already holds the code being documented than re-explained in a fresh one.
+
+A **subagent** is the other option, and it is not much better. A subagent runs
+in a child session with fresh context, so the documentation task has to be
+handed over with everything it needs spelled out, and the result handed back.
+For a method that is mostly *how to phrase a sentence in the file already
+open*, that is a worse fit than a skill, which is loaded into the session doing
+the work.
+
 ## Global settings
 
 These live in `config/opencode/opencode.json` and apply in every project on any
 machine this repository is installed on.
-
-### `agents`
-
-One global primary agent, `doc-writer`, for documentation work. Its system
-prompt encodes the rules that matter most when a model writes docs rather than
-code: match the voice and frontmatter of the document being edited, and verify
-every command, flag, and path before writing it down. A plausible command that
-does not exist is the worst output this agent can produce. It is `mode: primary`
-so it can be selected with `/agent doc-writer`, but it does not override the
-default agent for coding sessions.
 
 ### `references`
 

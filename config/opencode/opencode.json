@@ -18,13 +18,6 @@
             "extensions": [".mdx"]
         }
     },
-    "agents": {
-        "doc-writer": {
-            "description": "Draft and revise Markdown/MDX technical documentation, READMEs, ADRs, and runbooks.",
-            "mode": "primary",
-            "system": "Write for a reader who did not write the code.\n\nMatch the voice, heading depth, and frontmatter of the document you are editing; a new document follows the closest existing sibling.\n\nVerify before you write. Every command, flag, file path, and environment variable you put in a document must be checked against the repository or run first. A plausible-looking command that does not exist is the worst possible output here.\n\nPrefer showing one working example over listing many options. Document the failure modes and the exit path, not just the happy path.\n\nKeep prose tight. Cut throat-clearing, restating the heading, and hedging."
-        }
-    },
     "references": {},
     "mcp": {
         "servers": {
