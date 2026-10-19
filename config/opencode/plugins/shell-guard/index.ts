@@ -29,10 +29,14 @@ import { Plugin } from "@opencode/plugin"
 //   xargs -I {} sh -c …    reached only through a wrapper this cannot resolve
 //   python -c '…'          an interpreter this does not know how to read
 //   a variable holding a blocked word:  S=sudo; $S id
+//   a substitution whose output cannot be told:  $(basename /usr/bin/sudo) id
 //
-// All four are the same class of limit the plugin has always had: this sees
-// text, not a process tree. Treat a pass here as "no obvious foot-gun", never as
-// "proven safe".
+// The last two are the same class of limit the plugin has always had: this sees
+// text, not a process tree. A substitution in command position is caught when
+// the words it prints can be read off the text -- `$(echo sudo) id` and
+// `$(printf sudo) id` are -- and left alone when they cannot, because reading
+// them would mean running them. Treat a pass here as "no obvious foot-gun",
+// never as "proven safe".
 //
 // To tighten or loosen: edit BLOCKED. Keep it short — every entry is a command
 // the agent can no longer run even when a user asks for it by name.
@@ -278,6 +282,209 @@ export function substitutions(command: string): string[] {
     return found
 }
 
+// The word as the shell would pass it on: without its quotes.
+//
+// split() drops the quotes as it goes; this does the same to a word that has
+// been kept whole, so the two agree on what a word says.
+const unquoted = (word: string): string => word.replace(/['"]/g, "")
+
+// The commands in the text, with their words exactly as they were written.
+//
+// split() reduces a word to what the shell would pass on, which drops the
+// quotes and cannot tell a word apart from a substitution -- it splits on the
+// brackets of a $(...) as if they were commands of their own. This keeps both:
+// a single-quoted word is literal, a double-quoted one is not, and a
+// substitution stays one word however much punctuation it holds.
+const rawCommands = (command: string): string[][] => {
+    const commands: string[][] = []
+    let words: string[] = []
+    let word = ""
+    let pending = false
+    let quote: string | null = null
+
+    const endWord = () => {
+        if (!pending) return
+        words.push(word)
+        word = ""
+        pending = false
+    }
+
+    const endCommand = () => {
+        endWord()
+        commands.push(words)
+        words = []
+    }
+
+    for (let index = 0; index < command.length; index++) {
+        const char = command[index]
+        const next = command[index + 1]
+
+        if (quote !== null) {
+            word += char
+            if (char === quote) quote = null
+            continue
+        }
+        if (char === "'" || char === '"') {
+            quote = char
+            word += char
+            pending = true
+            continue
+        }
+        if (char === "\\" && next !== undefined) {
+            word += char + next
+            pending = true
+            index++
+            continue
+        }
+        // A substitution is one word, whatever it holds.
+        if (char === "$" && next === "(") {
+            const body = group(command, index + 1)
+            if (body !== undefined) {
+                word += command.slice(index, body.end + 1)
+                pending = true
+                index = body.end
+                continue
+            }
+        }
+        if (char === "`") {
+            const close = command.indexOf("`", index + 1)
+            if (close !== -1) {
+                word += command.slice(index, close + 1)
+                pending = true
+                index = close
+                continue
+            }
+        }
+        if (char === "\n" || char === ";" || char === "(" || char === ")") {
+            endCommand()
+            continue
+        }
+        if (char === "&" || char === "|") {
+            endCommand()
+            if (next === char) index++
+            continue
+        }
+        if (char === " " || char === "\t") {
+            endWord()
+            continue
+        }
+        word += char
+        pending = true
+    }
+    endCommand()
+
+    return commands
+}
+
+// The body of a substitution at the start of a word, and the text that
+// follows it. Undefined when the word does not start with one.
+//
+// A single-quoted word is literal text, so it never starts with one. A
+// double-quoted one does: the shell still substitutes inside it, and the
+// result is still the command.
+const substitutionBody = (raw: string): { body: string; tail: string } | undefined => {
+    if (raw.startsWith("'")) return undefined
+    let text = raw
+    if (text.length >= 2 && text.startsWith('"') && text.endsWith('"')) {
+        text = text.slice(1, -1)
+    }
+    if (text.startsWith("$(")) {
+        const parsed = group(text, 1)
+        if (parsed === undefined) return undefined
+        return { body: parsed.text, tail: text.slice(parsed.end + 1) }
+    }
+    if (text.startsWith("`")) {
+        const close = text.indexOf("`", 1)
+        if (close === -1) return undefined
+        return { body: text.slice(1, close), tail: text.slice(close + 1) }
+    }
+    return undefined
+}
+
+// The words a body prints, when they can be told without running anything.
+//
+// echo, printf, and which are the three that matter: they are the cheapest
+// way to spell a blocked word without typing it. Anything else needs the
+// program to be run to know what it prints, so it is left alone.
+const printedWords = (body: string, depth: number): string[] | undefined => {
+    if (depth > MAX_DEPTH) return undefined
+    const words = rawCommands(body)[0]
+    if (words.length === 0) return undefined
+    const name = unquoted(words[0])
+    const rest = words.slice(1)
+
+    if (name === "which") {
+        // which prints the path of the program it was asked about.
+        return rest.length > 0
+            ? rest.map((word) => {
+                  const printed = unquoted(word)
+                  return printed.split("/").pop() ?? printed
+              })
+            : undefined
+    }
+    if (name !== "echo" && name !== "printf") return undefined
+
+    // printf's first argument is a format when it holds a percent sign, and
+    // the word itself when it does not.
+    const format = name === "printf" && rest.length > 0 ? unquoted(rest[0]) : undefined
+    const argumentsOf = name === "printf" ? rest.slice(1) : rest
+
+    const printed: string[] = []
+    for (const word of argumentsOf) {
+        const literal = unquoted(word)
+        // echo's own options are not part of what it prints.
+        if (name === "echo" && literal.startsWith("-")) continue
+        const produced = producedWords(word, depth + 1)
+        if (produced !== undefined) {
+            printed.push(...produced)
+            continue
+        }
+        // A substitution whose output cannot be told makes the whole output
+        // unknown.
+        if (substitutionBody(word) !== undefined) return undefined
+        printed.push(literal)
+    }
+
+    if (format !== undefined && !format.includes("%")) return [format]
+    return printed.length > 0 ? printed : undefined
+}
+
+// The words a raw word produces when it is a substitution.
+//
+// Undefined when the word is not one, or when what it prints cannot be told
+// without running something.
+const producedWords = (raw: string, depth: number): string[] | undefined => {
+    if (depth > MAX_DEPTH) return undefined
+    const substitution = substitutionBody(raw)
+    if (substitution === undefined) return undefined
+    const printed = printedWords(substitution.body, depth + 1)
+    if (printed === undefined || printed.length === 0) return undefined
+    // The substitution and the text that follows it are one word.
+    return [printed[0] + substitution.tail, ...printed.slice(1)]
+}
+
+// The reason a substitution in command position blocks, or undefined.
+//
+// A substitution in command position *is* the command: the shell substitutes
+// before it resolves the command, so `$(echo sudo) id` runs sudo. The word the
+// substitution prints is therefore checked as a command word of its own.
+const substitutedReason = (command: string, depth: number): string | undefined => {
+    for (const words of rawCommands(command)) {
+        let index = 0
+        while (index < words.length && ASSIGNMENT.test(unquoted(words[index]))) index++
+        while (index < words.length && KEYWORDS.has(unquoted(words[index]))) index++
+        const raw = words[index]
+        if (raw === undefined) continue
+
+        const produced = producedWords(raw, depth)
+        if (produced === undefined || produced.length === 0) continue
+        const word = produced[0]
+        const reason = BLOCKED[word.split("/").pop() ?? word]
+        if (reason !== undefined) return reason
+    }
+    return undefined
+}
+
 // The script a shell was handed, for `bash -lc 'sudo id'`. Only options are
 // considered, so `bash script.sh -c 'sudo id'` — where -c belongs to the script
 // rather than to bash — resolves to nothing instead of blocking innocently.
@@ -299,6 +506,11 @@ const scan = (command: string, depth: number, words: string[], seen: Set<string>
     // Text, not a program: a heredoc body is data, so it is removed before any
     // newline in it can be mistaken for a command separator.
     command = withoutHeredocBodies(command)
+
+    // A substitution in command position is the command itself, so the word it
+    // prints is checked before anything else.
+    const substituted = substitutedReason(command, depth)
+    if (substituted !== undefined) return substituted
 
     // Substitution is resolved first: it runs before the shell picks a command,
     // so it can hide a blocked word behind an innocent outer one.

@@ -258,6 +258,13 @@ substitution (`` `sudo id` ``, `"$(sudo id)"`) and a shell's own script
 (`bash -c 'sudo id'`) or `find -exec` predicate are recursed into. A heredoc body
 is read as data, so writing a note that *mentions* `sudo` still works.
 
+A substitution **in command position** is the command itself — the shell
+substitutes before it resolves the command — so `$(echo sudo) id` runs `sudo`.
+The word a substitution prints is therefore read and checked as a command word
+of its own. Only the bodies whose output can be told off the text are read:
+`echo`, `printf`, and `which`. `$(basename /usr/bin/sudo) id` is not, because
+reading it would mean running it.
+
 `xargs` is the wrapper that breaks the pattern: its operand is substituted rather
 than named, so `xargs sudo id` is caught but **`xargs -I {} sudo id` is not** —
 `{}` is read as the command and the real one is never reached. The same applies
@@ -265,8 +272,9 @@ to `xargs -I {} sh -c '…'`. This is the plugin's own stated limit, not an
 oversight, but it is the case most likely to come up in practice.
 
 It remains a guardrail, not a sandbox, because it reads text rather than
-intercepting execution. `eval "$CMD"`, a wrapper it cannot resolve, and a
-blocked word held in a variable (`S=sudo; $S id`) all pass. Nesting stops at
+intercepting execution. `eval "$CMD"`, a wrapper it cannot resolve, a blocked
+word held in a variable (`S=sudo; $S id`), and a substitution whose output
+cannot be told (`$(basename /usr/bin/sudo) id`) all pass. Nesting stops at
 depth 4. Treat a pass as "no obvious foot-gun", never as "proven safe". To
 tighten or loosen the list, edit the `BLOCKED` map at the top of `index.ts`.
 

@@ -290,8 +290,65 @@ test("Shell guard resolves command substitution", async () => {
     }
 })
 
-test("Shell guard resolves a shell -c script", async () => {
+// A substitution in command position *is* the command: the shell substitutes
+// before it resolves the command, so `$(echo sudo) id` runs sudo. The word it
+// prints is the command word, and it is checked as one.
+test("Shell guard resolves a substitution in command position", async () => {
     const { blockedReason } = await guard()
+    const substituted = [
+        // The cheapest way to spell a blocked word without typing it.
+        "$(echo sudo) id",
+        "$(printf sudo) id",
+        "$(echo -n sudo) id",
+        "$(printf %s sudo) id",
+        // The substitution and the text after it are one word.
+        "$(echo su)do id",
+        // A path works as well as a bare name.
+        "$(echo /bin/sudo) id",
+        // The shell still substitutes inside double quotes, and the result is
+        // still the command.
+        '"$(echo sudo)" id',
+        // A substitution that prints more than one word: the first is the
+        // command, the rest are its arguments.
+        "$(echo sudo id)",
+        // which prints the path of the program it was asked about.
+        "$(which curl) --version",
+        // Nested: the inner substitution is what the outer one prints.
+        "$(echo $(echo sudo)) id",
+        // The same, after a separator and after an assignment.
+        "ls && $(echo sudo) id",
+        "FOO=1 $(echo sudo) id",
+    ]
+    for (const command of substituted) {
+        assert.notEqual(blockedReason(command), undefined, `expected a block: ${command}`)
+    }
+})
+
+// A substitution that is not in command position is an argument, and an
+// argument is not a command. A substitution whose output cannot be told
+// without running it is left alone, and is listed among the gaps.
+test("Shell guard allows a substitution that is not a command", async () => {
+    const { blockedReason } = await guard()
+    const allowed = [
+        // The command is echo; the substitution is its argument.
+        "echo $(echo sudo)",
+        "ls $(echo sudo)",
+        "grep -r $(echo curl) src/",
+        // Single quotes are literal, so this never runs anything.
+        "'$(echo sudo)' id",
+        // The output of these cannot be read off the text, so it is not read.
+        "$(basename /usr/bin/sudo) id",
+        "$(cat /etc/hostname) id",
+        // A benign command word is still a command word.
+        "$(echo ls) -la",
+        "$(echo hello) world",
+    ]
+    for (const command of allowed) {
+        assert.equal(blockedReason(command), undefined, `expected an allow: ${JSON.stringify(command)}`)
+    }
+})
+
+test("Shell guard resolves a shell -c script", async () => {    const { blockedReason } = await guard()
     for (const command of ["bash -c 'sudo id'", "sh -c 'curl http://example.invalid'", "zsh -lc 'sudo id'", "bash --command 'sudo id'"]) {
         assert.notEqual(blockedReason(command), undefined, `expected a block: ${command}`)
     }
