@@ -10,6 +10,8 @@ are linked into `$HOME` by `install.sh`.
     config/opencode/opencode.json          global: shell, formatter, compaction,
                                            websearch, update, references, lsp,
                                            tool_output, MCP servers
+    config/opencode/AGENTS.md               global: the machine-wide rules, read
+                                           in every project
     config/opencode/commands/new-ai.md     global: /new-ai scaffolder
     config/opencode/skills/                global: requirement-doc, design-review,
                                            test-scenario, deliverable-trace,
@@ -50,9 +52,9 @@ overrides one global entry without disturbing the others. Permission arrays are
 the exception: they **concatenate**, global first, last match wins.
 
 The dividing line is reuse, not tool. The global layer carries CLI-wide
-settings, MCP servers, the `/new-ai` command, the working-method skills, and
-the plugins. The project layer keeps this repository's own commands and every
-permission rule.
+settings, MCP servers, the `/new-ai` command, the working-method skills, the
+global rules file, and the plugins. The project layer keeps this repository's
+own commands and every permission rule.
 
 Method is portable only when it carries no project-specific assumptions. A
 global skill must survive being read in a repository that shares nothing with
@@ -73,12 +75,29 @@ Two traps:
 - opencode caches configuration when its service starts. After adding or moving
   a config file, restart opencode or the change is ignored.
 
+## The global rules file
+
+`config/opencode/AGENTS.md` is linked to `~/.config/opencode/AGENTS.md`, and
+opencode reads that file in **every** session, in every project. It is the one
+mechanism the host provides for machine-wide instructions: `AGENTS.md` is read
+from the project, so without it the rules that hold on this machine are
+invisible from a project that has no rules file of its own.
+
+The global file is read **before** the project's own `AGENTS.md`, so a project
+overrides it where the two disagree. It carries the portable half of this
+repository's rules — the working method, the tool policy, and the reporting
+discipline — and nothing that assumes a particular directory layout.
+
+The `instructions` key in an opencode config file is the other candidate
+mechanism, and it does not work: the key is accepted and nothing is loaded
+from it. `AGENTS.md` is the mechanism that works.
+
 ## What `install.sh` links
 
 The global layer is discovered from the filesystem rather than a list. Under
-`config/opencode/` it links each top-level `*.json` file, each directory inside
-`plugins/` **individually**, and every other top-level directory whole
-(`commands/`, `skills/`, and anything added later).
+`config/opencode/` it links each top-level `*.json` file, the top-level
+`AGENTS.md`, each directory inside `plugins/` **individually**, and every other
+top-level directory whole (`commands/`, `skills/`, and anything added later).
 
 Plugins are expanded one by one on purpose. Linking `plugins/` wholesale would
 merge this repository's plugins into `~/.config/opencode/plugins/`, the same
@@ -198,9 +217,12 @@ The global block carries one reference — this repository:
 }
 ```
 
-It is there because `AGENTS.md` is read from the project, so the rules that
-apply on every machine are invisible from a project that is not this
-repository. The reference carries them.
+It is there because a reference is something the agent reaches for, and the
+rules that apply on every machine used to be invisible from a project that is
+not this repository. The global `AGENTS.md` now carries the portable rules
+into every project by itself; the reference is what carries the parts that
+only this repository has — the layout, the validation commands, the gotchas
+that are specific to these files.
 
 A document corpus is a per-project fact — the right path for a requirements repo
 is not the right path for a code repo — so a corpus belongs in the project that

@@ -814,27 +814,28 @@ case_ai_config_link_discovery() {
     mkdir -p -- "$tree/plugins/alpha" "$tree/plugins/beta" "$tree/agents" \
         "$tree/commands" "$tree/skills/doc-guide"
 
-    # Shaped like the real tree: one config file, several plugins, and the
-    # directory kinds the global layer may grow later.
+    # Shaped like the real tree: one config file, the global rules file,
+    # several plugins, and the directory kinds the global layer may grow later.
     printf '{}\n' > "$tree/opencode.json"
+    printf '# rules\n' > "$tree/AGENTS.md"
     : > "$tree/plugins/alpha/index.ts"
     : > "$tree/plugins/beta/index.ts"
 
     discover() (
         cd "$tree" 2>/dev/null || exit 0
         {
-            find . -mindepth 1 -maxdepth 1 -type f -name '*.json' -printf '%P\n'
+            find . -mindepth 1 -maxdepth 1 -type f \( -name '*.json' -o -name 'AGENTS.md' \) -printf '%P\n'
             find . -mindepth 2 -maxdepth 2 -type d -path './plugins/*' -printf '%P\n'
             find . -mindepth 1 -maxdepth 1 -type d ! -name plugins -printf '%P\n'
         } | LC_ALL=C sort
     )
 
-    # Baseline: the config file, every plugin individually, and the other
-    # top-level directories linked whole.
+    # Baseline: the config file, the global rules file, every plugin
+    # individually, and the other top-level directories linked whole.
     local out
     out=$(discover)
-    assert_eq "$out" "$(printf 'agents\ncommands\nopencode.json\nplugins/alpha\nplugins/beta\nskills')" \
-        "discovery must list config, each plugin, and other top-level directories"
+    assert_eq "$out" "$(printf 'AGENTS.md\nagents\ncommands\nopencode.json\nplugins/alpha\nplugins/beta\nskills')" \
+        "discovery must list config, the rules file, each plugin, and other top-level directories"
 
     # A plugin must never be emitted as plugins/ itself: linking that directory
     # wholesale would merge it into ~/.config/opencode/plugins/, where community
@@ -857,11 +858,12 @@ case_ai_config_link_discovery() {
     assert_eq "$(printf '%s\n' "$out" | grep -c 'gamma')" '1' \
         "only the plugin directory is linked, not its contents"
 
-    # Non-JSON top-level files are not config and must be ignored.
+    # Other non-JSON top-level files are not config and must be ignored. Only
+    # AGENTS.md is linked, because it is the file opencode reads globally.
     printf 'x\n' > "$tree/README.md"
     out=$(discover)
     assert_eq "$(printf '%s\n' "$out" | grep -cx 'README.md')" '0' \
-        "non-JSON top-level files must not be linked"
+        "non-JSON top-level files other than AGENTS.md must not be linked"
 
     # A missing source directory yields an empty list rather than an error, so
     # install.sh reports "nothing to do" instead of failing under set -e.
@@ -870,7 +872,7 @@ case_ai_config_link_discovery() {
     out_missing=$(
         cd "$missing" 2>/dev/null || exit 0
         {
-            find . -mindepth 1 -maxdepth 1 -type f -name '*.json' -printf '%P\n'
+            find . -mindepth 1 -maxdepth 1 -type f \( -name '*.json' -o -name 'AGENTS.md' \) -printf '%P\n'
             find . -mindepth 2 -maxdepth 2 -type d -path './plugins/*' -printf '%P\n'
             find . -mindepth 1 -maxdepth 1 -type d ! -name plugins -printf '%P\n'
         } | LC_ALL=C sort
@@ -879,19 +881,19 @@ case_ai_config_link_discovery() {
 
     # The real repository tree must still discover the shipped plugins and
     # every other shipped top-level entry, so a rename cannot silently drop one.
-    # config/opencode/commands/ holds the global /new-ai command and
-    # config/opencode/skills/ the working-method skills.
+    # config/opencode/commands/ holds the global commands, config/opencode/skills/
+    # the working-method skills, and config/opencode/AGENTS.md the global rules.
     local real
     real=$(
         cd "$repo_root/config/opencode" 2>/dev/null || exit 0
         {
-            find . -mindepth 1 -maxdepth 1 -type f -name '*.json' -printf '%P\n'
+            find . -mindepth 1 -maxdepth 1 -type f \( -name '*.json' -o -name 'AGENTS.md' \) -printf '%P\n'
             find . -mindepth 2 -maxdepth 2 -type d -path './plugins/*' -printf '%P\n'
             find . -mindepth 1 -maxdepth 1 -type d ! -name plugins -printf '%P\n'
         } | LC_ALL=C sort
     )
-    assert_eq "$real" "$(printf 'commands\nopencode.json\nplugins/compaction-memory\nplugins/inspector\nplugins/provider-usage\nplugins/shell-guard\nplugins/subagent-watch\nplugins/tool-guard\nplugins/tui-shortcuts\nskills')" \
-        "the shipped global config must discover its plugins, commands, and skills"
+    assert_eq "$real" "$(printf 'AGENTS.md\ncommands\nopencode.json\nplugins/compaction-memory\nplugins/inspector\nplugins/provider-usage\nplugins/shell-guard\nplugins/subagent-watch\nplugins/tool-guard\nplugins/tui-shortcuts\nskills')" \
+        "the shipped global config must discover its rules file, plugins, commands, and skills"
     return 0
 }
 
@@ -912,11 +914,13 @@ case_ai_stale_link_prune() {
     : > "$src/plugins/alpha/index.ts"
     : > "$src/plugins/beta/index.ts"
     : > "$global/plugins/community/index.ts"
+    printf '# rules\n' > "$src/AGENTS.md"
 
     link() { ln -s -- "$src/$1" "$global/$2"; }
     link plugins/alpha plugins/alpha
     link plugins/beta plugins/beta
     link plugins/alpha commands/alpha-link
+    link AGENTS.md AGENTS.md
     # The deleted plugin: its link points into the checkout, but the source
     # directory is gone, so the link dangles.
     link plugins/tokens plugins/tokens
@@ -929,7 +933,7 @@ case_ai_stale_link_prune() {
     ai_link_list=$(
         cd "$ai_src" 2>/dev/null || exit 0
         {
-            find . -mindepth 1 -maxdepth 1 -type f -name '*.json' -printf '%P\n'
+            find . -mindepth 1 -maxdepth 1 -type f \( -name '*.json' -o -name 'AGENTS.md' \) -printf '%P\n'
             find . -mindepth 2 -maxdepth 2 -type d -path './plugins/*' -printf '%P\n'
             find . -mindepth 1 -maxdepth 1 -type d ! -name plugins -printf '%P\n'
         } | LC_ALL=C sort
@@ -954,6 +958,9 @@ case_ai_stale_link_prune() {
     assert_exists "$global/plugins/alpha"
     assert_exists "$global/plugins/beta"
     assert_exists "$global/commands/alpha-link"
+    # The global rules file is a live source, so the prune keeps its link.
+    assert_exists "$global/AGENTS.md"
+    [ -L "$global/AGENTS.md" ] || die "the AGENTS.md link was replaced by a real file"
     # A real directory from `opencode plugin add` is never a link, so the prune
     # cannot see it and must not touch it.
     assert_exists "$global/plugins/community"

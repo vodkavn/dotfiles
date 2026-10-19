@@ -81,6 +81,7 @@ done
 #
 # Like every other entry here, the source path is named after its $HOME target:
 #   config/opencode/opencode.json  ->  ~/.config/opencode/opencode.json
+#   config/opencode/AGENTS.md      ->  ~/.config/opencode/AGENTS.md
 #   config/opencode/plugins/       ->  ~/.config/opencode/plugins/
 #
 # opencode auto-discovers ~/.config/opencode/plugins/ and the project's
@@ -102,6 +103,12 @@ done
 # config/opencode/commands/ is the one command directory that is global:
 # new-ai.md scaffolds agents, skills, and commands for whatever project you are
 # standing in, so it is useful everywhere. What it creates is still project-level.
+#
+# config/opencode/AGENTS.md is the global rules file. opencode reads
+# ~/.config/opencode/AGENTS.md in every project, alongside the project's own
+# AGENTS.md, so the machine-wide rules hold in a project that has no rules
+# file of its own. It is a Markdown file, not a JSON one, so the discovery
+# below needs to name it explicitly.
 #
 # Community packages installed with `opencode plugin add` land in the same
 # ~/.config/opencode/plugins/ directory but are NOT symlinked from here. Linking
@@ -125,10 +132,10 @@ done
 #   $HOME/.dotfiles/.opencode/   project; this repository only
 #
 # The global layer carries CLI-wide settings, MCP servers, agents, references,
-# tool-agnostic commands, and plugins. Repository-specific commands, skills, and
-# permission rules stay project-scoped in .opencode/. Note that ~/.opencode is
-# opencode's own data directory, not its config directory; never link this
-# repository's .opencode there.
+# tool-agnostic commands, the global rules file, and plugins. Repository-specific
+# commands, skills, and permission rules stay project-scoped in .opencode/. Note
+# that ~/.opencode is opencode's own data directory, not its config directory;
+# never link this repository's .opencode there.
 #
 ai_global=$HOME/.config/opencode
 ai_src=$HOME/.dotfiles/config/opencode
@@ -138,6 +145,7 @@ ai_src=$HOME/.dotfiles/config/opencode
 # is sorted so two runs print the same order.
 #
 #   top-level *.json  the config file itself
+#   AGENTS.md         the global rules file, read in every project
 #   plugins/*/        each plugin on its own, so a plugin directory is never
 #                     merged wholesale into ~/.config/opencode/plugins/, which
 #                     would collide with community plugins living there
@@ -147,7 +155,7 @@ ai_src=$HOME/.dotfiles/config/opencode
 ai_link_list=$(
     cd "$ai_src" 2>/dev/null || exit 0
     {
-        find . -mindepth 1 -maxdepth 1 -type f -name '*.json' -printf '%P\n'
+        find . -mindepth 1 -maxdepth 1 -type f \( -name '*.json' -o -name 'AGENTS.md' \) -printf '%P\n'
         find . -mindepth 2 -maxdepth 2 -type d -path './plugins/*' -printf '%P\n'
         find . -mindepth 1 -maxdepth 1 -type d ! -name plugins -printf '%P\n'
     } | LC_ALL=C sort
