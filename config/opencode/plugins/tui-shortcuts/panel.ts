@@ -35,6 +35,29 @@ export const MODEL_GLYPH = "◇"
 export const AGENT_LABEL = `${AGENT_GLYPH} switch agent`
 export const MODEL_LABEL = `${MODEL_GLYPH} switch model`
 
+// Whether the agent shortcut is worth drawing: there has to be somewhere to
+// switch to, so the project needs more than one primary agent.
+//
+// `mode: "all"` counts, because such an agent can be the prompt's agent; a
+// `subagent` cannot. Hidden and disabled entries are dropped, the same defensive
+// pair inspector applies, because the host keeps its internal agents (compaction,
+// summary, title) in this registry and they never reach the dialog.
+//
+// An undefined list means the location's store has not synced yet. That is not
+// "one agent": the shortcut stays, so a slow or failed sync cannot take away a
+// working action.
+export const showsAgentSwitch = (entries: readonly unknown[] | undefined): boolean => {
+    if (entries === undefined) return true
+    let primary = 0
+    for (const entry of entries) {
+        if (!entry || typeof entry !== "object") continue
+        const agent = entry as Record<string, unknown>
+        if (agent.mode === "subagent" || agent.hidden === true || agent.disabled === true) continue
+        primary += 1
+    }
+    return primary > 1
+}
+
 // What a shortcut wears: muted at rest, so the footer still reads as chrome
 // rather than as a second prompt, and the body colour under the pointer, so the
 // label lights up as a target.

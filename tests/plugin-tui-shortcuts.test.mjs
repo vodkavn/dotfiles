@@ -27,7 +27,7 @@ const load = async (path) => {
     return scope.exports
 }
 
-const { AGENT_GLYPH, AGENT_LABEL, COMMANDS, labelTone, MODEL_GLYPH, MODEL_LABEL } = await load(
+const { AGENT_GLYPH, AGENT_LABEL, COMMANDS, labelTone, MODEL_GLYPH, MODEL_LABEL, showsAgentSwitch } = await load(
     "../config/opencode/plugins/tui-shortcuts/panel.ts",
 )
 
@@ -51,6 +51,30 @@ test("Each shortcut opens the dialog its leader key opens", () => {
     // same dialog, so search, favourites, and grouping stay the host's.
     assert.equal(COMMANDS.agent, "agent.list")
     assert.equal(COMMANDS.model, "model.list")
+})
+
+test("The agent shortcut disappears when there is no agent to switch to", () => {
+    // The dialog is pointless with one destination, so the shortcut is drawn
+    // only when the project's agent registry offers more than one primary.
+    const agent = (overrides) => ({ id: "a", name: "a", mode: "primary", hidden: false, ...overrides })
+
+    // An unsynced store is unknown, not one: keep the action rather than hide it
+    // because the server was slow.
+    assert.equal(showsAgentSwitch(undefined), true)
+
+    assert.equal(showsAgentSwitch([]), false)
+    assert.equal(showsAgentSwitch([agent()]), false)
+    assert.equal(showsAgentSwitch([agent(), agent({ id: "b", name: "b" })]), true)
+
+    // A subagent cannot be the prompt's agent, so it is not a choice, while
+    // "all" can be and counts.
+    assert.equal(showsAgentSwitch([agent(), agent({ mode: "subagent" })]), false)
+    assert.equal(showsAgentSwitch([agent(), agent({ mode: "all" })]), true)
+
+    // The host keeps internal agents in the registry; the dialog does not list
+    // them, so neither does the count.
+    assert.equal(showsAgentSwitch([agent(), agent({ hidden: true })]), false)
+    assert.equal(showsAgentSwitch([agent(), agent({ disabled: true })]), false)
 })
 
 test("A label is muted at rest and lit under the pointer", () => {

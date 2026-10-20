@@ -679,6 +679,13 @@ buttons, and each names **the action it performs** — `◆ switch agent` and
 `◇ switch model` — instead of repeating a value the host already draws. Both are
 registered on `prompt.footer.status`.
 
+The agent shortcut is **drawn only when the project has more than one primary
+agent**. With one destination (or none) there is nothing to switch to, so the
+registry is read per render from the session's location — including `mode: "all"`
+agents and excluding subagents and hidden entries — and the shortcut renders
+nothing until a choice exists. An unsynced registry keeps it visible rather than
+hiding a working action on a slow or failed request.
+
 The placement is **`after`, not `append`**. The host's child inside that region is
 a box with `flexGrow: 1`, and while a turn runs it draws a second one holding the
 spinner and the interrupt hint; appending lands inside that boundary, after the
