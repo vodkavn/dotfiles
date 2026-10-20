@@ -76,6 +76,13 @@ export default Plugin.define({
         // or folded section from asking for repaints.
         let animating = false
 
+        // Which row a held press started on. It lives at plugin scope, not in
+        // the render, because the spinner repaints every SPIN_MS and each
+        // repaint replaces the handlers with fresh closures: state kept in one
+        // of those closures would be lost halfway through a click and the
+        // release dropped.
+        let pressed: string | undefined
+
         // The repaint clock for the spinner.
         //
         // It exists only while there is a spinner to turn. An interval that
@@ -239,11 +246,8 @@ export default Plugin.define({
                 // stuck panel. Every handler stops propagation because the host
                 // binds the sidebar itself.
                 //
-                // `pressed` is per render, not per plugin, which is correct here
-                // because a press and its release are always inside one repaint's
-                // element tree. It is a guard, not state: nothing reads it after
-                // the release clears it.
-                let pressed: string | undefined
+                // `pressed` is the guard above, shared by every paint so a press
+                // survives the repaints that happen between it and the release.
                 const press = (id: string) => (event: MouseEvent) => {
                     pressed = id
                     event.stopPropagation()
