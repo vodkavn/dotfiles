@@ -292,16 +292,16 @@ test("connections keeps only the providers with an active key", () => {
 
 test("bar fills in proportion and never leaves the row ragged", () => {
     assert.equal(bar(0, 8), "········")
-    assert.equal(bar(100, 8), "████████")
-    assert.equal(bar(50, 8), "████····")
+    assert.equal(bar(100, 8), "■■■■■■■■")
+    assert.equal(bar(50, 8), "■■■■····")
     // Clamped: a provider that overshoots must not widen or shorten the bar.
-    assert.equal(bar(140, 8), "████████")
+    assert.equal(bar(140, 8), "■■■■■■■■")
     assert.equal(bar(-5, 8), "········")
     // The shipped width is ten cells, so one cell is about ten percent.
     assert.equal(BAR_WIDTH, 10)
-    assert.equal(bar(80, BAR_WIDTH), "████████··")
+    assert.equal(bar(80, BAR_WIDTH), "■■■■■■■■··")
     // Half a cell rounds up, so a window just under ten percent still shows one.
-    assert.equal(bar(5, BAR_WIDTH), "█·········")
+    assert.equal(bar(5, BAR_WIDTH), "■·········")
 })
 
 test("resetText counts down in at most two units", () => {
@@ -349,7 +349,7 @@ test("buildPanel draws connected providers in order and skips those with no resu
     // MiniMax first, by PROVIDERS order, not by insertion order.
     assert.equal(textOf(lines[0]), "MiniMax Coding Plan")
     assert.equal(lines[0].segments[0].tone, "label")
-    assert.match(textOf(lines[1]), /^ {2}5h +█+·+ +83% {2}1h28m$/)
+    assert.match(textOf(lines[1]), /^ {2}5h +■+·+ +83% {2}1h28m$/)
     // Two MiniMax windows and three Go windows, plus a name row per provider.
     assert.equal(lines.length, 7)
 
@@ -363,7 +363,7 @@ test("only a window's bar carries the severity tone; the rest of the row stays b
     // lines[0] is the provider name; then 5h (96%, normal), weekly (23%, warn),
     // monthly (0%, exhausted). Only the middle segment is toned on each.
     assert.deepEqual(lines[2].segments.map((segment) => segment.tone), ["normal", "warn", "normal"])
-    assert.match(lines[2].segments[1].text, /^[█·]{10}$/)
+    assert.match(lines[2].segments[1].text, /^[■·]{10}$/)
     assert.equal(lines[3].segments[1].tone, "error")
 })
 
@@ -377,10 +377,10 @@ test("every window bar starts in one column, aligned with the monthly label", ()
     ])
     const lines = plain(buildPanel(usages, NOW, 8))
     const starts = lines
-        .filter((line) => /[█·]/.test(textOf(line)))
+        .filter((line) => /[■·]/.test(textOf(line)))
         .map((line) => {
             const text = textOf(line)
-            const filled = text.indexOf("█")
+            const filled = text.indexOf("■")
             return filled >= 0 ? filled : text.indexOf("·")
         })
     assert.equal(new Set(starts).size, 1, `bars start at different columns: ${starts.join(", ")}`)

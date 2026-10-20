@@ -198,7 +198,7 @@ export const BAR_WIDTH = 10
 
 export function bar(remaining: number, width: number): string {
     const filled = Math.round((clampPct(remaining) / 100) * width)
-    return "█".repeat(filled) + "·".repeat(Math.max(0, width - filled))
+    return "■".repeat(filled) + "·".repeat(Math.max(0, width - filled))
 }
 
 const MINUTE_MS = 60_000
