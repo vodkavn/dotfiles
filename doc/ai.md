@@ -243,6 +243,13 @@ For a method that is mostly *how to phrase a sentence in the file already
 open*, that is a worse fit than a skill, which is loaded into the session doing
 the work.
 
+The global `sequential-thinking` MCP server is not a second method. Its tool
+description asks for a chain of thoughts repeated until the answer is
+satisfactory, while a skill gives one procedure with a stopping point, so the
+two drift apart when both run. `config/opencode/AGENTS.md` therefore limits the
+tool to problems whose scope is unclear and whose steps a loaded skill does
+not already derive, and names the skill's procedure as the one to follow.
+
 ## Global settings
 
 These live in `config/opencode/opencode.json` and apply in every project on any

@@ -54,6 +54,17 @@ An interactive alias is not an executable. After `sudo apt install fd-find` the
 binary is `fdfind`, not `fd`. Check the exact executable the workflow needs,
 not the name the package ships.
 
+## Skills and the scratchpad tool
+
+Use the `sequential-thinking` MCP tool only when a problem's scope is unclear
+and the steps are not derivable from a loaded skill. A loaded skill's procedure
+is the one to follow; the tool is scratchpad, not a second method.
+
+The tool's own description asks for a chain of thoughts repeated until the
+answer is satisfactory, while a skill gives one procedure with a stopping
+point. Running both spends the budget the ladder above says not to spend, and
+lets two versions of the same procedure drift apart.
+
 ## Honest reporting
 
 Report the checks you actually ran, and the ones you skipped. A partial check
