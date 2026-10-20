@@ -56,6 +56,7 @@ const {
     LABEL_WIDTH,
     money,
     printable,
+    refreshParts,
     refreshText,
     resetText,
     retrySoon,
@@ -331,8 +332,15 @@ test("refreshText wraps the age in parentheses and shows 'recent' for a fresh ag
     assert.equal(refreshText(true, "⠹", NOW, NOW), "⠹ refreshing…")
 })
 
+test("refreshParts isolates the parenthesised age so it can be muted", () => {
+    assert.deepEqual(plain(refreshParts("⟳ refresh (3m ago)")), { text: "⟳ refresh", note: " (3m ago)" })
+    assert.deepEqual(plain(refreshParts("⟳ refresh (recent)")), { text: "⟳ refresh", note: " (recent)" })
+    assert.deepEqual(plain(refreshParts("⟳ refresh")), { text: "⟳ refresh", note: "" })
+    assert.deepEqual(plain(refreshParts("⠹ refreshing…")), { text: "⠹ refreshing…", note: "" })
+})
+
 test("toneFor escalates as a window empties", () => {
-    assert.equal(toneFor({ remaining: 80, status: "ok" }), "normal")
+    assert.equal(toneFor({ remaining: 80, status: "ok" }), "muted")
     assert.equal(toneFor({ remaining: 20, status: "ok" }), "warn")
     assert.equal(toneFor({ remaining: 10, status: "ok" }), "error")
     assert.equal(toneFor({ remaining: 90, status: "exhausted" }), "error")
@@ -347,7 +355,7 @@ test("buildPanel draws connected providers in order and skips those with no resu
     ])
     const lines = plain(buildPanel(usages, NOW, 8))
     // MiniMax first, by PROVIDERS order, not by insertion order.
-    assert.equal(textOf(lines[0]), "MiniMax Coding Plan")
+    assert.equal(textOf(lines[0]), "• MiniMax Coding Plan")
     assert.equal(lines[0].segments[0].tone, "label")
     assert.match(textOf(lines[1]), /^ {2}5h +■+·+ +83% {2}1h28m$/)
     // Two MiniMax windows and three Go windows, plus a name row per provider.
@@ -357,12 +365,12 @@ test("buildPanel draws connected providers in order and skips those with no resu
     assert.deepEqual(plain(buildPanel(new Map(), NOW, 8)), [])
 })
 
-test("only a window's bar carries the severity tone; the rest of the row stays body colour", () => {
+test("only a window's bar carries the severity tone; the rest of the row stays muted", () => {
     const usages = new Map([["opencode-go", { id: "opencode-go", label: "OpenCode Go", kind: "windows", windows: parseOpencodeGo(GO) }]])
     const lines = plain(buildPanel(usages, NOW, 10))
-    // lines[0] is the provider name; then 5h (96%, normal), weekly (23%, warn),
+    // lines[0] is the provider name; then 5h (96%, muted), weekly (23%, warn),
     // monthly (0%, exhausted). Only the middle segment is toned on each.
-    assert.deepEqual(lines[2].segments.map((segment) => segment.tone), ["normal", "warn", "normal"])
+    assert.deepEqual(lines[2].segments.map((segment) => segment.tone), ["muted", "warn", "muted"])
     assert.match(lines[2].segments[1].text, /^[■·]{10}$/)
     assert.equal(lines[3].segments[1].tone, "error")
 })
@@ -391,7 +399,7 @@ test("every window bar starts in one column, aligned with the monthly label", ()
 test("buildPanel draws a failed provider as an error line rather than nothing", () => {
     const usages = new Map([["opencode-go", { id: "opencode-go", label: "OpenCode Go", error: "HTTP 403" }]])
     const lines = plain(buildPanel(usages, NOW, 8))
-    assert.equal(textOf(lines[0]), "OpenCode Go")
+    assert.equal(textOf(lines[0]), "• OpenCode Go")
     assert.equal(lines[0].segments[0].tone, "label")
     assert.deepEqual(lines[1], { segments: [{ text: "  HTTP 403", tone: "error" }] })
 })
@@ -401,8 +409,8 @@ test("buildPanel draws a credit provider as a money row", () => {
         ["deepseek", { id: "deepseek", label: "DeepSeek", kind: "credit", credit: { amount: 1.52, currency: "USD" } }],
     ])
     const lines = plain(buildPanel(usages, NOW, 10))
-    assert.equal(textOf(lines[0]), "DeepSeek")
-    assert.deepEqual(lines[1], { segments: [{ text: "  $1.52", tone: "normal" }] })
+    assert.equal(textOf(lines[0]), "• DeepSeek")
+    assert.deepEqual(lines[1], { segments: [{ text: "  $1.52", tone: "muted" }] })
 })
 
 test("describeError surfaces a JSON message and falls back to the status", () => {

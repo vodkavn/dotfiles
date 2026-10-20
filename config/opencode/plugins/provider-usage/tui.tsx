@@ -1,4 +1,5 @@
 import { Plugin } from "@opencode/plugin/tui"
+import { TextAttributes } from "@opentui/core"
 import {
     BAR_WIDTH,
     baseURLs,
@@ -7,6 +8,7 @@ import {
     describeError,
     describeThrown,
     dueProviders,
+    refreshParts,
     refreshText,
     retrySoon,
     TTL_MS,
@@ -315,11 +317,12 @@ export default Plugin.define({
                 // moved.
                 const frame = SPIN_FRAMES[Math.floor(Date.now() / SPIN_MS) % SPIN_FRAMES.length]
                 const refreshLabel = refreshText(busy > 0, frame, updatedAt, Date.now())
+                const { text: refreshMain, note: refreshNote } = refreshParts(refreshLabel)
 
                 return (
                     <box flexDirection="column" gap={0}>
                         <box flexDirection="row" onMouseDown={toggle} onMouseUp={hold}>
-                            <text>{`${collapsed ? "▶" : "▼"} Usage`}</text>
+                            <text fg={context.theme.text.base} attributes={TextAttributes.BOLD}>{`${collapsed ? "▶" : "▼"} Usage`}</text>
                         </box>
                         {!collapsed &&
                             lines.map((line) => (
@@ -330,10 +333,12 @@ export default Plugin.define({
                                         </text>
                                     ))}
                                 </box>
-                            ))}
+                            ))
+                        }
                         {!collapsed && (
                             <box flexDirection="row" onMouseDown={hold} onMouseUp={reload}>
-                                <text fg={context.theme.text.muted}>{`  ${refreshLabel}`}</text>
+                                <text fg={context.theme.text.base}>{refreshMain}</text>
+                                <text fg={context.theme.text.muted}>{refreshNote}</text>
                             </box>
                         )}
                     </box>

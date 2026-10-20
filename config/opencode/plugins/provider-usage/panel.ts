@@ -255,6 +255,13 @@ export function refreshText(fetching: boolean, frame: string, at: number | undef
     return age === "now" ? "⟳ refresh (recent)" : `⟳ refresh (${age} ago)`
 }
 
+// Split the refresh label at its parenthesised age, so the age can carry the
+// muted tone while the label stays in the body colour.
+export function refreshParts(label: string): { text: string; note: string } {
+    const at = label.indexOf(" (")
+    return at === -1 ? { text: label, note: "" } : { text: label.slice(0, at), note: label.slice(at) }
+}
+
 // Colour by how close a window is to empty. A bar alone reads too flat at a
 // glance; the tone is what makes a nearly-spent allowance visible.
 export const toneFor = (window: Window): Tone =>
@@ -262,7 +269,7 @@ export const toneFor = (window: Window): Tone =>
         ? "error"
         : window.remaining <= 30
           ? "warn"
-          : "normal"
+          : "muted"
 
 // The panel body, in provider order. A provider with no result yet is left out
 // entirely rather than drawn as a placeholder: the section appears once the
@@ -273,13 +280,13 @@ export function buildPanel(usages: ReadonlyMap<string, Usage>, now: number, barW
     for (const provider of PROVIDERS) {
         const usage = usages.get(provider.id)
         if (usage === undefined) continue
-        lines.push({ segments: [{ text: provider.label, tone: "label" }] })
+        lines.push({ segments: [{ text: `• ${provider.label}`, tone: "label" }] })
         if ("error" in usage) {
             lines.push({ segments: [{ text: `  ${usage.error}`, tone: "error" }] })
             continue
         }
         if (usage.kind === "credit") {
-            lines.push({ segments: [{ text: `  ${money(usage.credit)}`, tone: "normal" }] })
+            lines.push({ segments: [{ text: `  ${money(usage.credit)}`, tone: "muted" }] })
             continue
         }
         for (const window of usage.windows) {
@@ -287,9 +294,9 @@ export function buildPanel(usages: ReadonlyMap<string, Usage>, now: number, barW
             const reset = resetText(window.resetsAt, now)
             lines.push({
                 segments: [
-                    { text: `  ${window.label.padEnd(LABEL_WIDTH, " ")} `, tone: "normal" },
+                    { text: `  ${window.label.padEnd(LABEL_WIDTH, " ")} `, tone: "muted" },
                     { text: bar(window.remaining, barWidth), tone: toneFor(window) },
-                    { text: ` ${percent}${reset === "" ? "" : `  ${reset}`}`, tone: "normal" },
+                    { text: ` ${percent}${reset === "" ? "" : `  ${reset}`}`, tone: "muted" },
                 ],
             })
         }

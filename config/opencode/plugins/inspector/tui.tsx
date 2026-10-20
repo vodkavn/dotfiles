@@ -1,4 +1,5 @@
 import { Plugin } from "@opencode/plugin/tui"
+import { TextAttributes } from "@opentui/core"
 import { driftProblems, type Problem } from "./drift"
 
 // Sidebar inspector: shows the agents, slash commands, and skills opencode
@@ -251,7 +252,7 @@ export default Plugin.define({
                                         onMouseDown={toggle(section.key)}
                                         onMouseUp={(e: MouseEvent) => e.stopPropagation()}
                                     >
-                                        <text>{`${collapsed ? "▶" : "▼"} ${section.label}`}</text>
+                                        <text fg={context.theme.text.base} attributes={TextAttributes.BOLD}>{`${collapsed ? "▶" : "▼"} ${section.label}`}</text>
                                         <text fg={context.theme.text.muted}>{` (${entries.length})`}</text>
                                     </box>
                                     {!collapsed &&
@@ -259,14 +260,14 @@ export default Plugin.define({
                                             group(entries).map(([name, members]) => (
                                                 <box flexDirection="column">
                                                     <box flexDirection="row">
-                                                        <text>{`  ${name}`}</text>
+                                                        <text fg={context.theme.text.base}>{`• ${name}`}</text>
                                                         <text fg={context.theme.text.muted}>{` (${members.length})`}</text>
                                                     </box>
-                                                    {members.map((entry) => <text>{`    • ${label(entry)}`}</text>)}
+                                                    {members.map((entry) => <text fg={context.theme.text.muted}>{`  ${label(entry)}`}</text>)}
                                                 </box>
                                             ))
                                         ) : (
-                                            entries.map((entry) => <text>{`  • ${label(entry)}`}</text>)
+                                            entries.map((entry) => <text fg={context.theme.text.muted}>{`  ${label(entry)}`}</text>)
                                         ))}
                                 </box>
                             )
