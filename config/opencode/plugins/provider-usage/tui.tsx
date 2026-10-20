@@ -18,9 +18,9 @@ import {
 } from "./panel"
 import type { Provider, Usage } from "./providers"
 
-// A **Usage** section in the sidebar: what is left of the provider plans this
-// machine is connected to, as a percentage per quota window with the reset
-// countdown beside it, or as a money balance for a pay-as-you-go account.
+// A **Provider Usage** section in the sidebar: what is left of the provider
+// plans this machine is connected to, as a percentage per quota window with the
+// reset countdown beside it, or as a money balance for a pay-as-you-go account.
 //
 // Which providers appear. Only the ones with an active credential — the
 // adapters in providers.ts are a superset, and one that is not connected here is
@@ -326,7 +326,7 @@ export default Plugin.define({
                 return (
                     <box flexDirection="column" gap={0}>
                         <box flexDirection="row" onMouseDown={toggle} onMouseUp={hold}>
-                            <text fg={context.theme.text.base} attributes={TextAttributes.BOLD}>{`${collapsed ? "▶" : "▼"} Usage`}</text>
+                            <text fg={context.theme.text.base} attributes={TextAttributes.BOLD}>{`${collapsed ? "▶" : "▼"} Provider Usage`}</text>
                         </box>
                         {!collapsed &&
                             lines.map((line) => (

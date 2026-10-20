@@ -615,7 +615,7 @@ targets act on pointer release rather than pointer press.
 
 ### `provider-usage` (CLI)
 
-A **Usage** section in `sidebar.content` showing what is left of each provider
+A **Provider Usage** section in `sidebar.content` showing what is left of each provider
 plan this machine is connected to, as a percentage per quota window with the
 reset countdown beside it — or, for a pay-as-you-go account, a money balance —
 refetched on a timer and on a click of the **⟳ refresh** row. It reads the key
@@ -732,6 +732,49 @@ v2.0.32), the live selection lives in the host's local store, and the
 `session.agent.selected` event arrives when opencode *applies* a switch rather than
 when you cycle one. A caption that cannot be wrong is worth more than a second copy
 of a name that can.
+
+### `context-detail` (CLI)
+
+A **Token Usage** panel in `sidebar.content`, under opencode's own Context
+section: the session's cumulative tokens by kind, with the two rates that make
+them readable at a glance.
+
+opencode's built-in `opencode.sidebar.context` plugin draws the context window
+as it stands — the last step's total, the percentage of the model's window, and
+the spend. This panel is the other reading: the session's own cumulative
+totals, which only grow, so a number that moved between two glances means
+another step ran rather than another step's shape changed. It lists `Input`,
+`Output`, `Reasoning`, `Cache read`, `Cache write`, plus **Cache rate** (the
+share of prompt tokens read back from the cache) and **Generation speed**
+(output plus reasoning tokens over the streaming window, for the latest step
+that streamed — a rate cannot be cumulative).
+
+`Cache write` sitting at 0 for a whole session is not a bug: a provider with
+implicit caching reports its hits in `Cache read` and never reports the writes.
+Only a provider with explicit prompt caching — Anthropic's
+`cache_creation_input_tokens` — fills that row.
+
+The layout is Kilo Code's token panel: a bold, collapsible `Token Usage`
+heading, then one label per row with its value flush right, so the numbers read
+down one column. It starts **collapsed** — the host's section above already
+answers "how full is the window" — and the expanded state is persisted. Cost is
+deliberately absent: the built-in section already draws the spend, and a second
+dollar figure beside it could only disagree with it.
+
+**The host's section is left where it is.** A plugin cannot insert into it: the
+sidebar's content slot takes contributions in plugin enable order, so the only
+way to sit directly under the built-in section would be to take over its plugin
+id and redraw it — and a copy of the host's rows is a copy that can drift from
+them. This panel therefore appends to the same slot and sorts first among this
+repository's panels, so it lands as close under the built-in sections as the
+slot allows.
+
+**The totals are the host's own.** They are read from the session record
+(`context.data.session.get`), not summed from messages, so they are the number
+opencode itself reports. The speed is the one thing derived here, because the
+record carries no rate: it is `(output + reasoning) / (streamed - created)`
+over the latest message that streamed, pinned by
+`tests/plugin-context-detail.test.mjs`.
 
 ## Shell integration
 
