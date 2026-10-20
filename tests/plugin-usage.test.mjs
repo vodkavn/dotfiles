@@ -62,6 +62,7 @@ const {
     retrySoon,
     selectCredential,
     stale,
+    SPIN_FRAMES,
     TTL_MS,
     toneFor,
     usageUrl,
@@ -333,10 +334,22 @@ test("refreshText wraps the age in parentheses and shows 'recent' for a fresh ag
 })
 
 test("refreshParts isolates the parenthesised age so it can be muted", () => {
-    assert.deepEqual(plain(refreshParts("⟳ refresh (3m ago)")), { text: "⟳ refresh", note: " (3m ago)" })
-    assert.deepEqual(plain(refreshParts("⟳ refresh (recent)")), { text: "⟳ refresh", note: " (recent)" })
-    assert.deepEqual(plain(refreshParts("⟳ refresh")), { text: "⟳ refresh", note: "" })
-    assert.deepEqual(plain(refreshParts("⠹ refreshing…")), { text: "⠹ refreshing…", note: "" })
+    assert.deepEqual(plain(refreshParts("⟳ refresh (3m ago)")), { spinner: "", text: "⟳ refresh", note: " (3m ago)" })
+    assert.deepEqual(plain(refreshParts("⟳ refresh (recent)")), { spinner: "", text: "⟳ refresh", note: " (recent)" })
+    assert.deepEqual(plain(refreshParts("⟳ refresh")), { spinner: "", text: "⟳ refresh", note: "" })
+})
+
+test("refreshParts peels the spinner frame off so it can carry the loading colour", () => {
+    // The frame is the one cell the loader owns, so it is split off the label
+    // rather than sharing the label's colour.
+    const frame = SPIN_FRAMES[2]
+    assert.deepEqual(plain(refreshParts(`${frame} refreshing…`)), {
+        spinner: frame,
+        text: " refreshing…",
+        note: "",
+    })
+    // The idle refresh glyph is not a loading indicator, so it stays in the label.
+    assert.equal(plain(refreshParts("⟳ refresh")).spinner, "")
 })
 
 test("toneFor escalates as a window empties", () => {

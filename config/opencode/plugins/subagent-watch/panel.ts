@@ -254,19 +254,43 @@ export const spinFrame = (now: number): string => {
 // it is the same ceiling as before the base indent was removed.
 const indentOf = (row: Row): string => "  ".repeat(Math.max(0, Math.min(row.depth - 1, 4)))
 
+// The head line, split into the cells that are drawn in different colours: the
+// indent, the marker, and the rest of the line.
+//
+// The marker is a cell of its own because it is the one that says the row is
+// live, and it is drawn in opencode's loading colour -- the same one the host
+// uses for a running tab. It stays inside the single text the row draws, as a
+// span rather than a second text element, because a clickable row has to be one
+// box holding one text for the whole line to be one target.
+export type Head = {
+    indent: string
+    marker: string
+    rest: string
+}
+
 // Line one: a spinner frame while the subagent is running, a hollow mark once it
-// is finished, then the agent and the age. The glyph is drawn in the row's colour
-// rather than as a cell of its own, because a clickable row has to be a single
-// box holding a single text for the whole line to be one target.
+// is finished, then the agent and the age.
 //
 // The frame comes from `now` rather than from state: tui.tsx repaints on the
 // spinner's clock while a row is drawn, so reading the clock here is what makes
 // the glyph turn, and there is no frame variable anyone can forget to advance.
-export const rowHead = (row: Row, now: number): string => {
-    const head = `${indentOf(row)}${row.running ? spinFrame(now) : "○"} ${row.agent}`
+export const rowHeadParts = (row: Row, now: number): Head => {
+    const indent = indentOf(row)
+    const marker = row.running ? spinFrame(now) : "○"
     const age = elapsed(row, now)
-    const line = age === "" ? head : `${head} ${age}`
-    return size(line) > WIDTH ? `${clip(line, Math.max(0, WIDTH - 1)).trimEnd()}${ELLIPSIS}` : line
+    const rest = age === "" ? ` ${row.agent}` : ` ${row.agent} ${age}`
+    const line = `${indent}${marker}${rest}`
+    if (size(line) <= WIDTH) return { indent, marker, rest }
+    // The marker is never the cell that gets cut: it is the one that says the
+    // row is live, and the agent name is what overflows.
+    const budget = WIDTH - size(indent) - size(marker) - 1
+    return { indent, marker, rest: `${clip(rest, Math.max(0, budget)).trimEnd()}${ELLIPSIS}` }
+}
+
+// The head line as one string, for the callers that do not colour it.
+export const rowHead = (row: Row, now: number): string => {
+    const head = rowHeadParts(row, now)
+    return `${head.indent}${head.marker}${head.rest}`
 }
 
 // Line two: the task, indented one step under the agent it belongs to. Empty

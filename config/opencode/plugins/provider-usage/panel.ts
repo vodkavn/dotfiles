@@ -244,6 +244,15 @@ export function elapsed(at: number | undefined, now: number): string {
     return `${Math.round(ago / DAY_MS)}d`
 }
 
+// The spinner that stands in for the refresh row while a fetch is in flight.
+//
+// The same braille set subagent-watch turns, repeated here rather than
+// imported: opencode bundles a plugin directory's sibling files into one
+// scope, and one directory's constants are not another's to reach for. It
+// lives here rather than in tui.tsx because the row's parts are decided here,
+// and the split has to know which glyphs are frames.
+export const SPIN_FRAMES: readonly string[] = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+
 // The refresh row's text: a spinner while a fetch is in flight, otherwise the
 // age of the last one in parentheses. Built here rather than in the JSX because
 // "now" is an age, not a duration, and appending "ago" to it reads as "now ago";
@@ -255,11 +264,19 @@ export function refreshText(fetching: boolean, frame: string, at: number | undef
     return age === "now" ? "⟳ refresh (recent)" : `⟳ refresh (${age} ago)`
 }
 
-// Split the refresh label at its parenthesised age, so the age can carry the
-// muted tone while the label stays in the body colour.
-export function refreshParts(label: string): { text: string; note: string } {
+// Split the refresh label into the spinner frame, the label, and the
+// parenthesised age, so the age can carry the muted tone while the label stays
+// in the body colour, and the frame can carry the loading colour on its own.
+//
+// The frame is the one cell the loader owns; the rest of the row is the label.
+// A label with no frame carries the idle refresh glyph, which is not a loading
+// indicator and keeps the body's colour.
+export function refreshParts(label: string): { spinner: string; text: string; note: string } {
     const at = label.indexOf(" (")
-    return at === -1 ? { text: label, note: "" } : { text: label.slice(0, at), note: label.slice(at) }
+    const main = at === -1 ? label : label.slice(0, at)
+    const note = at === -1 ? "" : label.slice(at)
+    const spinner = SPIN_FRAMES.includes(main[0]) ? main[0] : ""
+    return { spinner, text: spinner === "" ? main : main.slice(1), note }
 }
 
 // Colour by how close a window is to empty. A bar alone reads too flat at a

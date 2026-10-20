@@ -1,5 +1,5 @@
 import { Plugin } from "@opencode/plugin/tui"
-import { buildRows, childrenOf, isRunning, rowBody, rowHead, runningRows, SPIN_MS, type Source, type Tree } from "./panel"
+import { buildRows, childrenOf, isRunning, rowBody, rowHeadParts, runningRows, SPIN_MS, type Source, type Tree } from "./panel"
 
 // A **Subagents** section in the sidebar: one row per *running* subagent of the
 // session on screen, clickable to open it.
@@ -224,6 +224,10 @@ export default Plugin.define({
 
                 const muted = context.theme.text.muted
                 const base = context.theme.text.base
+                // The colour the host draws a running tab in. The spinner is the
+                // one cell that says the row is live, so it carries that colour
+                // rather than the row's own.
+                const loading = context.theme.hue.interactive[200]
                 const now = Date.now()
 
                 // Both lines are composed here rather than inside the JSX.
@@ -234,7 +238,7 @@ export default Plugin.define({
                 // is running, which is what runningRows guarantees.
                 const lines = rows.map((row) => ({
                     id: row.id,
-                    head: rowHead(row, now),
+                    head: rowHeadParts(row, now),
                     body: rowBody(row),
                 }))
 
@@ -281,7 +285,9 @@ export default Plugin.define({
                                     onMouseUp={release(line.id)}
                                 >
                                     <text wrapMode="none" fg={base}>
-                                        {line.head}
+                                        {line.head.indent}
+                                        <span style={{ fg: loading }}>{line.head.marker}</span>
+                                        {line.head.rest}
                                     </text>
                                     {line.body !== "" && (
                                         <text wrapMode="none" fg={muted}>

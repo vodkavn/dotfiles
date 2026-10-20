@@ -28,7 +28,7 @@ const load = async (path) => {
     return scope.exports
 }
 
-const { buildRows, childrenOf, elapsed, isRunning, rowBody, rowHead, runningRows, spinFrame, SPIN_FRAMES, SPIN_MS, statusName } = await load(
+const { buildRows, childrenOf, elapsed, isRunning, rowBody, rowHead, rowHeadParts, runningRows, spinFrame, SPIN_FRAMES, SPIN_MS, statusName } = await load(
     "../config/opencode/plugins/subagent-watch/panel.ts",
 )
 
@@ -308,6 +308,29 @@ test("A running subagent turns a spinner frame instead of a bullet", () => {
     const head = rowHead(buildRows(source)[0], AT)
     assert.equal(head, `${spinFrame(AT)} reviewer`)
     assert.ok(SPIN_FRAMES.includes(head[0]), `expected a frame, got ${head[0]}`)
+})
+
+test("The head line is split so the marker can carry the loading colour", () => {
+    // The marker is the one cell that says the row is live, so it is drawn on
+    // its own; the indent and the rest of the line keep the row's colour.
+    const row = { depth: 2, id: "x", agent: "general", title: "", running: true, startedAt: AT, finishedAt: 0 }
+    const parts = rowHeadParts(row, AT)
+    assert.equal(parts.indent, "  ")
+    assert.equal(parts.marker, spinFrame(AT))
+    assert.equal(parts.rest, " general")
+    // The parts are the line: the split drops nothing between here and the draw.
+    assert.equal(`${parts.indent}${parts.marker}${parts.rest}`, rowHead(row, AT))
+})
+
+test("The marker survives the clipping a long agent name causes", () => {
+    // The marker says the row is live; the agent name is what overflows, so the
+    // cut lands on the name and never on the marker.
+    const row = { depth: 1, id: "x", agent: "a".repeat(60), title: "", running: true, startedAt: AT, finishedAt: 0 }
+    const parts = rowHeadParts(row, AT)
+    assert.equal(parts.marker, spinFrame(AT))
+    assert.ok(parts.rest.endsWith("…"), parts.rest)
+    const line = `${parts.indent}${parts.marker}${parts.rest}`
+    assert.ok(Array.from(line).length <= WIDTH, line)
 })
 
 test("The spinner advances on its own clock and wraps", () => {

@@ -11,6 +11,7 @@ import {
     refreshParts,
     refreshText,
     retrySoon,
+    SPIN_FRAMES,
     TTL_MS,
     usageUrl,
     type Tone,
@@ -104,7 +105,6 @@ const USER_AGENT = "opencode-provider-usage"
 
 // The spinner turns only while a fetch is in flight; SPIN_MS is one frame.
 const SPIN_MS = 120
-const SPIN_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
 
 // Reset countdowns and the "updated … ago" stamp age on this clock even when
 // nothing is being fetched, so a stale reading is visible as stale.
@@ -317,7 +317,11 @@ export default Plugin.define({
                 // moved.
                 const frame = SPIN_FRAMES[Math.floor(Date.now() / SPIN_MS) % SPIN_FRAMES.length]
                 const refreshLabel = refreshText(busy > 0, frame, updatedAt, Date.now())
-                const { text: refreshMain, note: refreshNote } = refreshParts(refreshLabel)
+                const { spinner: refreshFrame, text: refreshMain, note: refreshNote } = refreshParts(refreshLabel)
+                // The colour the host draws a running tab in. The spinner frame
+                // is the one cell that says a fetch is in flight, so it carries
+                // that colour rather than the row's own.
+                const loading = context.theme.hue.interactive[200]
 
                 return (
                     <box flexDirection="column" gap={0}>
@@ -337,7 +341,10 @@ export default Plugin.define({
                         }
                         {!collapsed && (
                             <box flexDirection="row" onMouseDown={hold} onMouseUp={reload}>
-                                <text fg={context.theme.text.base}>{refreshMain}</text>
+                                <text fg={context.theme.text.base}>
+                                    {refreshFrame !== "" && <span style={{ fg: loading }}>{refreshFrame}</span>}
+                                    {refreshMain}
+                                </text>
                                 <text fg={context.theme.text.muted}>{refreshNote}</text>
                             </box>
                         )}

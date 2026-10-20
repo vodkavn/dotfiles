@@ -495,6 +495,12 @@ than counted, so a coalesced repaint skips a frame instead of desyncing from rea
 time. Depth 1 draws flush with the section header's marker, so the spinner reads
 as that row's bullet and nesting is what adds indentation.
 
+The spinner is the one cell of the row that says it is live, so it is drawn in
+opencode's own loading colour — the one a running tab is drawn in
+(`theme.hue.interactive[200]`) — rather than in the row's colour. It is a span
+inside the row's single text, not a text of its own, because a clickable row has
+to stay one box holding one text for the whole line to be one target.
+
 Line width is the one place this plugin depends on a host constant. The sidebar
 is a fixed 42-column box with 2 columns of padding either side, and the box that
 carries the `sidebar.content` slot adds one more on the right, so a line gets 37.
@@ -615,6 +621,12 @@ reset countdown beside it — or, for a pay-as-you-go account, a money balance �
 refetched on a timer and on a click of the **⟳ refresh** row. It reads the key
 from opencode's own credential store (`client.credential.list()`), so there is
 no second copy on disk.
+
+While a fetch is in flight the refresh row shows a spinner frame instead of the
+**⟳**, and that frame carries opencode's loading colour — the one a running tab
+is drawn in (`theme.hue.interactive[200]`) — so the row reads as busy without
+the word beside it having to be read. The idle **⟳** is an action glyph rather
+than a loading indicator, so it keeps the body's colour.
 
 **Only connected providers are shown.** The adapter registry is a superset;
 the drawn set is its intersection with opencode's connected accounts, so a
