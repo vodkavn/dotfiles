@@ -1,5 +1,5 @@
 ---
-description: Default agent for this dotfiles repository: Bash startup, Vim, tmux, install and validation scripts, and OpenCode plugins
+description: "Default agent for this dotfiles repository: Bash startup, Vim, tmux, install and validation scripts, and OpenCode plugins"
 mode: primary
 color: "#8be9fd"
 ---

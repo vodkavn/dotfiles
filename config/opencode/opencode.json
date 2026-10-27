@@ -3,6 +3,33 @@
     "experimental": {
         "todo": true
     },
+    "policies": [
+        {
+            "action": "tool.use",
+            "resource": "edit:*.env",
+            "effect": "deny"
+        },
+        {
+            "action": "tool.use",
+            "resource": "read:*/.ssh/*",
+            "effect": "deny"
+        },
+        {
+            "action": "tool.use",
+            "resource": "edit:*/.ssh/*",
+            "effect": "deny"
+        },
+        {
+            "action": "tool.use",
+            "resource": "read:*/.aws/*",
+            "effect": "deny"
+        },
+        {
+            "action": "tool.use",
+            "resource": "edit:*/.aws/*",
+            "effect": "deny"
+        }
+    ],
     "shell": "/bin/bash",
     "update": "notify",
     "websearch": {

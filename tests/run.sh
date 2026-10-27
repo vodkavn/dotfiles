@@ -881,8 +881,9 @@ case_ai_config_link_discovery() {
 
     # The real repository tree must still discover the shipped plugins and
     # every other shipped top-level entry, so a rename cannot silently drop one.
-    # config/opencode/commands/ holds the global commands, config/opencode/skills/
-    # the working-method skills, and config/opencode/AGENTS.md the global rules.
+    # config/opencode/commands/ holds the global commands, config/opencode/agents/
+    # the read-only reviewer, config/opencode/skills/ the working-method skills,
+    # and config/opencode/AGENTS.md the global rules.
     local real
     real=$(
         cd "$repo_root/config/opencode" 2>/dev/null || exit 0
@@ -892,8 +893,8 @@ case_ai_config_link_discovery() {
             find . -mindepth 1 -maxdepth 1 -type d ! -name plugins -printf '%P\n'
         } | LC_ALL=C sort
     )
-    assert_eq "$real" "$(printf 'AGENTS.md\ncommands\nopencode.json\nplugins/compaction-memory\nplugins/context-detail\nplugins/inspector\nplugins/provider-usage\nplugins/shell-guard\nplugins/subagent-watch\nplugins/tool-guard\nplugins/tui-shortcuts\nskills')" \
-        "the shipped global config must discover its rules file, plugins, commands, and skills"
+    assert_eq "$real" "$(printf 'AGENTS.md\nagents\ncommands\nopencode.json\nplugins/compaction-memory\nplugins/context-detail\nplugins/inspector\nplugins/provider-usage\nplugins/shell-guard\nplugins/subagent-watch\nplugins/tool-guard\nplugins/tui-shortcuts\nskills')" \
+        "the shipped global config must discover its rules file, plugins, agents, commands, and skills"
     return 0
 }
 

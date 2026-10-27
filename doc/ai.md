@@ -9,9 +9,10 @@ are linked into `$HOME` by `install.sh`.
 
     config/opencode/opencode.json          global: shell, formatter, compaction,
                                            websearch, update, references, lsp,
-                                           tool_output, MCP servers
+                                           tool_output, policies, MCP servers
     config/opencode/AGENTS.md               global: the machine-wide rules, read
                                            in every project
+    config/opencode/agents/reviewer.md     global: read-only review subagent
     config/opencode/commands/new-ai.md     global: /new-ai scaffolder
     config/opencode/commands/shortcut-debt.md
                                            global: /shortcut-debt deferral ledger
@@ -56,8 +57,8 @@ the exception: they **concatenate**, global first, last match wins.
 
 The dividing line is reuse, not tool. The global layer carries CLI-wide
 settings, MCP servers, the `/new-ai` command, the working-method skills, the
-global rules file, and the plugins. The project layer keeps this repository's
-own commands and every permission rule.
+reviewer agent, the global rules file, and the plugins. The project layer keeps
+this repository's own commands and every permission rule.
 
 Method is portable only when it carries no project-specific assumptions. A
 global skill must survive being read in a repository that shares nothing with
@@ -68,15 +69,16 @@ project's paths and identifiers; keep the judgement calls, which transfer.
 
 Because permission rules concatenate, a global `deny` is a floor a project can
 override but not escape — so the global layer defines no permission rules at
-all.
+all. The file-level `policies` described under [Permissions](#permissions) are
+a separate mechanism.
 
 Two traps:
 
 - `~/.opencode` is opencode's own **data** directory (it holds `bin/`), not its
   config directory. Never link this repository's `.opencode` there, or it
   shadows the binary and injects `/validate` and `/doctor` into every project.
-- opencode caches configuration when its service starts. After adding or moving
-  a config file, restart opencode or the change is ignored.
+- opencode watches configuration files and reloads agents, commands, skills,
+  MCP servers, and plugins after a save. `/reload` forces a full reload.
 
 ## The global rules file
 
@@ -91,9 +93,11 @@ overrides it where the two disagree. It carries the portable half of this
 repository's rules — the working method, the tool policy, and the reporting
 discipline — and nothing that assumes a particular directory layout.
 
-The `instructions` key in an opencode config file is the other candidate
-mechanism, and it does not work: the key is accepted and nothing is loaded
-from it. `AGENTS.md` is the mechanism that works.
+The `instructions` key in an opencode config file is the other mechanism. It
+loads files, glob patterns, and HTTP(S) URLs after the discovered `AGENTS.md`
+files. `AGENTS.md` remains the primary mechanism because it is discovered
+automatically; `instructions` is for material outside the config directory or
+shared from a URL.
 
 ## What `install.sh` links
 
@@ -163,6 +167,21 @@ otherwise only be prose in `AGENTS.md`:
 
 The `sudo`/`curl`/`wget` rules are repo-agnostic and the global **shell-guard**
 plugin enforces them in every project, so these entries are defence in depth.
+
+### Global policies
+
+`config/opencode/opencode.json` carries the few file actions that must never
+happen in any project:
+
+- edit a `.env` file
+- read or edit anything under `.ssh/`
+- read or edit anything under `.aws/`
+
+A policy is not a permission rule: it is binary, it never prompts, and it
+tightens what permissions would otherwise allow. It is the file-tool
+counterpart to **shell-guard**, which enforces the command rules in every
+project. The pattern is a path glob against the tool resource, so
+`read:*/.ssh/*` covers a key under any project or home directory.
 
 ## Skills
 
@@ -249,6 +268,19 @@ satisfactory, while a skill gives one procedure with a stopping point, so the
 two drift apart when both run. `config/opencode/AGENTS.md` therefore limits the
 tool to problems whose scope is unclear and whose steps a loaded skill does
 not already derive, and names the skill's procedure as the one to follow.
+
+## Agents
+
+`config/opencode/agents/reviewer.md` is the global reviewer. It runs as a
+subagent, denies `edit` and `shell`, and points at the `change-review` skill, so
+a project can delegate a diff review without carrying the review reasoning in
+the main context. A project agent with the same ID replaces it; this
+repository's `.opencode/agents/reviewer.md` does exactly that and adds the local
+checks.
+
+An agent is the right shape only when the task needs its own context or its own
+permissions. A method that changes how the current session writes — the
+`tech-doc` and `minimal-change` skills, for example — stays a skill.
 
 ## Global settings
 

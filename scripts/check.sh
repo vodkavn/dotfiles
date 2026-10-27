@@ -168,20 +168,50 @@ if [[ $mode != syntax ]]; then
     fi
 
     # opencode advertises commands, agents, and skills to the model using the
-    # frontmatter description. A missing one silently hides the file rather
-    # than failing loudly, so assert it here.
+    # frontmatter description. A missing or malformed one silently hides the
+    # file rather than failing loudly, so assert it here. Parse the YAML rather
+    # than grep for a line, so an unquoted colon is caught instead of read as
+    # text that only some hosts tolerate.
     meta_errors=0
     meta_count=0
-    for file in "${meta_files[@]}"; do
-        [ -r "$file" ] || continue
-        meta_count=$((meta_count + 1))
-        if ! head -n 20 -- "$file" | grep -q '^description:'; then
-            printf 'FAIL: missing description frontmatter: %s\n' "${file#"$root/"}" >&2
-            meta_errors=$((meta_errors + 1))
-        fi
-    done
+    meta_blocked=0
+    if ! command -v python3 >/dev/null 2>&1 || ! python3_bin=$(type -P python3); then
+        printf 'BLOCKED: python3 unavailable (needed to parse agent frontmatter)\n' >&2
+        meta_blocked=1
+    elif ! "$python3_bin" -c 'import yaml' >/dev/null 2>&1; then
+        printf 'BLOCKED: PyYAML unavailable (needed to parse agent frontmatter). Ubuntu: sudo apt install python3-yaml\n' >&2
+        meta_blocked=1
+    else
+        for file in "${meta_files[@]}"; do
+            [ -r "$file" ] || continue
+            meta_count=$((meta_count + 1))
+            if ! "$python3_bin" - "$file" <<'PY'
+import sys
+
+import yaml
+
+path = sys.argv[1]
+with open(path, encoding="utf-8") as handle:
+    text = handle.read()
+if not text.startswith("---\n"):
+    sys.exit(1)
+try:
+    data = yaml.safe_load(text.split("---\n", 2)[1])
+except yaml.YAMLError:
+    sys.exit(1)
+description = data.get("description") if isinstance(data, dict) else None
+sys.exit(0 if isinstance(description, str) and description.strip() else 1)
+PY
+            then
+                printf 'FAIL: missing or malformed description frontmatter: %s\n' "${file#"$root/"}" >&2
+                meta_errors=$((meta_errors + 1))
+            fi
+        done
+    fi
     if (( meta_errors )); then
         failures=$((failures + 1))
+    elif (( meta_blocked )); then
+        blocked=$((blocked + 1))
     else
         printf 'PASS: agent metadata (.opencode/ and config/opencode/ commands, agents, skills; %s files)\n' "$meta_count"
     fi
