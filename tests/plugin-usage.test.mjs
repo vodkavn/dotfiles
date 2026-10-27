@@ -42,7 +42,7 @@ const load = async (path, globals = {}) => {
 const providers = await load("../config/opencode/plugins/provider-usage/providers.ts")
 const panel = await load("../config/opencode/plugins/provider-usage/panel.ts", providers)
 
-const { PROVIDERS, parseDeepseek, parseMinimax, parseOpencodeGo } = providers
+const { PROVIDERS, parseDeepseek, parseMinimax, parseOpencodeGo, parseOpenrouter } = providers
 const {
     bar,
     BAR_WIDTH,
@@ -191,6 +191,23 @@ test("DeepSeek decodes its prepaid balance as a credit", () => {
     assert.throws(() => parseDeepseek(JSON.stringify({ balance_infos: [{ total_balance: "abc" }] })), /no balance/)
 })
 
+// OpenRouter reports how much was purchased and how much was spent, so the
+// remaining credit is their difference.
+const OPENROUTER = JSON.stringify({ data: { total_credits: 100.5, total_usage: 25.75 } })
+
+test("OpenRouter derives the remaining account credit from purchased minus used", () => {
+    assert.deepEqual(plain(parseOpenrouter(OPENROUTER)), { amount: 74.75, currency: "USD" })
+    // An overdrawn account is a real reading, not a decode failure.
+    assert.deepEqual(plain(parseOpenrouter(JSON.stringify({ data: { total_credits: 5, total_usage: 7 } }))), {
+        amount: -2,
+        currency: "USD",
+    })
+    // One missing or non-numeric amount is refused rather than read as zero.
+    assert.throws(() => parseOpenrouter(JSON.stringify({ data: { total_credits: 1 } })), /no credit balance/)
+    assert.throws(() => parseOpenrouter(JSON.stringify({ data: { total_usage: "nonsense" } })), /no credit balance/)
+    assert.throws(() => parseOpenrouter(JSON.stringify({})), /no credit balance/)
+})
+
 test("usageUrl takes the host from opencode's base URL and the path from the adapter", () => {
     const minimax = PROVIDERS.find((provider) => provider.id === "minimax-coding-plan")
     // One declaration covers the global host and its China sibling: only the
@@ -215,9 +232,10 @@ test("usageUrl refuses a host the adapter does not vouch for", () => {
     const minimax = PROVIDERS.find((provider) => provider.id === "minimax-coding-plan")
     const deepseek = PROVIDERS.find((provider) => provider.id === "deepseek")
     const go = PROVIDERS.find((provider) => provider.id === "opencode-go")
+    const openrouter = PROVIDERS.find((provider) => provider.id === "openrouter")
 
     // The shape a cloned repository ships.
-    for (const provider of [minimax, deepseek, go]) {
+    for (const provider of [minimax, deepseek, go, openrouter]) {
         assert.equal(
             usageUrl(provider, "https://attacker.example/v1"),
             usageUrl(provider, undefined),
@@ -239,6 +257,8 @@ test("usageUrl still follows the provider's own hosts", () => {
     assert.equal(usageUrl(deepseek, "https://api.deepseek.com/v1"), "https://api.deepseek.com/user/balance")
     // The host is matched case-insensitively, as hostnames are.
     assert.equal(usageUrl(deepseek, "https://API.DeepSeek.com/v1"), "https://api.deepseek.com/user/balance")
+    const openrouter = PROVIDERS.find((provider) => provider.id === "openrouter")
+    assert.equal(usageUrl(openrouter, "https://openrouter.ai/api/v1"), "https://openrouter.ai/api/v1/credits")
 })
 
 test("baseURLs keys each provider by its id and its integration id", () => {
@@ -481,10 +501,12 @@ test("dueProviders returns the lapsed providers, or all of them when forced", ()
     assert.deepEqual(plain(dueProviders(attempts, NOW, false)).map((provider) => provider.id), [
         "opencode-go",
         "deepseek",
+        "openrouter",
     ])
     assert.deepEqual(plain(dueProviders(attempts, NOW, true)).map((provider) => provider.id), [
         "minimax-coding-plan",
         "opencode-go",
         "deepseek",
+        "openrouter",
     ])
 })

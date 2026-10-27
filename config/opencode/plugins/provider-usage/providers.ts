@@ -14,7 +14,8 @@
 //
 //   windows   a subscription plan that meters by rolling windows and reports a
 //             remaining or used percentage per window (MiniMax, OpenCode Go)
-//   credit    a pay-as-you-go account that holds a money balance (DeepSeek)
+//   credit    a pay-as-you-go account that holds a money balance (DeepSeek,
+//             OpenRouter)
 //
 // Every route is first-party but not stable API surface. The Go route is
 // namespaced `zen/` yet reads the Go ("lite") subscription table and answers
@@ -31,6 +32,8 @@
 //             "weekly":{...},"monthly":{...}}}
 //   DeepSeek  {"is_available":true,"balance_infos":[{"currency":"USD",
 //             "total_balance":"1.52", ...}]}
+//   OpenRouter {"data":{"total_credits":100.5,"total_usage":25.75}} (documented
+//             shape, not yet verified against a live key)
 //
 // MiniMax reports the percent *remaining*, Go the percent *used*, and DeepSeek a
 // balance inside a string; each quirk is handled by its own parser below.
@@ -179,6 +182,18 @@ export function parseDeepseek(body: string): Credit {
     return { amount, currency }
 }
 
+// OpenRouter reports credits purchased and used rather than a balance, so the
+// remaining account credit is the difference. The docs mark this route as
+// needing a management key, but it is the only endpoint that exposes the
+// account balance an inference key cannot otherwise see.
+export function parseOpenrouter(body: string): Credit {
+    const data = record(record(JSON.parse(body)).data)
+    const total = num(data.total_credits)
+    const used = num(data.total_usage)
+    if (total === undefined || used === undefined) throw new Error("no credit balance in response")
+    return { amount: total - used, currency: "USD" }
+}
+
 export const PROVIDERS: readonly Provider[] = [
     {
         id: "minimax-coding-plan",
@@ -204,5 +219,13 @@ export const PROVIDERS: readonly Provider[] = [
         origin: "https://api.deepseek.com",
         hosts: ["api.deepseek.com"],
         parse: (body) => ({ kind: "credit", credit: parseDeepseek(body) }),
+    },
+    {
+        id: "openrouter",
+        label: "OpenRouter",
+        path: "/api/v1/credits",
+        origin: "https://openrouter.ai",
+        hosts: ["openrouter.ai"],
+        parse: (body) => ({ kind: "credit", credit: parseOpenrouter(body) }),
     },
 ]

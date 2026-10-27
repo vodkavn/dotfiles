@@ -655,6 +655,8 @@ money balance):
   panel subtracts it
 - **DeepSeek** — `GET {origin}/user/balance`, a prepaid balance rather than a
   window
+- **OpenRouter** — `GET {origin}/api/v1/credits`, whose `total_credits` and
+  `total_usage` are subtracted to give the remaining account credit
 
 **The host is not taken on trust from opencode.** The panel sends the
 provider's *raw* credential to whatever host it ends up calling, and
