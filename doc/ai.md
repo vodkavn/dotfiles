@@ -474,10 +474,11 @@ Enable it per project where table normalisation is actually wanted, with
 
 ## Plugins
 
-Nine plugins in `config/opencode/plugins/`, all global. `loadout`,
-`subagent-watch`, `provider-usage`, `context-detail` and `tui-shortcuts` are
-CLI plugins that draw; `shell-guard`, `secret-guard`, `tool-guard` and
-`compaction-memory` are server plugins that only change behaviour. The CLI ones still ship a server
+Ten plugins in `config/opencode/plugins/`, all global. `loadout`,
+`subagent-watch`, `provider-usage`, `context-detail`, `check-watch` and
+`tui-shortcuts` are CLI plugins that draw; `shell-guard`, `secret-guard`,
+`tool-guard` and `compaction-memory` are server plugins that only change
+behaviour. The CLI ones still ship a server
 entry: discovery needs `index.ts` beside `tui.tsx`, and it is what carries the
 plugin id into the storage namespace.
 
@@ -525,6 +526,17 @@ than named, so `xargs sudo id` is caught but **`xargs -I {} sudo id` is not** �
 `{}` is read as the command and the real one is never reached. The same applies
 to `xargs -I {} sh -c '…'`. This is the plugin's own stated limit, not an
 oversight, but it is the case most likely to come up in practice.
+
+**A second table reads arguments, not words.** A command word cannot tell
+`git push` from `git push --force`, and blocking git outright would be useless,
+so `destructiveReason` matches the invocation: a force push (`--force`, `-f`, or a
+`+refspec`), `git reset --hard`, `git clean -f`, and `git branch -D`. The
+comparison for force is exact, so `--force-with-lease` — the safe form — still
+runs. `git -C <path> push` is read the same as the bare one, because a global
+option would otherwise be the subcommand and every rule could be bypassed with a
+flag. `rm -rf` is deliberately absent: telling a scratch directory from a checkout
+needs the target path resolved against the shell's cwd, and a guard that guesses is
+a guard that blocks `/tmp`.
 
 It remains a guardrail, not a sandbox, because it reads text rather than
 intercepting execution. `eval "$CMD"`, a wrapper it cannot resolve, a blocked
@@ -748,6 +760,31 @@ Rules live in `secret-guard/mask.ts`, which takes a string and returns a string;
 every table is a plain list, so adding a command or a pattern is a one-line edit
 and a test.
 
+### `check-watch` (CLI)
+
+A **Check** section in the sidebar: the result of this repository's own
+`scripts/check.sh`, run as a background shell and kept current as files change.
+
+The suite is what this repository is for, and until now it was reachable only by
+asking an agent to run it. A badge turns a thirty-second script into a fact one
+can glance at, and a red one is the difference between noticing a regression in
+the file that caused it and noticing it at commit time.
+
+It draws **only where `scripts/check.sh` exists**, tested with `existsSync` and
+cached per directory. This plugin is global, and a badge for a script a project
+does not have would be a permanent failure.
+
+The run is a shell, not a tool call: it needs no turn and leaves no trace in the
+transcript. Progress is read by polling that shell record and **the exit code is
+the verdict** — a `killed` or `timeout` status is a failure even when the exit
+code is 0, because the suite did not finish.
+
+Cost is bounded on purpose. A burst of saves is coalesced by a three-second
+debounce, two runs are never closer than twenty seconds, and a run in flight
+blocks another; two suites at once would fight over the same working tree. A
+click on the row runs it immediately, which is also how a project with no changes
+gets its first run.
+
 ### `tool-guard` (server)
 
 Notices when the agent is repeating a failing tool call, and says so once in the
@@ -771,9 +808,19 @@ each, and a read never creates an entry — otherwise every model call for a
 session it has nothing to say about would grow the map. A test asserts the
 retained count under a flood of 5,000 sessions.
 
-What it does not detect: a loop where every call succeeds but makes no progress,
-and a stall with no tool calls at all. Both need a progress signal the agent does
-not currently emit.
+**The loop that never fails is caught too**, and it is the quieter one: the same
+tool, the same input, the same result, three times running. Nothing raises, the
+transcript fills with identical answers, and from outside it looks like work.
+Both the input and the result are hashed into the run key, so "the same answer to
+the same question" is one comparison — and the store holds no transcript, which
+also means it holds nothing a masked secret could come back from. The
+announcement follows the same rule as a failure streak: once per run, and again
+only when it doubles.
+
+What it does not detect: a loop that keeps making *different* calls without
+progress (only an identical call is a signal here, because a heuristic over
+dissimilar calls would fire on every honest exploration), and a stall with no
+tool calls at all. Both need a progress signal the agent does not currently emit.
 
 ### `loadout` (CLI)
 

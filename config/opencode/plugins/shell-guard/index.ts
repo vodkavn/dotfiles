@@ -38,8 +38,9 @@ import { Plugin } from "@opencode/plugin"
 // them would mean running them. Treat a pass here as "no obvious foot-gun",
 // never as "proven safe".
 //
-// To tighten or loosen: edit BLOCKED. Keep it short — every entry is a command
-// the agent can no longer run even when a user asks for it by name.
+// To tighten or loosen: edit BLOCKED for a command word, and destructiveReason
+// for a command whose arguments decide. Keep both short — every entry is a
+// command the agent can no longer run even when a user asks for it by name.
 
 // Bare command names. A word is only ever tested where it names a command, so
 // blocking "apt" does not also block "apt-cache", `ls ./curl`, or a file named
@@ -54,6 +55,80 @@ const BLOCKED: Record<string, string> = {
     apt: "system package changes are disabled",
     "apt-get": "system package changes are disabled",
     aptitude: "system package changes are disabled",
+}
+
+// Commands that are ordinary until their arguments make them destructive.
+//
+// A command word cannot tell `git push` from `git push --force`, and blocking git
+// outright would be useless, so these are matched on the argument list instead.
+// The set is deliberately short: every entry is a command whose *ordinary* form
+// stays available, and only the irreversible variant is refused.
+//
+// Not here, and why: `rm -rf` needs the target path resolved against the shell's
+// cwd to tell a scratch directory from a checkout, and a guard that guesses is a
+// guard that blocks `/tmp`.
+type ArgumentRule = (args: readonly string[]) => string | undefined
+
+// The subcommand of a git invocation, and the words from it on.
+//
+// The global options that take a value are skipped with it: `git -C /repo push`
+// and `git push` are the same command, and reading `-C` as the subcommand would
+// let every rule be bypassed by a flag.
+const gitSubcommand = (args: readonly string[]): { name: string; rest: readonly string[] } | undefined => {
+    for (let index = 0; index < args.length; index++) {
+        const word = args[index]
+        if (word === undefined) return undefined
+        if (word === "-C" || word === "-c" || word === "--git-dir" || word === "--work-tree") {
+            index++
+            continue
+        }
+        if (word.startsWith("-")) continue
+        return { name: word, rest: args.slice(index) }
+    }
+    return undefined
+}
+
+const gitRule: ArgumentRule = (args) => {
+    const subcommand = gitSubcommand(args)
+    if (subcommand === undefined) return undefined
+    const { name, rest } = subcommand
+
+    if (name === "push") {
+        for (const word of rest) {
+            // --force-with-lease is the safe form and has to survive, so the
+            // comparison is exact: it starts with "--force" but is not it.
+            if (word === "--force" || word === "-f") return "force-pushing rewrites shared history"
+            // A refspec prefixed with + forces that one ref.
+            if (word.startsWith("+")) return "force-pushing rewrites shared history"
+        }
+        return undefined
+    }
+    if (name === "reset") {
+        return rest.includes("--hard") ? "git reset --hard discards uncommitted work" : undefined
+    }
+    if (name === "clean") {
+        // -f combines with -d and -x, so a prefix test rather than an exact one.
+        return rest.some((word) => word === "--force" || /^-[a-zA-Z]*f/.test(word))
+            ? "git clean -f deletes untracked files"
+            : undefined
+    }
+    if (name === "branch") {
+        // -D is --delete --force: it removes a branch even when unmerged.
+        return rest.some((word) => /^-[a-zA-Z]*D/.test(word))
+            ? "deleting an unmerged branch loses its commits"
+            : undefined
+    }
+    return undefined
+}
+
+// The reason a command's *arguments* make it destructive, or undefined.
+//
+// Separate from BLOCKED because it is asked a different question: BLOCKED holds a
+// word, this holds an invocation. Keeping them apart is what lets `git status`
+// stay free while `git reset --hard` does not.
+export function destructiveReason(word: string, args: readonly string[]): string | undefined {
+    if (word === "git") return gitRule(args)
+    return undefined
 }
 
 // Words that run something else rather than being the command.
@@ -541,6 +616,12 @@ const scan = (command: string, depth: number, words: string[], seen: Set<string>
             // mistaken for a transparent wrapper and skipped past.
             const reason = BLOCKED[word]
             if (reason !== undefined) return reason
+
+            // Then the rules that read this command's own arguments. `git` is the
+            // only one today, and it is asked here rather than in BLOCKED because
+            // `git status` and `git reset --hard` share a command word.
+            const destructive = destructiveReason(word, parts.slice(index + 1))
+            if (destructive !== undefined) return destructive
 
             if (TUNED.has(word)) {
                 // Past the wrapper itself, then its options and the values that

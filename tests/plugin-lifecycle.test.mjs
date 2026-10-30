@@ -440,3 +440,56 @@ test("Shell guard terminates on deeply nested substitution", async () => {
     assert.equal(blockedReason("echo `echo `echo `echo `echo `echo deep`````"), undefined)
     assert.ok(commandWords("ls").length > 0)
 })
+
+// A command word cannot tell `git push` from `git push --force`, so these rules
+// read the argument list. Every ordinary form below has to keep working: a guard
+// that blocks git outright would be worked around within a day.
+test("Shell guard blocks the destructive git invocations", async () => {
+    const { blockedReason } = await guard()
+    const blocked = [
+        "git push --force",
+        "git push -f origin main",
+        "git push origin +main",
+        "git push --force origin topic",
+        "git -C /repo push --force",
+        "git reset --hard",
+        "git reset --hard HEAD~1",
+        "git clean -fd",
+        "git clean -fdx",
+        "git clean --force",
+        "git branch -D topic",
+        "git branch -fD topic",
+        "ls && git push --force",
+        "bash -c 'git reset --hard'",
+    ]
+    for (const command of blocked) {
+        assert.notEqual(blockedReason(command), undefined, `expected a block: ${command}`)
+    }
+})
+
+test("Shell guard leaves the ordinary git invocations alone", async () => {
+    const { blockedReason } = await guard()
+    const allowed = [
+        "git status",
+        "git log --oneline -5",
+        "git push",
+        "git push origin main",
+        // The safe form of a force push, and the reason the comparison is exact
+        // rather than a prefix.
+        "git push --force-with-lease",
+        "git push --force-if-includes",
+        "git reset",
+        "git reset HEAD~1",
+        "git clean -n",
+        "git clean -nd",
+        "git branch -d topic",
+        "git branch --list",
+        "git -C /repo status",
+        // Text about git is not git.
+        "echo 'do not git push --force'",
+        "git log --grep='reset --hard'",
+    ]
+    for (const command of allowed) {
+        assert.equal(blockedReason(command), undefined, `expected no block: ${command}`)
+    }
+})
