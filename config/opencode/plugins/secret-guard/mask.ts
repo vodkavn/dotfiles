@@ -126,6 +126,25 @@ export const looksSecret = (name: string): boolean => {
     return false
 }
 
+// Whether a value is shaped like a credential rather than like a type.
+//
+// The rule this guards is `NAME=value`, and the name alone is not enough: a
+// TypeScript field `tokens: string[]` has a secret-shaped name and a value that is
+// a type. Masking it would corrupt the most ordinary tool result there is, a file
+// read. So the value has to carry something a type does not: a digit, a capital,
+// or one of the symbols a credential is made of. A bare lowercase word is a
+// keyword far more often than it is a password, and this is the one place the
+// guard deliberately fails open.
+const CREDENTIAL_SYMBOL = /[0-9A-Z/+=_@:.-]/
+
+// Syntax a type has and a credential does not. `Array<string>` carries a capital,
+// so the symbol class alone would call it a credential; a generic, an array, or a
+// union is a declaration whatever it is named.
+const TYPE_SHAPE = /[<>[\]|()]/
+
+export const looksLikeValue = (value: string): boolean =>
+    value.length >= 6 && !TYPE_SHAPE.test(value) && CREDENTIAL_SYMBOL.test(value)
+
 // The words of a command, with quoting and flags left in place. Only membership
 // is asked of them, so a `--flag=value` staying as one word is harmless.
 //
@@ -236,7 +255,11 @@ export const SCRUB: readonly ScrubRule[] = [
                 // The quote is put back on both sides: dropping the closing one
                 // would leave `{"key": <masked>` and the agent would spend a turn
                 // on a JSON syntax error instead of on the task.
-                (_match, prefix: string, quote: string) => `${prefix}${quote}${MASKED}${quote}`,
+                //
+                // A value that is a type rather than a credential is left alone;
+                // see looksLikeValue.
+                (match: string, prefix: string, quote: string, value: string) =>
+                    looksLikeValue(value) ? `${prefix}${quote}${MASKED}${quote}` : match,
             ),
     },
     {

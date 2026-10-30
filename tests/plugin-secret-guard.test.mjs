@@ -108,6 +108,14 @@ test("Echoing a token variable is a whole-output rule, whatever the value looks 
     }
 })
 
+test("A value shaped like a type is not treated as a credential", () => {
+    // The false positive that would corrupt the most ordinary result there is,
+    // a file read: a field named like a secret whose value is a TypeScript type.
+    for (const text of ["tokens: string[]", "token: string;", "password: string | null", "secretKey: Array<string>"]) {
+        assert.equal(inspect({ text }).kind, "pass", `over-masked: ${text}`)
+    }
+})
+
 test("A variable name is a secret when it says so", () => {
     for (const name of ["GITHUB_TOKEN", "AWS_SECRET_ACCESS_KEY", "db_password", "apiKey", "CLIENT_CREDENTIAL", "SIGNING_PRIVATE_KEY"]) {
         assert.equal(looksSecret(name), true, name)
@@ -220,7 +228,7 @@ test("A value wrapped in backticks does not eat the closing tick", () => {
     // "false" is too short to be a credential, so nothing is masked at all here.
     assert.equal(out, undefined)
 
-    const long = textOf(inspect({ text: "set `API_TOKEN=abcdefghij` now" }))
+    const long = textOf(inspect({ text: "set `API_TOKEN=abc123def4` now" }))
     assert.equal(long, "set `API_TOKEN=<masked>` now")
 })
 
