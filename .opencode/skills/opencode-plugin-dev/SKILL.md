@@ -106,6 +106,25 @@ implements its own render context has to be rewritten for that floor. OpenTUI
 own `setInterval` now spends a frame per tick of its own rather than sharing
 the host's.
 
+## Two hooks worth knowing
+
+**`tool.hook("execute.after")` can rewrite a result before it is recorded.**
+`event.result` is assignable (`Tool.Result`'s own fields are readonly, the hook's
+field is not), so `event.result = { ...event.result, content: masked }` is
+type-checked and verified: the model receives the replacement, not the original.
+That is the only place to filter a tool's output, because it runs *before* the
+result reaches the transcript — a render-time filter would hide the value on
+screen and hand it back a moment later through compaction, revert or export.
+Content is `string | readonly Content[]`; a file part must be left alone, since
+masking a uri breaks the tool.
+
+**A location-scoped data store lists `undefined` until it is synced.** `agent`,
+`command`, `skill`, `provider`, `reference`, `mcp`, and `shell` all follow
+`list` / `sync` / `invalidate`. Reading `list()` without a `sync()` first reads
+as "empty", which is indistinguishable from "not loaded yet" — so a panel built
+on an unsynced store never draws, and nothing reports it. Issue the sync once per
+location and retry on failure, the way the loadout and inspector plugins do.
+
 ## Discovery is positional and fails silently
 
 *verified* A plugin directory is discovered by **sibling filenames**, not by a
