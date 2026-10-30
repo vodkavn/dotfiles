@@ -28,7 +28,26 @@ const load = async (path) => {
     return scope.exports
 }
 
-const { buildRows, childrenOf, elapsed, isRunning, rowBody, rowHead, rowHeadParts, runningRows, spinFrame, SPIN_FRAMES, SPIN_MS, statusName } = await load(
+const {
+    buildRows,
+    childrenOf,
+    createFinishTracker,
+    elapsed,
+    isRunning,
+    rowBody,
+    rowHead,
+    rowHeadParts,
+    runningRows,
+    runningShells,
+    shellLine,
+    since,
+    spinFrame,
+    SPIN_FPS,
+    SPIN_FRAMES,
+    SPIN_MS,
+    statusName,
+    subscribeClock,
+} = await load(
     "../config/opencode/plugins/subagent-watch/panel.ts",
 )
 
@@ -41,6 +60,12 @@ const SIDEBAR_BOX = 42
 const SIDEBAR_PADDING = 2
 const SLOT_PADDING = 1
 const WIDTH = SIDEBAR_BOX - 2 * SIDEBAR_PADDING - SLOT_PADDING
+
+// Values built inside the vm carry that realm's prototypes, which
+// assert.deepStrictEqual rejects even when the contents match. A JSON round
+// trip is enough to move a row into this realm, and the panel's output is all
+// plain data by construction.
+const plain = (value) => JSON.parse(JSON.stringify(value))
 
 // A fixed clock, so no assertion depends on the wall clock.
 const AT = 1_000_000
@@ -410,4 +435,135 @@ test("The walk reads the store a bounded number of times per session", () => {
     // A comparator that reached for source.info() would add roughly
     // 2 * 500 * log2(500), so about 9,000 reads instead of 1,500.
     assert.ok(reads <= 1_700, `${reads} store reads for 500 subagents`)
+})
+
+// --- background shells -------------------------------------------------------
+
+// A shell record, in the shape context.data.shell.list() returns.
+const shell = (id, status, command, startedAt) => ({
+    id,
+    status,
+    command,
+    cwd: "/tmp",
+    shell: "/bin/bash",
+    file: "/tmp/out",
+    metadata: {},
+    time: { started: startedAt, completed: status === "running" ? undefined : startedAt + 1000 },
+})
+
+test("Only running shells are listed", () => {
+    const rows = runningShells([
+        shell("sh_1", "running", "npm run build", AT),
+        shell("sh_2", "exited", "ls", AT),
+        shell("sh_3", "killed", "sleep 100", AT),
+        shell("sh_4", "timeout", "curl x", AT),
+    ])
+    assert.deepEqual(plain(rows.map((row) => row.id)), ["sh_1"])
+})
+
+test("A shell record the panel cannot place is skipped, not drawn blank", () => {
+    // A store that has not synced, and entries missing the fields the row needs.
+    assert.deepEqual(plain(runningShells(undefined)), [])
+    assert.deepEqual(plain(runningShells([])), [])
+    assert.deepEqual(plain(runningShells([null, {}, { status: "running" }, { id: "sh_1" }])), [])
+    assert.equal(runningShells([{ id: "sh_1", status: "running" }]).length, 1)
+})
+
+test("A shell row is its command and how long it has been running", () => {
+    const [row] = runningShells([shell("sh_1", "running", "npm run build", AT)])
+    assert.equal(shellLine(row, AT + 3 * MINUTE), "npm run build 3m")
+    assert.equal(shellLine(row, AT), "npm run build")
+})
+
+test("A shell row is clipped to the sidebar, and the age survives", () => {
+    const [row] = runningShells([shell("sh_1", "running", "x".repeat(200), AT)])
+    const line = shellLine(row, AT + 5 * MINUTE)
+    assert.ok(Array.from(line).length <= WIDTH, `${Array.from(line).length} cells: ${line}`)
+    assert.match(line, /5m$/)
+    assert.match(line, /…/)
+})
+
+test("since says the coarsest unit that still means something", () => {
+    assert.equal(since(AT, AT), "")
+    assert.equal(since(0, AT), "")
+    assert.equal(since(AT, AT + 30_000), "30s")
+    assert.equal(since(AT, AT + 5 * MINUTE), "5m")
+    assert.equal(since(AT, AT + 90 * MINUTE), "1h+")
+    assert.equal(since(AT, AT + 5 * 60 * MINUTE), "2h+")
+})
+
+// --- finish tracking ---------------------------------------------------------
+
+test("A subagent that stops running is announced once", () => {
+    const tracker = createFinishTracker()
+    const running = [{ id: "ses_a", title: "add the thing" }]
+
+    // The first look only records what is running; there is no history to
+    // compare against, so nothing is announced.
+    assert.deepEqual(plain(tracker.finished("ses_root", running)), [])
+    assert.equal(tracker.size(), 1)
+
+    // Still running: silent.
+    assert.deepEqual(plain(tracker.finished("ses_root", running)), [])
+
+    // Gone: announced once, with the title it had.
+    const done = plain(tracker.finished("ses_root", []))
+    assert.deepEqual(done, [{ id: "ses_a", title: "add the thing" }])
+    assert.equal(tracker.size(), 0)
+
+    // And not again on the next look.
+    assert.deepEqual(plain(tracker.finished("ses_root", [])), [])
+})
+
+test("Switching sessions does not announce every subagent as finished", () => {
+    const tracker = createFinishTracker()
+    tracker.finished("ses_root", [{ id: "ses_a", title: "a" }])
+    // A different session's tree is a different set of ids, not a set of
+    // subagents that all finished at once.
+    assert.deepEqual(plain(tracker.finished("ses_other", [])), [])
+    assert.equal(tracker.size(), 0)
+    // And coming back is another reset, not a completion.
+    assert.deepEqual(plain(tracker.finished("ses_root", [])), [])
+})
+
+test("A subagent with no title is still announced", () => {
+    const tracker = createFinishTracker()
+    tracker.finished("ses_root", [{ id: "ses_a", title: "" }])
+    const done = plain(tracker.finished("ses_root", []))
+    assert.equal(done.length, 1)
+    assert.equal(done[0].title, "")
+})
+
+// --- the shared animation clock ----------------------------------------------
+
+test("subscribeClock uses the host's clock when there is one", () => {
+    const seen = []
+    const host = {
+        onAnimationTick(fps, callback) {
+            seen.push({ fps, callback })
+            return () => seen.push("stopped")
+        },
+    }
+    let fellBack = 0
+    const stop = subscribeClock(host, SPIN_FPS, () => {}, () => {
+        fellBack++
+        return () => {}
+    })
+    assert.equal(fellBack, 0, "the fallback must not run when the host has a clock")
+    assert.equal(seen[0].fps, SPIN_FPS)
+    stop()
+    assert.deepEqual(seen[1], "stopped")
+})
+
+test("subscribeClock falls back to a timer on a host older than OpenTUI 0.8", () => {
+    let stopped = 0
+    const stop = subscribeClock(undefined, SPIN_FPS, () => {}, () => () => {
+        stopped++
+    })
+    stop()
+    assert.equal(stopped, 1)
+})
+
+test("The shared clock and the fallback run at the same rate", () => {
+    assert.equal(Math.round(1000 / SPIN_FPS), SPIN_MS)
 })

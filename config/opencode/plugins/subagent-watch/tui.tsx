@@ -1,8 +1,24 @@
 import { Plugin } from "@opencode/plugin/tui"
-import { buildRows, childrenOf, isRunning, rowBody, rowHeadParts, runningRows, SPIN_MS, type Source, type Tree } from "./panel"
+import {
+    buildRows,
+    childrenOf,
+    createFinishTracker,
+    isRunning,
+    rowBody,
+    rowHeadParts,
+    runningRows,
+    runningShells,
+    shellLine,
+    SPIN_FPS,
+    SPIN_MS,
+    subscribeClock,
+    type Source,
+    type Tree,
+} from "./panel"
 
 // A **Subagents** section in the sidebar: one row per *running* subagent of the
-// session on screen, clickable to open it.
+// session on screen, clickable to open it. A second section lists the
+// background shells still running under it.
 //
 // opencode already has a subagent list, but it lives in the composer, it is
 // hidden behind a keybind, and it disappears the moment you act on it. Delegated
@@ -10,6 +26,10 @@ import { buildRows, childrenOf, isRunning, rowBody, rowHeadParts, runningRows, S
 // a session of its own, so its messages never appear in the one on screen and a
 // long-running one looks exactly like a hang. This puts the list in permanent
 // chrome, next to the session it belongs to.
+//
+// The shells are the same problem one level down. A subagent that starts a long
+// build and returns leaves that build running, and from the transcript it is as
+// invisible as the subagent was.
 //
 // Only subagents that are still running are drawn, which is what separates this
 // from the session list rather than a duplicate of it: a finished subagent is
@@ -25,9 +45,9 @@ import { buildRows, childrenOf, isRunning, rowBody, rowHeadParts, runningRows, S
 // correct at any depth, and means the section reads as "this session's
 // subagents" rather than "everything in a family that happens to include this".
 //
-// Nothing is drawn when no subagent is running. A permanent "Subagents (0)" row
+// Nothing is drawn when nothing is running. A permanent "Subagents (0)" row
 // teaches the eye to skip the section, which is the opposite of what it is for --
-// the same reasoning session-vitals and the inspector's Config block use.
+// the same reasoning provider-usage uses for a section with nothing to say.
 //
 // Every list is read inside render(), never captured in setup(). Status is a
 // local store read on top of that: caching it would freeze a row on "running"
@@ -38,6 +58,10 @@ type MouseEvent = { stopPropagation(): void; preventDefault(): void }
 // Not a session id. The header shares the press/release guard with the rows, so
 // it needs an identity that cannot collide with one.
 const HEADER = ""
+
+// The shells header needs its own identity for the same reason, and it shares
+// the guard with the subagent header, so it cannot be the empty string.
+const SHELL_HEADER = "\u0000shells"
 
 // How many levels below the session on screen to *fetch*. opencode's own event
 // handling syncs direct children only; a subagent is not supposed to delegate
@@ -51,7 +75,7 @@ const DEPTH = 1
 export default Plugin.define({
     id: "dotfiles.subagent-watch.tui",
     setup(context) {
-        // The *values*, not the key, are what differ from the inspector's store
+        // The *values*, not the key, are what differ from the loadout plugin's store
         // of the same name: its keys are section names and a `true` means
         // collapsed, so a `true` under this one would read as "the section is
         // on" to anyone copying from that file. Named for what it holds instead.
@@ -59,7 +83,7 @@ export default Plugin.define({
         // Starts expanded -- the point of this section is to be read without a
         // click. Memory storage, so it survives a plugin reload and resets when
         // the TUI exits.
-        const [state, setState] = context.storage.memory("collapse", { initial: { collapsed: false } })
+        const [state, setState] = context.storage.memory("collapse", { initial: { collapsed: false, shells: false } })
 
         // The repaint clock for the spinner.
         //
@@ -83,9 +107,14 @@ export default Plugin.define({
         // release dropped.
         let pressed: string | undefined
 
+        // Which subagents were running last time, so the ones that have since
+        // finished can be announced once each. The tracker holds the state, so
+        // nothing here has to survive a repaint.
+        const finished = createFinishTracker()
+
         // The repaint clock for the spinner.
         //
-        // It exists only while there is a spinner to turn. An interval that
+        // It exists only while there is a spinner to turn. An animation that
         // wakes the process eight times a second to animate nothing is waste,
         // and this panel is idle most of the time -- so the clock is created
         // when the first spinner appears and cleared when the last one goes.
@@ -93,27 +122,38 @@ export default Plugin.define({
         // Created from the render rather than from setup, which also settles
         // the order of business: a slot that never renders never starts a
         // timer, and a registration that throws leaves nothing running.
-        let spinner: ReturnType<typeof setInterval> | undefined
+        let stopSpin: (() => void) | undefined
         const spinClock = () => {
+            const tick = () => {
+                // A guard inside the callback is not needed: the clock is
+                // cleared on the way out, so no tick outlives it.
+                setSpin((draft) => {
+                    draft.tick++
+                })
+            }
             if (animating) {
-                if (spinner !== undefined) return
-                spinner = setInterval(() => {
-                    // A guard inside the callback is not needed: the clock is
-                    // cleared on the way out, so no tick outlives it.
-                    if (!animating) return
-                    setSpin((draft) => {
-                        draft.tick++
-                    })
-                }, SPIN_MS)
-                // `unref` keeps it from holding the TUI's event loop open on
-                // its own.
-                ;(spinner as { unref?: () => void }).unref?.()
+                if (stopSpin !== undefined) return
+                stopSpin = subscribeClock(context.renderer, SPIN_FPS, tick, () => {
+                    const handle = setInterval(tick, SPIN_MS)
+                    // `unref` keeps it from holding the TUI's event loop open on
+                    // its own.
+                    ;(handle as { unref?: () => void }).unref?.()
+                    return () => clearInterval(handle)
+                })
                 return
             }
-            if (spinner === undefined) return
-            clearInterval(spinner)
-            spinner = undefined
+            if (stopSpin === undefined) return
+            stopSpin()
+            stopSpin = undefined
         }
+
+        // The location whose shells the panel lists. Resolved per render from
+        // the session on screen, not from context.location: that is captured at
+        // setup and would keep answering for whichever project was open then.
+        type Location = Parameters<typeof context.data.shell.list>[0]
+        const at = (sessionID: string | undefined): Location =>
+            (sessionID === undefined ? undefined : context.data.session.get(sessionID))?.location ??
+            context.data.location.default()
 
         const tree = (current: string | undefined): Tree => ({
             current,
@@ -212,7 +252,12 @@ export default Plugin.define({
                 // under a finished parent still draws. runningRows in panel.ts
                 // carries the reasoning.
                 const rows = runningRows(buildRows(source))
+                // The shells the host still reports as running under this
+                // location. The same blind spot the subagent list fills, one
+                // level down: work that outlived the turn that started it.
+                const shells = runningShells(context.data.shell.list(at(current.sessionID)))
                 const collapsed = state.collapsed
+                const shellsCollapsed = state.shells
                 // Set before the empty return, so a section that has gone quiet --
                 // every subagent finished, or the list folded away -- stops asking
                 // for repaints.
@@ -220,7 +265,22 @@ export default Plugin.define({
                 // The clock follows the panel: it runs while there is a spinner
                 // to turn, and stops as soon as there is not.
                 spinClock()
-                if (rows.length === 0) return null
+
+                // Announce the subagents that have finished since the last look.
+                //
+                // Once each: the tracker remembers what was running, so a
+                // subagent that has gone quiet is announced once rather than on
+                // every repaint after it. Both channels are used, because neither
+                // covers the other -- a toast is what the terminal shows, and an
+                // attention event is what the desktop app shows, and the host
+                // ships a sound for exactly this.
+                for (const done of finished.finished(current.sessionID, rows.map((row) => ({ id: row.id, title: row.title })))) {
+                    const message = done.title === "" ? "A subagent finished" : `“${done.title}” finished`
+                    context.ui.toast.show({ title: "Subagent finished", message, variant: "info" })
+                    void context.attention.notify({ title: "Subagent finished", message, sound: { name: "subagent_done" } }).catch(() => {})
+                }
+
+                if (rows.length === 0 && shells.length === 0) return null
 
                 const muted = context.theme.text.muted
                 const base = context.theme.text.base
@@ -271,39 +331,76 @@ export default Plugin.define({
                     open(id)
                 }
 
+                // The shells header has its own identity, because the press
+                // guard is shared with the rows and a session id can never be
+                // this. Its rows are not clickable: a shell is not a session,
+                // so there is nothing to open.
+                const shellPress = (event: MouseEvent) => {
+                    pressed = SHELL_HEADER
+                    event.stopPropagation()
+                }
+                const shellRelease = (event: MouseEvent) => {
+                    const armed = pressed
+                    pressed = undefined
+                    event.stopPropagation()
+                    event.preventDefault()
+                    if (armed !== SHELL_HEADER) return
+                    setState((draft) => {
+                        draft.shells = !draft.shells
+                    })
+                }
+
                 return (
                     <box flexDirection="column" gap={0}>
-                        <box flexDirection="row" onMouseDown={press(HEADER)} onMouseUp={release(HEADER)}>
-                            <text wrapMode="none" fg={base}>{`${collapsed ? "▶" : "▼"} Subagents`}</text>
-                            <text wrapMode="none" fg={muted}>{` (${rows.length})`}</text>
-                        </box>
-                        {!collapsed &&
-                            lines.map((line) => (
-                                <box
-                                    flexDirection="column"
-                                    onMouseDown={press(line.id)}
-                                    onMouseUp={release(line.id)}
-                                >
-                                    <text wrapMode="none" fg={base}>
-                                        {line.head.indent}
-                                        <span style={{ fg: loading }}>{line.head.marker}</span>
-                                        {line.head.rest}
-                                    </text>
-                                    {line.body !== "" && (
-                                        <text wrapMode="none" fg={muted}>
-                                            {line.body}
-                                        </text>
-                                    )}
+                        {rows.length > 0 && (
+                            <box flexDirection="column" gap={0}>
+                                <box flexDirection="row" onMouseDown={press(HEADER)} onMouseUp={release(HEADER)}>
+                                    <text wrapMode="none" fg={base}>{`${collapsed ? "▶" : "▼"} Subagents`}</text>
+                                    <text wrapMode="none" fg={muted}>{` (${rows.length})`}</text>
                                 </box>
-                            ))}
+                                {!collapsed &&
+                                    lines.map((line) => (
+                                        <box
+                                            flexDirection="column"
+                                            onMouseDown={press(line.id)}
+                                            onMouseUp={release(line.id)}
+                                        >
+                                            <text wrapMode="none" fg={base}>
+                                                {line.head.indent}
+                                                <span style={{ fg: loading }}>{line.head.marker}</span>
+                                                {line.head.rest}
+                                            </text>
+                                            {line.body !== "" && (
+                                                <text wrapMode="none" fg={muted}>
+                                                    {line.body}
+                                                </text>
+                                            )}
+                                        </box>
+                                    ))}
+                            </box>
+                        )}
+                        {shells.length > 0 && (
+                            <box flexDirection="column" gap={0}>
+                                <box flexDirection="row" onMouseDown={shellPress} onMouseUp={shellRelease}>
+                                    <text wrapMode="none" fg={base}>{`${shellsCollapsed ? "▶" : "▼"} Shells`}</text>
+                                    <text wrapMode="none" fg={muted}>{` (${shells.length})`}</text>
+                                </box>
+                                {!shellsCollapsed &&
+                                    shells.map((shell) => (
+                                        <text wrapMode="none" fg={muted}>
+                                            {`  ${shellLine(shell, now)}`}
+                                        </text>
+                                    ))}
+                            </box>
+                        )}
                     </box>
                 )
             },
         })
 
         return () => {
-            if (spinner !== undefined) clearInterval(spinner)
-            spinner = undefined
+            if (stopSpin !== undefined) stopSpin()
+            stopSpin = undefined
             dispose?.()
         }
     },

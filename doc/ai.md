@@ -586,6 +586,21 @@ transcript cannot show — a subagent runs as a session of its own, so its
 messages never appear in the one on screen and a long-running one looks exactly
 like a hang. This puts the list in permanent chrome instead.
 
+**The shells are the same problem one level down.** A subagent that starts a
+long build and returns leaves that build running, and from the transcript it is
+as invisible as the subagent was. The list comes from `data.shell.list()`,
+filtered to `status: "running"` — the host keeps exited shells around long after
+the fact, and they are history the same way a finished subagent is. Each row is
+the command and how long it has been going; the rows are not clickable, because
+a shell is not a session and there is nothing to open.
+
+**A subagent that stops is announced once.** The plugin keeps the set of ids
+that were running and diffs it on each render, so a row going quiet produces one
+toast and one attention event with the host's own `subagent_done` sound, rather
+than a notification per repaint. The session is part of that state: a session
+switch replaces the tree wholesale, and without it every id would look finished
+at once.
+
 **Only running subagents are listed.** A finished one is history, already readable
 in the session list; keeping it here pushed the live rows down the sidebar and
 left the section full of rows that never changed again. The section therefore
@@ -608,6 +623,14 @@ otherwise arrive to advance the glyph. The frame is derived from the clock rathe
 than counted, so a coalesced repaint skips a frame instead of desyncing from real
 time. Depth 1 draws flush with the section header's marker, so the spinner reads
 as that row's bullet and nesting is what adds indentation.
+
+**The tick is the host's shared animation clock**, `renderer.onAnimationTick`.
+OpenTUI 0.8 runs every animation on one clock, so each frame carries every
+subscriber's tick instead of one timer per panel asking for its own repaint.
+A host older than 0.8 has no such method, and these plugins are global — they
+load on every machine this repository is installed on — so the clock falls back
+to an interval at the same rate. The choice is one function, `subscribeClock`,
+and it takes the renderer as an argument so a test can drive both paths.
 
 The spinner is the one cell of the row that says it is live, so it is drawn in
 opencode's own loading colour — the one a running tab is drawn in
@@ -635,7 +658,8 @@ Things the implementation is explicit about:
 
 - **Nothing is drawn when there are no subagents.** A permanent `Subagents (0)`
   row teaches the eye to skip the section, which is the opposite of what it is
-  for — the same reasoning the inspector's Config block uses.
+  for — the same reasoning provider-usage uses for a section with nothing to
+  say.
 - **`session.status()` returns a status *name*** (`"running"` / `"idle"`), not
   the status object the server's `session.status` event carries. Reading `.type`
   off a string yields `undefined`, indistinguishable from "no status", so both

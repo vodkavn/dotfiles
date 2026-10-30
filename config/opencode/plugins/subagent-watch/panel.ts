@@ -1,6 +1,6 @@
 // The subagent list, as data.
 //
-// Kept out of tui.tsx for the same reason inspector's drift.ts is separate from
+// Kept out of tui.tsx for the same reason loadout's drift.ts is separate from
 // its panel: node can load a plain module and call its exports, but JSX needs
 // opencode's transform. plugin-layout.test.mjs enforces the split.
 //
@@ -184,14 +184,22 @@ export const runningRows = (rows: readonly Row[]): Row[] => rows.filter((row) =>
 // something. Sub-second is noise; past an hour it is stuck rather than slow,
 // and "2h+" says that in four characters where "2h 14m" reads like a duration
 // worth planning around.
-export const elapsed = (row: Row, now: number): string => {
-    const end = row.running ? now : row.finishedAt
-    if (row.startedAt <= 0 || end <= row.startedAt) return ""
-    const seconds = Math.max(0, Math.min(Math.round((end - row.startedAt) / 1000), 7200))
+//
+// The end of the interval is an argument, so a running thing passes "now" and a
+// finished one passes the moment it stopped.
+export const since = (startedAt: number, end: number): string => {
+    if (startedAt <= 0 || end <= startedAt) return ""
+    const seconds = Math.max(0, Math.min(Math.round((end - startedAt) / 1000), 7200))
     if (seconds < 60) return `${seconds}s`
     const minutes = Math.round(seconds / 60)
     if (minutes < 60) return `${minutes}m`
     return minutes < 120 ? "1h+" : "2h+"
+}
+
+export const elapsed = (row: Row, now: number): string => {
+    const end = row.running ? now : row.finishedAt
+    if (row.startedAt <= 0 || end <= row.startedAt) return ""
+    return since(row.startedAt, end)
 }
 
 // The status a session is in, as a name.
@@ -231,6 +239,37 @@ export const SPIN_FRAMES: readonly string[] = ["⠋", "⠙", "⠹", "⠸", "⠼"
 // a coalesced or dropped repaint skips a frame instead of desyncing the
 // animation from real time, and every row in one paint shows the same frame.
 export const SPIN_MS = 120
+
+// The same rate as a frame rate, for the host's shared animation clock.
+//
+// OpenTUI 0.8 runs every animation on one clock: renderer.onAnimationTick fires
+// each subscriber's tick inside one frame, so two panels that animate cost one
+// frame rather than two. The rate is the same either way; what changes is how
+// many frames are drawn to produce it.
+export const SPIN_FPS = 1000 / SPIN_MS
+
+// A repaint clock, and the function that stops it.
+//
+// The host's shared clock is the one to use, but this plugin is global -- it
+// loads on every machine this repository is installed on -- and a host older
+// than OpenTUI 0.8 has no onAnimationTick. So the clock falls back to a timer
+// there, at the same rate, and the caller supplies it because the timer is the
+// caller's to own.
+//
+// The renderer is an argument rather than something reached for, so this stays a
+// plain function a test can drive with a fake.
+export const subscribeClock = (
+    renderer: unknown,
+    fps: number,
+    tick: () => void,
+    fallback: () => () => void,
+): (() => void) => {
+    const host = renderer as { onAnimationTick?: (rate: number, callback: () => void) => () => void } | undefined
+    if (host !== undefined && typeof host.onAnimationTick === "function") {
+        return host.onAnimationTick(fps, tick)
+    }
+    return fallback()
+}
 
 // The frame due at `now`. A clock that is not a real instant yields the first
 // frame rather than the string "undefined": this is called from the render path,
@@ -304,4 +343,87 @@ export const rowBody = (row: Row): string => {
         return `${indent}${clip(row.title, Math.max(0, budget - 1)).trimEnd()}${ELLIPSIS}`
     }
     return `${indent}${row.title}`
+}
+
+// --- background shells ------------------------------------------------------
+
+// A shell that is still running, as the panel draws it.
+export type ShellRow = {
+    readonly id: string
+    readonly command: string
+    readonly cwd: string
+    readonly startedAt: number
+}
+
+// The shells that are still running.
+//
+// Only running ones: a shell that exited is history, and the host keeps exited
+// shells around long after the fact. This is the rule the subagent list
+// follows for the same reason.
+//
+// A shell is the other half of what delegated work leaves behind. A subagent
+// that starts a long build and returns leaves that build running, and from the
+// transcript it is as invisible as the subagent was.
+export const runningShells = (shells: readonly unknown[] | undefined): ShellRow[] => {
+    if (shells === undefined) return []
+    const rows: ShellRow[] = []
+    for (const entry of shells) {
+        const shell = record(entry)
+        if (shell.status !== "running") continue
+        const id = text(shell.id)
+        if (id === "") continue
+        rows.push({
+            id,
+            command: text(shell.command),
+            cwd: text(shell.cwd),
+            startedAt: clock(record(shell.time).started),
+        })
+    }
+    return rows
+}
+
+// The shell row as one line: the command, then how long it has been running.
+//
+// The command leads, because it is what tells two shells apart -- several can
+// run the same one -- and the age follows in the muted tone the panel uses
+// elsewhere.
+export const shellLine = (row: ShellRow, now: number): string => {
+    const age = since(row.startedAt, now)
+    const command = row.command === "" ? "(shell)" : row.command
+    const budget = WIDTH - size(age) - 1
+    const head = size(command) > budget ? `${clip(command, Math.max(0, budget - 1)).trimEnd()}${ELLIPSIS}` : command
+    return age === "" ? head : `${head} ${age}`
+}
+
+// --- finish tracking --------------------------------------------------------
+
+// A subagent the panel is watching, by id and title.
+export type Running = { readonly id: string; readonly title: string }
+
+// Which subagents have finished since the last look.
+//
+// A set difference is the whole rule: an id that was running and is not now
+// has finished. The session is part of the state, because a session switch
+// replaces the tree wholesale and every id would otherwise look finished. A
+// switch records the new tree and announces nothing.
+export const createFinishTracker = () => {
+    let session: string | undefined
+    let running = new Map<string, string>()
+    return {
+        finished: (current: string | undefined, now: readonly Running[]): Running[] => {
+            const live = new Map(now.map((entry) => [entry.id, entry.title]))
+            if (current !== session) {
+                session = current
+                running = live
+                return []
+            }
+            const done: Running[] = []
+            for (const [id, title] of running) {
+                if (!live.has(id)) done.push({ id, title })
+            }
+            running = live
+            return done
+        },
+        size: () => running.size,
+    }
 }
