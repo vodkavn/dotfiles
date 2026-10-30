@@ -178,6 +178,31 @@ Use append-style placement so other plugins can coexist. A replacing placement
 takes the region over entirely, including from plugins you did not intend to
 displace.
 
+**The footer is the exception to append.** *verified* The host's child inside
+`prompt.footer.status` is a box with `flexGrow: 1`, and while a turn runs it
+draws a second one holding the spinner and the interrupt hint. An `append` claim
+lands inside that boundary, after the greedy child, so the control collapses to
+zero width for the whole of a turn and only returns once the session is idle.
+`after` makes it a sibling of the status box, where the greedy child cannot
+reach it. A clickable row also has to be one box holding one text: a second box
+beside it either stacks the columns or needs a nesting level that stops the
+region painting.
+
+**A full report belongs in the session panel, not the sidebar.** Register a
+claim on `session.panel` and open it with `ui.panel.open(name, { presentation })`;
+the claim's input carries `name`, `sessionID`, `width`, and the panel's
+`close`/`focus`/`toggleFullscreen` actions, and it should render nothing unless
+`input.name` is the name it was opened under. The sidebar is for what changes
+while you work — a running subagent, a draining quota — not for a list that is
+read once.
+
+**Gate a host-owned key on your own surface.** `escape`, the digits, and the
+arrow keys already mean something to the host, so a keymap layer that binds one
+unconditionally silently takes that meaning away everywhere. Put the binding in
+its own layer with `enabled: () => ui.panel.current()?.name === PANEL_NAME` (or
+the equivalent for a dialog), so the key exists only while the surface that
+needs it is on screen.
+
 ## Reactivity: read where you draw
 
 CLI plugins get their data through cached, location-scoped stores. Two rules:
