@@ -748,6 +748,18 @@ than a loading indicator, so it keeps the body's colour.
 the drawn set is its intersection with opencode's connected accounts, so a
 provider with no active key is left out rather than drawn as "not connected".
 
+**A window that runs low is announced, not only drawn.** The panel is read only
+if you look at it, and the point of the numbers is to know before a request
+fails, so a crossing raises a toast and an attention event instead of waiting to
+be noticed. The thresholds are the same two the bar's tone uses — 30% and 15%,
+with the provider's own `exhausted` status outranking both — named once so the
+colour and the alert can never disagree about what "low" means. A window is
+announced when it first falls below a threshold and again when it falls to a
+worse one; a reading that has not moved says nothing, and a window that recovers
+is forgotten so the next dip announces again. That re-arming is what a plan that
+refills every few hours needs, and it is the case a plain "announce once" gets
+wrong.
+
 Provider knowledge is isolated in `provider-usage/providers.ts`, the only file
 that names a provider — adding one is an edit there alone. Each adapter declares
 a path, a parser, and the **hosts it may be called on**, not a full URL: the

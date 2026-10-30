@@ -1,17 +1,23 @@
 import { Plugin } from "@opencode/plugin/tui"
 import { TextAttributes } from "@opentui/core"
 import {
+    alertMessage,
+    alertVariant,
     BAR_WIDTH,
     baseURLs,
     buildPanel,
     connections,
+    createAlertTracker,
     describeError,
     describeThrown,
     dueProviders,
     refreshParts,
     refreshText,
     retrySoon,
+    SPIN_FPS,
     SPIN_FRAMES,
+    SPIN_MS,
+    subscribeClock,
     TTL_MS,
     usageUrl,
     type Tone,
@@ -103,9 +109,6 @@ const readBody = async (response: Response): Promise<string> => {
 // caller rather than impersonating a browser.
 const USER_AGENT = "opencode-provider-usage"
 
-// The spinner turns only while a fetch is in flight; SPIN_MS is one frame.
-const SPIN_MS = 120
-
 // Reset countdowns and the "updated … ago" stamp age on this clock even when
 // nothing is being fetched, so a stale reading is visible as stale.
 const HEARTBEAT_MS = 30_000
@@ -146,7 +149,35 @@ export default Plugin.define({
         // variables, read only after a bump, so they are not reactive state.
         let busy = 0
         let updatedAt: number | undefined
-        let spin: ReturnType<typeof setInterval> | undefined
+
+        // Windows that have fallen below the threshold, once each.
+        //
+        // The panel is only read if you look at it, and the point of the numbers
+        // is to know before a request fails. So a crossing is announced rather
+        // than only drawn: a toast in the terminal, and an attention event for
+        // the desktop app.
+        const alerts = createAlertTracker()
+
+        // Raise the alerts these readings have earned.
+        //
+        // Called when a reading lands rather than from the render, so a crossing
+        // is announced once and not once per repaint. A window that recovers is
+        // forgotten by the tracker, so the next dip announces again.
+        const announce = () => {
+            for (const alert of alerts.due(results)) {
+                const message = alertMessage(alert)
+                context.ui.toast.show({
+                    title: alert.level === "warn" ? "Provider quota low" : "Provider quota critical",
+                    message,
+                    variant: alertVariant(alert.level),
+                })
+                void context.attention
+                    .notify({ title: "Provider quota", message, sound: { name: alert.level === "warn" ? "default" : "error" } })
+                    .catch(() => {})
+            }
+        }
+
+        let stopSpin: (() => void) | undefined
         // The spinner runs only while busy: an idle pane repainting ten times a
         // second to animate nothing is waste. `bump` is the spinner's frame
         // advance; the glyph itself is derived from the clock in render.
@@ -155,14 +186,22 @@ export default Plugin.define({
         // Every frame is a repaint of the whole sidebar, and the other panels
         // in it rebuild their own state on each one, so a spinner nobody can
         // see is not free.
+        //
+        // The clock is the host's shared one where it exists: OpenTUI 0.8 runs
+        // every animation on one clock, so a panel with its own timer asks for
+        // its own frames. A host older than that has no shared clock, and this
+        // plugin is global, so the timer is the fallback.
         const animate = () => {
             if (stopped) return
-            if (busy > 0 && !state.collapsed && spin === undefined) {
-                spin = setInterval(bump, SPIN_MS)
-                ;(spin as { unref?: () => void }).unref?.()
-            } else if ((busy === 0 || state.collapsed) && spin !== undefined) {
-                clearInterval(spin)
-                spin = undefined
+            if (busy > 0 && !state.collapsed && stopSpin === undefined) {
+                stopSpin = subscribeClock(context.renderer, SPIN_FPS, bump, () => {
+                    const handle = setInterval(bump, SPIN_MS)
+                    ;(handle as { unref?: () => void }).unref?.()
+                    return () => clearInterval(handle)
+                })
+            } else if ((busy === 0 || state.collapsed) && stopSpin !== undefined) {
+                stopSpin()
+                stopSpin = undefined
             }
         }
 
@@ -207,6 +246,11 @@ export default Plugin.define({
                 inflight.delete(provider.id)
                 busy -= 1
                 updatedAt = Date.now()
+                // A reading has landed or failed, so this is the moment a window
+                // can be seen to have crossed a threshold. A failed fetch leaves
+                // the previous reading in place and raises nothing: an error is
+                // already drawn on the row.
+                announce()
                 animate()
                 bump()
             }
@@ -371,8 +415,8 @@ export default Plugin.define({
             stopped = true
             clearInterval(timer)
             clearInterval(heartbeat)
-            if (spin !== undefined) clearInterval(spin)
-            spin = undefined
+            if (stopSpin !== undefined) stopSpin()
+            stopSpin = undefined
             // Drop the closure's references so a disposed generation holds no
             // readings while it waits to be collected.
             results.clear()

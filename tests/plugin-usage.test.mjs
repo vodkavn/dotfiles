@@ -44,16 +44,22 @@ const panel = await load("../config/opencode/plugins/provider-usage/panel.ts", p
 
 const { PROVIDERS, parseDeepseek, parseMinimax, parseOpencodeGo, parseOpenrouter } = providers
 const {
+    alertMessage,
+    alertVariant,
+    ALERT_CRITICAL,
+    ALERT_WARN,
     bar,
     BAR_WIDTH,
     baseURLs,
     buildPanel,
     connections,
+    createAlertTracker,
     CREDENTIAL_RETRY_MS,
     describeError,
     dueProviders,
     elapsed,
     LABEL_WIDTH,
+    levelFor,
     money,
     printable,
     refreshParts,
@@ -61,8 +67,11 @@ const {
     resetText,
     retrySoon,
     selectCredential,
+    SPIN_FPS,
+    SPIN_MS,
     stale,
     SPIN_FRAMES,
+    subscribeClock,
     TTL_MS,
     toneFor,
     usageUrl,
@@ -509,4 +518,128 @@ test("dueProviders returns the lapsed providers, or all of them when forced", ()
         "deepseek",
         "openrouter",
     ])
+})
+
+// --- quota alerts ------------------------------------------------------------
+
+// A window reading, with the fields the panel reads.
+const window = (label, remaining, status = "ok") => ({ label, remaining, status })
+
+const windows = (id, label, list) => ({ id, label, kind: "windows", windows: list })
+
+test("levelFor uses the same thresholds the bar's tone does", () => {
+    // The alert and the colour must not disagree about what "low" means.
+    assert.equal(levelFor(window("5h", 80)), undefined)
+    assert.equal(levelFor(window("5h", ALERT_WARN + 1)), undefined)
+    assert.equal(levelFor(window("5h", ALERT_WARN)), "warn")
+    assert.equal(levelFor(window("5h", ALERT_CRITICAL + 1)), "warn")
+    assert.equal(levelFor(window("5h", ALERT_CRITICAL)), "critical")
+    assert.equal(levelFor(window("5h", 1)), "critical")
+    assert.equal(levelFor(window("5h", 0)), "exhausted")
+    // The provider's own word outranks the percentage: it will not serve from
+    // this window whatever the number says.
+    assert.equal(levelFor(window("5h", 12, "exhausted")), "exhausted")
+    assert.equal(toneFor(window("5h", ALERT_WARN)), "warn")
+    assert.equal(toneFor(window("5h", ALERT_CRITICAL)), "error")
+})
+
+test("An alert names the provider and the window, not just one of them", () => {
+    const low = alertMessage({ provider: "OpenCode Go", window: "weekly", remaining: 22, level: "warn" })
+    assert.match(low, /OpenCode Go/)
+    assert.match(low, /weekly/)
+    assert.match(low, /22%/)
+    assert.match(alertMessage({ provider: "P", window: "5h", remaining: 3, level: "critical" }), /down to 3%/)
+    assert.match(alertMessage({ provider: "P", window: "5h", remaining: 0, level: "exhausted" }), /used up/)
+    assert.equal(alertVariant("warn"), "warning")
+    assert.equal(alertVariant("critical"), "error")
+    assert.equal(alertVariant("exhausted"), "error")
+})
+
+test("A crossing is announced once, and again only after the quota recovers", () => {
+    const tracker = createAlertTracker()
+    const low = new Map([["opencode-go", windows("opencode-go", "OpenCode Go", [window("weekly", 25)])]])
+
+    const first = plain(tracker.due(low))
+    assert.equal(first.length, 1)
+    assert.equal(first[0].key, "opencode-go/weekly")
+    assert.equal(first[0].level, "warn")
+
+    // The same reading on the next pass is not news.
+    assert.deepEqual(plain(tracker.due(low)), [])
+
+    // It drops further: a different level, and worth saying again.
+    const worse = new Map([["opencode-go", windows("opencode-go", "OpenCode Go", [window("weekly", 10)])]])
+    const critical = plain(tracker.due(worse))
+    assert.equal(critical.length, 1)
+    assert.equal(critical[0].level, "critical")
+
+    // The window refills. That forgets it, so the next dip announces again --
+    // which is the case a plan that resets every few hours needs.
+    const healthy = new Map([["opencode-go", windows("opencode-go", "OpenCode Go", [window("weekly", 90)])]])
+    assert.deepEqual(plain(tracker.due(healthy)), [])
+    assert.equal(tracker.size(), 0)
+    assert.equal(plain(tracker.due(low)).length, 1)
+})
+
+test("The tracker announces each window separately and ignores what has no window", () => {
+    const tracker = createAlertTracker()
+    const both = new Map([
+        ["opencode-go", windows("opencode-go", "OpenCode Go", [window("5h", 40), window("weekly", 20)])],
+        // A credit balance is not a percentage, and an error carries no reading.
+        ["deepseek", { id: "deepseek", label: "DeepSeek", kind: "credit", credit: { amount: 1, currency: "USD" } }],
+        ["openrouter", { id: "openrouter", label: "OpenRouter", error: "HTTP 500" }],
+    ])
+    const alerts = plain(tracker.due(both))
+    assert.deepEqual(alerts.map((alert) => alert.key), ["opencode-go/weekly"])
+    assert.equal(tracker.size(), 1)
+})
+
+test("The tracker forgets a window that stops being reported", () => {
+    const tracker = createAlertTracker()
+    tracker.due(new Map([["opencode-go", windows("opencode-go", "OpenCode Go", [window("weekly", 20)])]]))
+    assert.equal(tracker.size(), 1)
+    // The provider is no longer connected, so the window is gone rather than
+    // recovered. Holding it would leak one entry per window ever seen.
+    tracker.due(new Map())
+    assert.equal(tracker.size(), 0)
+})
+
+// --- the shared animation clock ----------------------------------------------
+
+test("subscribeClock uses the host's clock when there is one", () => {
+    const seen = []
+    const host = {
+        onAnimationTick(fps, callback) {
+            seen.push({ fps, callback })
+            return () => seen.push("stopped")
+        },
+    }
+    let fellBack = 0
+    const stop = subscribeClock(host, SPIN_FPS, () => {}, () => {
+        fellBack++
+        return () => {}
+    })
+    assert.equal(fellBack, 0, "the fallback must not run when the host has a clock")
+    assert.equal(seen.length, 1)
+    assert.equal(seen[0].fps, SPIN_FPS)
+    stop()
+    assert.deepEqual(seen[1], "stopped")
+})
+
+test("subscribeClock falls back to a timer on a host older than OpenTUI 0.8", () => {
+    let fellBack = 0
+    let stopped = 0
+    const stop = subscribeClock({}, SPIN_FPS, () => {}, () => {
+        fellBack++
+        return () => { stopped++ }
+    })
+    assert.equal(fellBack, 1)
+    stop()
+    assert.equal(stopped, 1)
+    // A renderer that is not there at all is the same case.
+    assert.equal(typeof subscribeClock(undefined, SPIN_FPS, () => {}, () => () => {}), "function")
+})
+
+test("The shared clock and the fallback run at the same rate", () => {
+    assert.equal(Math.round(1000 / SPIN_FPS), SPIN_MS)
 })

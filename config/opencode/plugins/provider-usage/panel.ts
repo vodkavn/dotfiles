@@ -253,6 +253,12 @@ export function elapsed(at: number | undefined, now: number): string {
 // and the split has to know which glyphs are frames.
 export const SPIN_FRAMES: readonly string[] = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
 
+// One frame per SPIN_MS of wall clock, which is also the period the panel
+// repaints at while a fetch is in flight. The frame is picked from the clock
+// rather than counted, so a coalesced repaint skips a frame instead of desyncing
+// the animation from real time.
+export const SPIN_MS = 120
+
 // The refresh row's text: a spinner while a fetch is in flight, otherwise the
 // age of the last one in parentheses. Built here rather than in the JSX because
 // "now" is an age, not a duration, and appending "ago" to it reads as "now ago";
@@ -281,12 +287,146 @@ export function refreshParts(label: string): { spinner: string; text: string; no
 
 // Colour by how close a window is to empty. A bar alone reads too flat at a
 // glance; the tone is what makes a nearly-spent allowance visible.
+//
+// The two numbers are named, because the alert that fires on a low quota reads
+// them too. A colour that says 30% and an alert that says 20% would disagree
+// about what "low" means, and the user would be right to distrust both.
+export const ALERT_WARN = 30
+export const ALERT_CRITICAL = 15
+
 export const toneFor = (window: Window): Tone =>
-    window.status === "exhausted" || window.remaining <= 15
+    window.status === "exhausted" || window.remaining <= ALERT_CRITICAL
         ? "error"
-        : window.remaining <= 30
+        : window.remaining <= ALERT_WARN
           ? "warn"
           : "muted"
+
+// How low a window has to be before it is worth telling the user about.
+//
+// "exhausted" is the provider's own word for a window it will not serve from,
+// so it outranks the percentages: a window reporting 4% left is nearly spent,
+// and a window reporting 0% is spent.
+export type AlertLevel = "warn" | "critical" | "exhausted"
+
+export const levelFor = (window: Window): AlertLevel | undefined => {
+    if (window.status === "exhausted" || window.remaining <= 0) return "exhausted"
+    if (window.remaining <= ALERT_CRITICAL) return "critical"
+    if (window.remaining <= ALERT_WARN) return "warn"
+    return undefined
+}
+
+// A window that has fallen low enough to be worth an announcement.
+export type Alert = {
+    /** Identifies the window, so the same one is not announced twice. */
+    readonly key: string
+    readonly provider: string
+    readonly window: string
+    readonly remaining: number
+    readonly level: AlertLevel
+}
+
+// The alerts a set of readings has earned and not yet raised.
+//
+// A window is announced when it first falls below a threshold and again when it
+// falls to a worse one: "at 25%" and "down to 10%" are different situations, and
+// a second one that arrived silently is the one you needed. It is silent for a
+// level already announced, so a reading that has not moved says nothing.
+//
+// When the quota recovers -- a new window resets, or a reading comes back above
+// the threshold -- the window is forgotten, so the next dip announces again.
+// Without that, a plan that refills every few hours would go quiet after its
+// first warning, which is exactly when the warning is wanted again.
+//
+// The map holds one entry per window and a window that stops being reported is
+// dropped, so it cannot grow with the number of readings.
+const SEVERITY: Record<AlertLevel, number> = { warn: 0, critical: 1, exhausted: 2 }
+
+export const createAlertTracker = () => {
+    const announced = new Map<string, AlertLevel>()
+    return {
+        due: (usages: ReadonlyMap<string, Usage>): Alert[] => {
+            // The windows still below a threshold. A window that has recovered
+            // is deliberately not in here, because the prune below is what
+            // re-arms it for the next dip.
+            const low = new Set<string>()
+            const alerts: Alert[] = []
+            for (const usage of usages.values()) {
+                if ("error" in usage) continue
+                if (usage.kind !== "windows") continue
+                for (const window of usage.windows) {
+                    const level = levelFor(window)
+                    if (level === undefined) continue
+                    const key = `${usage.id}/${window.label}`
+                    low.add(key)
+                    const seen = announced.get(key)
+                    if (seen !== undefined && SEVERITY[seen] >= SEVERITY[level]) continue
+                    announced.set(key, level)
+                    alerts.push({
+                        key,
+                        provider: usage.label,
+                        window: window.label,
+                        remaining: window.remaining,
+                        level,
+                    })
+                }
+            }
+            for (const key of [...announced.keys()]) {
+                if (!low.has(key)) announced.delete(key)
+            }
+            return alerts
+        },
+        size: () => announced.size,
+    }
+}
+
+// What an alert says.
+//
+// The window is named because the provider is not enough: a plan with a 5-hour
+// window and a weekly one has two, and only one of them being low is news.
+export const alertMessage = (alert: Alert): string => {
+    const which = `${alert.provider} ${alert.window}`
+    if (alert.level === "exhausted") return `${which} allowance is used up.`
+    if (alert.level === "critical") return `${which} allowance is down to ${alert.remaining}%.`
+    return `${which} allowance is at ${alert.remaining}%.`
+}
+
+// The toast variant an alert wears.
+//
+// A window that is merely low is a warning; one that is nearly gone or spent is
+// an error, which is the tone the bar already carries for it.
+export const alertVariant = (level: AlertLevel): "warning" | "error" =>
+    level === "warn" ? "warning" : "error"
+
+// The same rate as a frame rate, for the host's shared animation clock.
+//
+// OpenTUI 0.8 runs every animation on one clock: renderer.onAnimationTick fires
+// each subscriber's tick inside one frame, so two panels that animate cost one
+// frame rather than two. The rate is the same either way; what changes is how
+// many frames are drawn to produce it.
+export const SPIN_FPS = 1000 / SPIN_MS
+
+// A repaint clock, and the function that stops it.
+//
+// The host's shared clock is the one to use, but this plugin is global -- it
+// loads on every machine this repository is installed on -- and a host older
+// than OpenTUI 0.8 has no onAnimationTick. So the clock falls back to a timer
+// there, at the same rate, and the caller supplies it because the timer is the
+// caller's to own.
+//
+// The renderer is an argument rather than something reached for, so this stays a
+// plain function a test can drive with a fake.
+export const subscribeClock = (
+    renderer: unknown,
+    fps: number,
+    tick: () => void,
+    fallback: () => () => void,
+): (() => void) => {
+    const host = renderer as { onAnimationTick?: (rate: number, callback: () => void) => () => void } | undefined
+    if (host !== undefined && typeof host.onAnimationTick === "function") {
+        return host.onAnimationTick(fps, tick)
+    }
+    return fallback()
+}
 
 // The panel body, in provider order. A provider with no result yet is left out
 // entirely rather than drawn as a placeholder: the section appears once the
