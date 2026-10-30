@@ -10,7 +10,7 @@ import vm from "node:vm"
 // Run the source with isolated host APIs; no live OpenCode service is touched.
 // tui.tsx is deliberately absent from this file: JSX needs opencode's transform,
 // which node cannot do, so the logic that would be hard to test lives in
-// inspector/drift.ts instead.
+// loadout/drift.ts instead.
 //
 // Imports are stripped rather than resolved -- the module graph runs inside a vm
 // context, not as a real module -- so the host APIs the sources reach for are
@@ -308,7 +308,7 @@ test("Every shipped plugin is discoverable, including the new ones", async () =>
     // Guards the discovery rule this repository depends on: a plugin is found by
     // a sibling index.ts or tui.tsx, and a directory without either is skipped
     // with no message at all. A rename would otherwise fail silently at runtime.
-    const { scanPlugins } = await load("../config/opencode/plugins/inspector/drift.ts")
+    const { scanPlugins } = await load("../config/opencode/plugins/loadout/drift.ts")
     const shipped = join(import.meta.dirname ?? new URL("..", import.meta.url).pathname, "..", "config", "opencode", "plugins")
     const problems = scanPlugins(shipped)
     assert.equal(problems.length, 0, `shipped plugins must all be discoverable, got ${JSON.stringify(problems)}`)
@@ -322,10 +322,10 @@ const tree = () => mkdtempSync(join(tmpdir(), "opencode-drift-"))
 // without crossing realms.
 const none = (problems) => assert.equal(problems.length, 0, `expected no problems, got ${JSON.stringify(problems)}`)
 
-// --- inspector config drift -----------------------------------------------
+// --- loadout config drift -------------------------------------------------
 
 test("Drift check reports nothing for a healthy plugin set", async () => {
-    const { scanPlugins } = await load("../config/opencode/plugins/inspector/drift.ts")
+    const { scanPlugins } = await load("../config/opencode/plugins/loadout/drift.ts")
     const root = tree()
     try {
         mkdirSync(join(root, "server-only"))
@@ -342,7 +342,7 @@ test("Drift check reports nothing for a healthy plugin set", async () => {
 })
 
 test("Drift check reports a dangling plugin symlink", async () => {
-    const { scanPlugins } = await load("../config/opencode/plugins/inspector/drift.ts")
+    const { scanPlugins } = await load("../config/opencode/plugins/loadout/drift.ts")
     const root = tree()
     try {
         // This is the exact shape left behind by deleting a plugin from the repo.
@@ -357,7 +357,7 @@ test("Drift check reports a dangling plugin symlink", async () => {
 })
 
 test("Drift check accepts a live plugin symlink", async () => {
-    const { scanPlugins } = await load("../config/opencode/plugins/inspector/drift.ts")
+    const { scanPlugins } = await load("../config/opencode/plugins/loadout/drift.ts")
     const root = tree()
     try {
         const target = join(root, "real-plugin")
@@ -375,7 +375,7 @@ test("Drift check resolves a relative symlink against the link's own directory",
     // against the process's working directory. Resolving it against the latter
     // reported every healthy relative link as broken, and this panel exists to
     // tell the truth about broken links.
-    const { scanPlugins } = await load("../config/opencode/plugins/inspector/drift.ts")
+    const { scanPlugins } = await load("../config/opencode/plugins/loadout/drift.ts")
     const root = tree()
     try {
         const target = join(root, "real-plugin")
@@ -390,7 +390,7 @@ test("Drift check resolves a relative symlink against the link's own directory",
 })
 
 test("Drift check still reports a relative symlink whose target is gone", async () => {
-    const { scanPlugins } = await load("../config/opencode/plugins/inspector/drift.ts")
+    const { scanPlugins } = await load("../config/opencode/plugins/loadout/drift.ts")
     const root = tree()
     try {
         symlinkSync("not-here", join(root, "relative"))
@@ -404,7 +404,7 @@ test("Drift check still reports a relative symlink whose target is gone", async 
 })
 
 test("Drift check reports a plugin directory opencode would skip", async () => {
-    const { scanPlugins } = await load("../config/opencode/plugins/inspector/drift.ts")
+    const { scanPlugins } = await load("../config/opencode/plugins/loadout/drift.ts")
     const root = tree()
     try {
         // Nested src/ is the documented non-resolved shape.

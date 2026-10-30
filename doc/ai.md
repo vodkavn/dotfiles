@@ -21,10 +21,11 @@ are linked into `$HOME` by `install.sh`.
                                            release-rollback, workspace-hygiene,
                                            tech-doc, minimal-change,
                                            change-review, doc-lookup
-    config/opencode/plugins/               global: inspector, subagent-watch,
-                                           provider-usage, tui-shortcuts (TUI);
-                                           shell-guard, tool-guard,
-                                           compaction-memory (server)
+    config/opencode/plugins/               global: loadout, subagent-watch,
+                                           provider-usage, context-detail,
+                                           tui-shortcuts (TUI); shell-guard,
+                                           tool-guard, compaction-memory
+                                           (server)
     package.json, tsconfig.json            the npm tree and the settings that
                                            type-check the plugins
     .opencode/opencode.json                 project: permissions, watcher, worktree
@@ -473,7 +474,7 @@ Enable it per project where table normalisation is actually wanted, with
 
 ## Plugins
 
-Eight plugins in `config/opencode/plugins/`, all global. `inspector`,
+Eight plugins in `config/opencode/plugins/`, all global. `loadout`,
 `subagent-watch`, `provider-usage`, `context-detail` and `tui-shortcuts` are
 CLI plugins that draw; `shell-guard`, `tool-guard` and `compaction-memory` are
 server plugins that only change behaviour. The CLI ones still ship a server
@@ -721,19 +722,44 @@ What it does not detect: a loop where every call succeeds but makes no progress,
 and a stall with no tool calls at all. Both need a progress signal the agent does
 not currently emit.
 
-### `inspector` (CLI)
+### `loadout` (CLI)
 
-Renders what opencode actually loaded at the current location into
-`sidebar.content`: agents, slash commands, and skills, each a section that
-starts collapsed and toggles on **mouse click**. MCP servers are deliberately
-absent — opencode already shows those itself.
+The **loadout** is what opencode has loaded at the current location: agents,
+slash commands, and skills, as a full report in the **session panel**. MCP
+servers are deliberately absent: opencode already shows those itself.
 
-The location is resolved per render from the session on screen, and `sync()` is
-issued when it changes, so switching project or worktree repoints the panel
-rather than leaving it listing whatever was loaded at startup.
+It is opened three ways, all the same action: the **⚙ loadout** button in the
+prompt footer, `ctrl+alt+i`, and the command palette. `escape` closes it, and
+only while it is open: the close binding lives in its own keymap layer, gated on
+`ui.panel.current()`. That gate is not tidiness — `escape` is the host's
+`session.interrupt`, so a layer that bound it unconditionally would take the
+interrupt away from every turn. Disabled, the binding does not exist and the key
+is the host's again.
 
-It also renders a **Config** block at the top of the panel, and only when
-something is actually wrong, for two failures that are otherwise silent:
+The footer button sits beside the two `tui-shortcuts` labels and is built the
+same way — `after`, not `append`, one box holding one text, muted at rest and
+lit under the pointer. It says "loadout" rather than naming the lists
+underneath because the report is exactly the kit this project has loaded, and
+name plus glyph fits a footer where "open inspector" did not.
+
+**The glyph is the warning.** It is a gear while the drift scan finds nothing
+and `⚠` the moment it finds something, drawn in the warning colour while the
+word keeps the button's own. That is why the scan runs in the footer as well as
+in the report: a problem visible only once you have opened the report is not a
+warning. The scan is cached per directory for 30 seconds, so the footer's
+frequent repaints do not walk the filesystem each time.
+
+**There is no sidebar section**, and that is the change from how this started.
+The sidebar is for what changes while you work: a running subagent, a draining
+quota. A list of loaded agents changes only when a plugin or a command is added,
+so a permanent section spent the most expensive space in the TUI on a list that
+is read once. The full panel is the whole surface.
+
+The report draws every section expanded, with each entry's description and the
+count per section, because it was opened on purpose and `(0)` is the answer to
+"did my skill load?". Its **Plugins** section carries the two failures that are
+otherwise silent, and carries no count — it counts problems, so `(0)` there
+would read as "no plugins":
 
 - a plugin symlink whose target no longer exists — opencode still walks the
   directory it lives in, so a plugin deleted from this repository left a dangling
@@ -741,12 +767,27 @@ something is actually wrong, for two failures that are otherwise silent:
 - a plugin directory with no sibling `index.ts` or `tui.tsx`, which the
   discovery rule skips *without a message*
 
-The scan reads the filesystem (`inspector/drift.ts`) rather than
+Those used to be a sidebar block drawn only when something was wrong, which
+announced itself without being asked for. Moving the report to the panel means
+they are found by opening the loadout rather than by glancing at the sidebar;
+that is the cost of removing the section, and it is why the report always draws
+them rather than only on failure.
+
+The scan reads the filesystem (`loadout/drift.ts`) rather than
 `ctx.client.plugin.list()`, because the reported list says what loaded, not what
 was meant to — a silently-skipped plugin is invisible in it. It is cached per
-project directory, so it does not re-walk on every repaint. A symlink's target
-is resolved against the directory the link sits in, so a relative link is
+project directory for 30 seconds, so it does not re-walk on every repaint while
+still noticing a link that broke after the report was first opened. A symlink's
+target is resolved against the directory the link sits in, so a relative link is
 judged by the file it actually points at.
+
+The report's content lives in `loadout/panel.ts`, so the JSX only lays out:
+which registry entries are listed, how agents group by mode, what each section
+counts, and what the report says are all testable without a terminal.
+
+The location is resolved per render from the session on screen, and `sync()` is
+issued when it changes, so switching project or worktree repoints the report
+rather than leaving it listing whatever was loaded at startup.
 
 Plugin-authoring constraints worth knowing before editing the TUI plugin: no
 comment may sit inside a JSX expression (opencode's transform compiles one into

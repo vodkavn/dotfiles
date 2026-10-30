@@ -2,7 +2,7 @@ import { lstatSync, readdirSync, readlinkSync } from "node:fs"
 import { homedir } from "node:os"
 import { join, resolve } from "node:path"
 
-// Config drift check for the inspector plugin.
+// Config drift check for the loadout plugin.
 //
 // opencode discovers plugin directories positionally, from flat sibling
 // entries: index.ts is the server entry, tui.tsx the CLI one. A directory with

@@ -5,8 +5,8 @@
 //
 // 1. opencode bundles a plugin's sibling files into one scope, so a name
 //    declared at the top level of two files in the same directory is a
-//    duplicate declaration and takes the whole entry down. inspector lost its
-//    panel this way when tui.tsx and drift.ts both declared driftProblems, and
+//    duplicate declaration and takes the whole entry down. The loadout plugin
+//    lost its panel this way when tui.tsx and drift.ts both declared driftProblems, and
 //    todo shipped the same landmine twice (record and GLYPH) before this
 //    existed. Neither failure announces itself: /api/plugin still reports the
 //    plugin active.

@@ -91,9 +91,10 @@ done
 # loads fine as a server-only plugin. A nested src/ directory or a package.json
 # is not resolved.
 #
-# inspector and subagent-watch draw in the sidebar and tui-shortcuts in the
-# prompt footer, so each has an index.ts plus a tui.tsx. shell-guard, tool-guard
-# and compaction-memory only change behaviour, so each is index.ts alone.
+# subagent-watch, provider-usage and context-detail draw in the sidebar, and
+# loadout and tui-shortcuts in the prompt footer (loadout also fills the session
+# panel), so each has an index.ts plus a tui.tsx. shell-guard, tool-guard and
+# compaction-memory only change behaviour, so each is index.ts alone.
 #
 # Skills under .opencode/skills/ stay project-scoped: that directory belongs to
 # this repository, not to the global layer, and is never linked here. Global
@@ -141,7 +142,7 @@ ai_global=$HOME/.config/opencode
 ai_src=$HOME/.dotfiles/config/opencode
 
 # Build the link list from the filesystem rather than a hardcoded array. Emits
-# paths relative to config/opencode/ (opencode.json, plugins/inspector, ...) and
+# paths relative to config/opencode/ (opencode.json, plugins/loadout, ...) and
 # is sorted so two runs print the same order.
 #
 #   top-level *.json  the config file itself
