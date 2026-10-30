@@ -26,7 +26,7 @@ use it to infer v2 field names.
 
 ## Look before you build
 
-*verified* opencode ships roughly 90 **builtin** plugins, and they already
+*verified* opencode ships roughly 100 **builtin** plugins, and they already
 occupy most of the obvious extension points. They register under
 `source.type: "builtin"` and are not configurable from `opencode.json`, but they
 are the reason several plugins below are less work than they look.
@@ -35,19 +35,21 @@ The groups worth knowing, because they decide whether you need a plugin at all:
 
 - **Config domain** (`opencode.config.*`) — agent, command, skill, mcp,
   provider, compaction, formatter, instruction, policy, reference, snapshot,
-  shell, tool-output, websearch, watcher.
+  shell, tool-output, websearch, watcher, image, location-watcher, compatibility,
+  worktree.
 - **Providers** (`opencode.provider.*`) — bundled auth for GitHub Copilot,
   OpenAI, GitLab, Bedrock, Vertex, Azure, Ollama, LM Studio, OpenRouter, and
   roughly twenty more. Only worth overriding to rename, retag, or price-filter.
 - **Tools** (`opencode.tool.*`) — read, write, edit, glob, grep, shell, patch,
-  webfetch, websearch, skill, subagent, question. Registering a tool with the
-  same name overrides the builtin.
+  webfetch, websearch, skill, subagent, question, todo, schedule,
+  image-generate, input.repair. Registering a tool with the same name overrides
+  the builtin.
 - **Websearch** (`opencode.websearch.*`) — exa, tavily, firecrawl, parallel,
   tinyfish.
 - **VCS** (`opencode.vcs.git`, `opencode.vcs.hg`) — the default strategies for
   worktrees.
-- **Behaviour** — `opencode.prompt.*`, `opencode.warming`, `opencode.browser`,
-  `opencode.wellknown`, `opencode.models.dev`.
+- **Behaviour** — `opencode.prompt.*`, `opencode.goal`, `opencode.warming`,
+  `opencode.browser`, `opencode.wellknown`, `opencode.models.dev`.
 
 Ask the running service what is actually loaded before assuming any of this:
 
@@ -93,6 +95,17 @@ docs on upgrade. v2 keeps reading v1-shaped configuration without rewriting the
 file, which means a partly-migrated setup can appear to work; do not point a v1
 install at files already converted to v2-only shapes.
 
+The host's version also sets a floor for the terminal runtime. From v2.2.3,
+`@opencode/plugin` declares `@opentui/core` and `@opentui/solid` as peer
+dependencies at 0.8.0 or later, and OpenTUI 0.8 changed the `ScrollBox` parts
+into facade objects rather than renderables and made `RenderContext` require
+`clock` and `onAnimationTick`. A plugin that reaches into `scroll.content` or
+implements its own render context has to be rewritten for that floor. OpenTUI
+0.8 also puts every animation on one clock through
+`renderer.onAnimationTick(fps, cb)`, so a plugin that drives a spinner from its
+own `setInterval` now spends a frame per tick of its own rather than sharing
+the host's.
+
 ## Discovery is positional and fails silently
 
 *verified* A plugin directory is discovered by **sibling filenames**, not by a
@@ -126,6 +139,22 @@ rebuilt. Consequences that are easy to get wrong:
 - Registrations are disposable, and disposing is idempotent. Unloading the
   plugin disposes everything it created, so returning an explicit cleanup from
   setup is still the polite thing to do.
+
+## Keeping a note across a compaction
+
+Since v2.2.0 a server plugin can attach keyed session instructions with
+`ctx.session.instructions.entry.put/list/remove` — `put` takes
+`{ sessionID, key, value }`, where the key matches `^[a-z0-9][a-z0-9._-]*$` and
+the value is JSON. The entry is added as a small update at the next step
+instead of editing the system prompt, so it does not bust the prompt cache and
+does not start an extra model turn, and it survives compaction and reverts.
+
+That is the host's own mechanism for "remember this across a compaction", and
+it is the first place to look before writing one. What it does not replace is
+delivery aimed at the *summariser*: `ctx.session.hook("compaction")` puts text
+into the request that writes the summary, and an instruction entry is session
+context applied at the next step, so whether the summariser sees it is not
+established.
 
 ## Extending the terminal
 

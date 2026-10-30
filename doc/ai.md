@@ -183,6 +183,23 @@ counterpart to **shell-guard**, which enforces the command rules in every
 project. The pattern is a path glob against the tool resource, so
 `read:*/.ssh/*` covers a key under any project or home directory.
 
+Since v2.2.3 the action list also carries `mcp.use`, `skill.use` and
+`plugin.use`, which deny an MCP server by its configured name, a skill by its
+ID, and a plugin by its unversioned package name or path; and
+`integration.connect`, which controls what `/connect` offers. None of them is
+used here: the three MCP servers and the ten skills this layer ships are the
+ones meant to run, and `opencode plugin add` is a supported way to install a
+community plugin, so a blanket plugin deny would break it.
+
+One consequence of the same release is worth recording, because it changes what
+an old policy means. `integration.use` used to cover MCP servers, skills and
+plugins through an `mcp:`, `skill:` or `plugin:` resource prefix, and it now
+covers integrations only. This file has no `integration.use` statement, so
+nothing here changes meaning — but a policy carried over from an older
+machine would. Statements with those prefixes are still converted
+automatically; a bare `integration.use` `*` now means "no integration at all",
+including the free tier, and no longer blocks MCP servers, skills or plugins.
+
 ## Skills
 
 Ten global working-method skills in `config/opencode/skills/`, one directory
@@ -287,6 +304,16 @@ permissions. A method that changes how the current session writes — the
 These live in `config/opencode/opencode.json` and apply in every project on any
 machine this repository is installed on.
 
+Everything in this file is verified against **opencode v2.2.3**, the release
+this machine runs. The plugin API is beta and the config schema moves, so
+`package.json` pins `@opencode/plugin` and `@opencode/theme` to the running
+opencode version and `@opentui/core` and `@opentui/solid` to the floor that
+version's peer dependency demands (0.8.0 as of v2.2.3). The plugins are
+type-checked against those types, so a plugin that reaches for something the
+host no longer has fails the check rather than the session. Bump all four
+together when opencode is upgraded, and run `npm install` so the committed
+lockfile follows.
+
 ### `references`
 
 `references` gives opencode named access to directories outside the current
@@ -337,12 +364,14 @@ warning, so confirm the path exists.
 ### `lsp`
 
 `lsp` is `true`, which enables opencode's built-in language servers. **The key is
-accepted but nothing runs behind it in v2.0.32.** The release carries the
+accepted but nothing runs behind it in v2.2.3.** The release carries the
 configuration schema and the `lsp.updated` event, but no server manager: no
-language server starts, and nothing is downloaded. The documentation for the
-feature describes auto-installing a server on first use and feeding its
-diagnostics back to the agent — behaviour that belongs to a release that has not
-shipped, and 2.0.32 is the newest v2 tag.
+language server starts, and nothing is downloaded. Verified against the running
+2.2.3 service — its plugin list holds 99 plugins and none of them is a language
+server — and against the v2 configuration guide, which does not document `lsp`
+at all. The documentation for the feature describes auto-installing a server on
+first use and feeding its diagnostics back to the agent — behaviour that
+belongs to a release that has not shipped.
 
 The setting stays because it is inert, because it is the key a release with the
 runtime would read, and because the servers it would start are chosen per
@@ -385,6 +414,33 @@ explicitly so a work machine does not silently auto-install a new release.
 keeps the _recent detail_, while the **compaction-memory** plugin protects the
 _original ask_. Raise it for long documentation sessions.
 
+### `experimental`
+
+Two experimental switches are on, and both are the ones whose cost is paid in
+tokens this machine already spends:
+
+    "experimental": {
+        "todo": true,
+        "background_compaction": true
+    }
+
+`todo` gives the model the `todowrite` tool and draws the list in the session
+and the sidebar.
+
+`background_compaction` writes the summary ahead of the threshold instead of
+at it, so automatic compaction does not pause the session. It is the other half
+of what **compaction-memory** does: that plugin makes the summary lossless,
+this one makes it free of a stall. The cost is that a summary written and never
+used still costs tokens — the summary request reuses the prompt cache, so it is
+far cheaper than a normal turn, and it is skipped entirely in sessions under
+about 64k tokens, so short sessions never pay it.
+
+Three more experimental keys exist and are deliberately left off:
+`image_generate` (a connected provider here serves no image model),
+`location_idle_timeout` (the 60-minute default is already right for a machine
+with one active project), and `media_blob` (this machine attaches no stored
+image references).
+
 ### `formatter`
 
 Enabled globally, with the built-in `prettier` entry overridden to run through
@@ -417,12 +473,12 @@ Enable it per project where table normalisation is actually wanted, with
 
 ## Plugins
 
-Seven plugins in `config/opencode/plugins/`, all global. `inspector`,
-`subagent-watch`, `provider-usage` and `tui-shortcuts` are CLI plugins that
-draw; `shell-guard`, `tool-guard` and `compaction-memory` are server plugins that
-only change behaviour. The CLI ones still ship a server entry: discovery needs
-`index.ts` beside `tui.tsx`, and it is what carries the plugin id into the storage
-namespace.
+Eight plugins in `config/opencode/plugins/`, all global. `inspector`,
+`subagent-watch`, `provider-usage`, `context-detail` and `tui-shortcuts` are
+CLI plugins that draw; `shell-guard`, `tool-guard` and `compaction-memory` are
+server plugins that only change behaviour. The CLI ones still ship a server
+entry: discovery needs `index.ts` beside `tui.tsx`, and it is what carries the
+plugin id into the storage namespace.
 
 Community packages are a separate mechanism: `opencode plugin add <pkg>`
 installs into the same directory as real directories the installer leaves alone
@@ -499,6 +555,23 @@ than a token estimate, which would be a guess about a number the hook is not
 given. Once a transcript has demonstrably been summarised, the agent is told
 that anything it decided but did not write down is gone, and to write decisions
 into the transcript as it goes. The warning map is capped at 16 sessions.
+
+**The host now has a mechanism for this, and it is deliberately not used yet.**
+Since v2.2.0 a plugin can attach keyed session instructions with
+`ctx.session.instructions.entry.put/list/remove`: the entry survives compaction
+and reverts, it does not bust the prompt cache, and it does not start an extra
+model turn. That is the host's own answer to "keep a note across a compaction",
+and it would let this plugin store the note and stop re-injecting it.
+
+It is not used yet for two reasons. The delivery here is aimed at the
+*summariser* — the note goes into `event.system` on the compaction hook, which
+is what makes the original task land in the summary instead of being summarised
+away — and an instruction entry is session context applied at the next step, so
+whether it reaches the summariser is not established. And the entry's value is
+JSON, which means the host renders the note rather than this plugin: the
+"prior state, not a new request" framing that keeps the note from reading as
+new work would be lost. Switching is a change of delivery mechanism, not a
+refactor, so it wants its own decision and its own test.
 
 ### `subagent-watch` (CLI)
 
@@ -577,8 +650,10 @@ Things the implementation is explicit about:
   is how a subagent delegated after this plugin looked still appears;
   `sync(id, { children: true })` pulls the children of a session the store has not
   otherwise fetched, which is the cold-start case. The second argument is not in
-  the published docs and is verified against v2.0.28 — if a future host ignores
-  it, the failure is a thinner list rather than an empty one.
+  the published docs and is verified against v2.0.28; it is still absent from
+  the v2.2.3 types, so the plugin keeps widening the signature itself — if a
+  future host ignores it, the failure is a thinner list rather than an empty
+  one.
 - **The caller does not read the store inside the sort comparator.** The walk is
   one pass to link `parentID`, one to read each sort key, one to describe each
   row; a comparator calling `session.get()` would add ~2n·log2(n) reads per
@@ -767,12 +842,12 @@ Naming the action rather than the value is the design, not a limitation worked
 around. The model *could* be read the way the host reads it —
 `context.ui.model.current()` — but the agent could not, and a footer where one
 shortcut tracks and the other goes stale is worse than one where neither claims to.
-The plugin context exposes `ui.model` and **no `ui.agent`** (the context's own keys
-are `sessionTabs`, `model`, `slot`, `dialog`, `toast` and `format`, verified against
-v2.0.32), the live selection lives in the host's local store, and the
-`session.agent.selected` event arrives when opencode *applies* a switch rather than
-when you cycle one. A caption that cannot be wrong is worth more than a second copy
-of a name that can.
+The plugin context exposes `ui.model` and **no `ui.agent`** — the `ui` keys
+are `dialog`, `toast`, `format`, `router`, `panel`, `tabs`, `model` and `slot`,
+verified against the v2.2.3 plugin types — the live selection lives in the
+host's local store, and the `session.agent.selected` event arrives when opencode
+*applies* a switch rather than when you cycle one. A caption that cannot be
+wrong is worth more than a second copy of a name that can.
 
 ### `context-detail` (CLI)
 
@@ -869,12 +944,16 @@ policy — verify before using, suggest but never install, and never
   `bat`/`batcat`.
 - Verify `ast-grep`, not `sg`. On Ubuntu `sg` can be an unrelated system
   command, so the alias is `asg`.
-- `instructions` in an opencode config file is accepted but not loaded. Use
-  `AGENTS.md` for instructions.
+- `instructions` in an opencode config file **is** loaded, after the discovered
+  `AGENTS.md` files and in the order the array lists them. The v2 instructions
+  guide documents it and the running service carries the
+  `opencode.config.instruction` plugin that reads it. The note that used to say
+  otherwise was true of an older release. `AGENTS.md` stays the primary
+  mechanism because it is discovered automatically.
 - Do not mix the two MCP config shapes. Under `mcp`, the servers object is
   either `{ "servers": { ... } }` or a flat `{ "name": { ... } }`; if any flat
   key is present the nested `servers` object is silently ignored. This
-  repository uses `servers`, which is what opencode v2.0.26 loads.
+  repository uses `servers`, which is what opencode v2.2.3 loads.
 - A plugin that fails to load can print nothing at all. Check positively with
   `opencode api get /api/plugin`, which lists every plugin with its source and
   `active` status. It resolves against the service's location, which is not
@@ -899,5 +978,11 @@ installs the tree, so a skip there means a genuine gap. `package.json` holds
 the tree and `tsconfig.json` the settings — `strict`, `noEmit`, and the host's
 JSX runtime — and the lockfile is committed so CI and a local run resolve the
 same dependency set.
+
+The tree tracks the running opencode: `@opencode/plugin` and `@opencode/theme`
+are pinned to the same version as the host, and `@opentui/core` and
+`@opentui/solid` to the floor that version's peer dependency requires. A
+plugin type-checked against older types than the host runs is a plugin whose
+guarantees were never checked, so an opencode upgrade bumps all four together.
 
 See `AGENTS.md` for exit codes and prerequisites.
