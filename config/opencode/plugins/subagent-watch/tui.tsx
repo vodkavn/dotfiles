@@ -155,6 +155,26 @@ export default Plugin.define({
             (sessionID === undefined ? undefined : context.data.session.get(sessionID))?.location ??
             context.data.location.default()
 
+        // The shell store is location-scoped and starts empty, so an unsynced one
+        // lists undefined -- which this panel reads as "nothing running", forever.
+        // Issued once per location; a failed attempt is retried by a later render
+        // rather than costing that location its shells for the life of the TUI.
+        //
+        // `sync` is looked up rather than called directly: this plugin is global,
+        // and a host old enough not to have it should show an empty section
+        // instead of failing setup.
+        const shellStore = context.data.shell as typeof context.data.shell & {
+            sync?: (location?: Location) => Promise<void>
+        }
+        const syncedShells = new Set<string>()
+        const syncShells = (location: Location) => {
+            if (typeof shellStore.sync !== "function") return
+            const key = JSON.stringify(location ?? null)
+            if (syncedShells.has(key)) return
+            syncedShells.add(key)
+            void shellStore.sync(location).catch(() => {}).finally(() => syncedShells.delete(key))
+        }
+
         const tree = (current: string | undefined): Tree => ({
             current,
             family: current === undefined ? [] : context.data.session.family(current) ?? [],
@@ -255,7 +275,9 @@ export default Plugin.define({
                 // The shells the host still reports as running under this
                 // location. The same blind spot the subagent list fills, one
                 // level down: work that outlived the turn that started it.
-                const shells = runningShells(context.data.shell.list(at(current.sessionID)))
+                const here = at(current.sessionID)
+                syncShells(here)
+                const shells = runningShells(context.data.shell.list(here))
                 const collapsed = state.collapsed
                 const shellsCollapsed = state.shells
                 // Set before the empty return, so a section that has gone quiet --

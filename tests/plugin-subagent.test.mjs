@@ -567,3 +567,14 @@ test("subscribeClock falls back to a timer on a host older than OpenTUI 0.8", ()
 test("The shared clock and the fallback run at the same rate", () => {
     assert.equal(Math.round(1000 / SPIN_FPS), SPIN_MS)
 })
+
+test("The shell store is synced before it is read", async () => {
+    // data.shell is a location-scoped store with the same list/sync shape as the
+    // registries. An unsynced one lists undefined, which this panel reads as
+    // "nothing running" -- so a missing sync is a section that never appears, not
+    // an error. Pinned because that failure is silent.
+    const source = await readFile(new URL("../config/opencode/plugins/subagent-watch/tui.tsx", import.meta.url), "utf8")
+    assert.match(source, /context\.data\.shell as/, "the shell store is the one that is synced")
+    assert.match(source, /shellStore\.sync\(/, "the shell store must be synced")
+    assert.match(source, /data\.shell\.list\(/, "and then read")
+})
