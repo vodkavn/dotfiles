@@ -556,27 +556,29 @@ given. Once a transcript has demonstrably been summarised, the agent is told
 that anything it decided but did not write down is gone, and to write decisions
 into the transcript as it goes. The warning map is capped at 16 sessions.
 
-**The host now has a mechanism for this, and it is deliberately not used yet.**
-Since v2.2.0 a plugin can attach keyed session instructions with
-`ctx.session.instructions.entry.put/list/remove`: the entry survives compaction
-and reverts, it does not bust the prompt cache, and it does not start an extra
-model turn. That is the host's own answer to "keep a note across a compaction",
-and it would let this plugin store the note and stop re-injecting it.
+**The note is delivered as a session instruction entry.** Since v2.2.0 a plugin
+can attach keyed session instructions with `ctx.session.instructions.entry.*`:
+the entry survives compaction and reverts, it does not bust the prompt cache,
+and it does not start an extra model turn. That is the host's own answer to
+"keep a note across a compaction", so the note is published under
+`dotfiles.session-memory` on the prompt that captures it — and republished only
+when the note changes, because an update per prompt is exactly the cost the
+mechanism exists to avoid.
 
-It is not used yet for two reasons. The delivery here is aimed at the
-*summariser* — the note goes into `event.system` on the compaction hook, which
-is what makes the original task land in the summary instead of being summarised
-away — and an instruction entry is session context applied at the next step, so
-whether it reaches the summariser is not established. And the entry's value is
-JSON, which means the host renders the note rather than this plugin: the
-"prior state, not a new request" framing that keeps the note from reading as
-new work would be lost. Switching is a change of delivery mechanism, not a
-refactor, so it wants its own decision and its own test.
+**The compaction hook is now the fallback, not the route.** It still puts the
+note in `event.system`, which is what hands it to the summariser, but only when
+the entry is not there. The entry is the delivery; the hook covers the case the
+documented behaviour does not: if the host dropped the entry, the old route is
+what keeps the original ask from being summarised away. A list that cannot be
+read counts as "not there", because the fallback is additive — being wrong
+towards it costs a duplicate, and being wrong the other way loses the ask.
 
 ### `subagent-watch` (CLI)
 
 A **Subagents** section in `sidebar.content`: one row per *running* subagent of
-the session on screen, and clicking a row focuses that subagent.
+the session on screen, and clicking a row focuses that subagent. A second
+section, **Shells**, lists the background shells still running under the
+session.
 
 opencode's own subagent list lives in the composer, behind a keybind, and
 disappears the moment you act on it. Delegated work is the one thing the

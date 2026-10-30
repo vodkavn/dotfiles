@@ -426,6 +426,134 @@ test("Drift check reports a plugin directory opencode would skip", async () => {
 })
 
 test("Drift check treats a missing directory as normal", async () => {
-    const { scanPlugins } = await load("../config/opencode/plugins/inspector/drift.ts")
+    const { scanPlugins } = await load("../config/opencode/plugins/loadout/drift.ts")
     none(scanPlugins(join(tmpdir(), "definitely-not-here-opencode")))
+})
+
+// --- compaction-memory: how the note reaches the model ----------------------
+
+// A session context whose storage holds one note and whose instruction entries
+// are whatever the test says. The hooks are captured so a test can drive them
+// directly, which is the only way to exercise a path that needs a compaction.
+const memory = async ({ stored, entries = [], listThrows = false } = {}) => {
+    const scope = await load("../config/opencode/plugins/compaction-memory/index.ts", {
+        setInterval: () => ({ unref() {} }),
+        clearInterval: () => {},
+    })
+    const hooks = {}
+    const puts = []
+    let note = stored
+    const cleanup = await scope.plugin.setup({
+        storage: {
+            get: async () => note,
+            set: async (_key, value) => { note = value },
+            remove: async () => {},
+            scan: async () => ({ entries: [], next: undefined }),
+        },
+        session: {
+            hook: async (name, callback) => {
+                hooks[name] = callback
+                return { dispose: async () => {} }
+            },
+            instructions: {
+                entry: {
+                    put: async (input) => { puts.push(input) },
+                    list: async () => {
+                        if (listThrows) throw new Error("unreadable")
+                        return entries
+                    },
+                },
+            },
+        },
+    })
+    return { hooks, puts, cleanup }
+}
+
+const compactionEvent = () => ({ sessionID: "s1", messages: [], system: [] })
+
+test("The note is published as a session instruction entry, once", async () => {
+    const { hooks, puts, cleanup } = await memory()
+
+    await hooks.prompt({ sessionID: "s1", prompt: { text: "fix the parser" } })
+    assert.equal(puts.length, 1)
+    // The key has to be the shape opencode accepts for an entry.
+    assert.match(puts[0].key, /^[a-z0-9][a-z0-9._-]*$/)
+    assert.equal(puts[0].sessionID, "s1")
+    assert.match(puts[0].value, /fix the parser/)
+
+    // A later prompt that changes nothing about the note publishes nothing. A
+    // put per prompt would add an update to every turn for text that has not
+    // moved, which is the cost the entry mechanism exists to avoid.
+    await hooks.prompt({ sessionID: "s1", prompt: { text: "and now add a test" } })
+    assert.equal(puts.length, 1)
+
+    await cleanup()
+})
+
+test("An attached file republishes the note, because the note changed", async () => {
+    const { hooks, puts, cleanup } = await memory()
+    await hooks.prompt({ sessionID: "s1", prompt: { text: "fix the parser" } })
+    await hooks.prompt({ sessionID: "s1", prompt: { text: "same again", files: [{ path: "src/parser.ts" }] } })
+    assert.equal(puts.length, 2)
+    assert.match(puts[1].value, /src\/parser\.ts/)
+    // The task is still the first one: attachments update, the ask does not.
+    assert.match(puts[1].value, /fix the parser/)
+    await cleanup()
+})
+
+test("A first prompt with no text publishes nothing", async () => {
+    const { hooks, puts, cleanup } = await memory()
+    await hooks.prompt({ sessionID: "s1", prompt: {} })
+    assert.equal(puts.length, 0, "an empty note is not worth an entry")
+    await cleanup()
+})
+
+test("Compaction adds nothing when the entry survived it", async () => {
+    const { hooks, cleanup } = await memory({
+        stored: { task: "fix the parser", files: [], updated: 1 },
+        entries: [{ key: "dotfiles.session-memory", value: "rendered elsewhere" }],
+    })
+    const event = compactionEvent()
+    await hooks.compaction(event)
+    // The note is already standing context. Adding it here as well would put it
+    // in the summary *and* leave it in the session, which is the duplicate the
+    // entry mechanism exists to remove.
+    assert.deepEqual(event.system, [])
+    await cleanup()
+})
+
+test("Compaction falls back to the system text when the entry is gone", async () => {
+    const { hooks, cleanup } = await memory({
+        stored: { task: "fix the parser", files: ["src/parser.ts"], updated: 1 },
+        entries: [],
+    })
+    const event = compactionEvent()
+    await hooks.compaction(event)
+    assert.equal(event.system.length, 1)
+    // The fallback is the old route: text in the request that writes the
+    // summary, which is what carries the ask into the summary.
+    assert.match(event.system[0].text, /fix the parser/)
+    assert.match(event.system[0].text, /src\/parser\.ts/)
+    await cleanup()
+})
+
+test("A list that cannot be read falls back rather than assuming the note is there", async () => {
+    const { hooks, cleanup } = await memory({
+        stored: { task: "fix the parser", files: [], updated: 1 },
+        listThrows: true,
+    })
+    const event = compactionEvent()
+    await hooks.compaction(event)
+    // Being wrong towards the fallback costs a duplicate; being wrong the other
+    // way loses the original ask.
+    assert.equal(event.system.length, 1)
+    await cleanup()
+})
+
+test("Compaction says nothing when the session has no note", async () => {
+    const { hooks, cleanup } = await memory({ stored: undefined, entries: [] })
+    const event = compactionEvent()
+    await hooks.compaction(event)
+    assert.deepEqual(event.system, [])
+    await cleanup()
 })

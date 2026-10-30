@@ -26,13 +26,19 @@ import { Plugin } from "@opencode/plugin"
 //
 // How the note reaches the model.
 //
-// ctx.session.hook("compaction") runs immediately before the summary call, with
-// the transcript in event.messages. Putting the note in event.system therefore
-// hands it to the summariser, which is what makes the original task survive into
-// the summary instead of being summarised away as a side quest. It is a nudge
-// to the summariser, not a guarantee: if the summary still drops the task, the
-// user still re-explains. The durable copy in storage is what the next prompt
-// can fall back on.
+// It is published as a session instruction entry, keyed per session. The host
+// keeps that entry across compaction and reverts, adds it as a small update at
+// the next step rather than editing the system prompt, and does not start an
+// extra model turn -- so the note does not have to be carried by the summary if
+// it survives the summary.
+//
+// ctx.session.hook("compaction") is the fallback, not the route. It runs
+// immediately before the summary call with the transcript in event.messages, so
+// putting the note in event.system hands it to the summariser -- which is what
+// makes the original task land in the summary instead of being summarised away
+// as a side quest. That is where the note goes when the entry is missing, which
+// is a failure the documented behaviour does not cover: the fallback is additive,
+// so the worst case is the note appearing twice rather than not at all.
 //
 // This is not a custom summariser — event.result is left unset, so opencode
 // performs the compaction itself and this plugin only shapes what it reads.
@@ -74,6 +80,15 @@ const MAX_PRUNE_REMOVALS = 500
 // fires for every model call in every session the server sees.
 const MAX_WARNED_SESSIONS = 16
 
+// The key the note is delivered under. Lowercase letters, dots and dashes only,
+// which is the shape opencode accepts for a session instruction entry.
+const ENTRY = "dotfiles.session-memory"
+
+// Whether two file lists name the same files in the same order. Used to decide
+// whether the note has changed enough to be worth publishing again.
+const sameFiles = (a: readonly string[], b: readonly string[]): boolean =>
+    a.length === b.length && a.every((name, index) => name === b[index])
+
 // Exported for testing; opencode only reads the default export.
 export const render = (note: Note): string =>
     [
@@ -111,6 +126,34 @@ export default Plugin.define({
     async setup(ctx) {
         const key = (sessionID: string) => `session/${sessionID}`
 
+        // Publish the note as a session instruction entry.
+        //
+        // A failed write is not fatal, and is not rethrown: the compaction hook
+        // below falls back to the system text when the entry is not there, so
+        // the note is delivered either way. Throwing here would fail the prompt
+        // that happened to be the first one in the session.
+        const publish = async (sessionID: string, text: string) => {
+            try {
+                await ctx.session.instructions.entry.put({ sessionID, key: ENTRY, value: text })
+            } catch {
+                // Left to the fallback.
+            }
+        }
+
+        // Whether the note's entry is still attached to the session.
+        //
+        // A list that cannot be read is treated as "not there": the fallback is
+        // additive, so the cost of being wrong in that direction is the note
+        // appearing twice, and the cost of the other direction is losing the ask.
+        const present = async (sessionID: string): Promise<boolean> => {
+            try {
+                const entries = await ctx.session.instructions.entry.list({ sessionID })
+                return entries.some((entry) => entry.key === ENTRY)
+            } catch {
+                return false
+            }
+        }
+
         const promptHook = await ctx.session.hook("prompt", async (event) => {
             const sessionID = event.sessionID
             if (!sessionID) return
@@ -129,11 +172,17 @@ export default Plugin.define({
                     ? existing.task
                     : String(event.prompt?.text ?? "").trim().slice(0, TASK_LIMIT)
 
-            await ctx.storage.set(key(sessionID), {
-                task,
-                files: files.slice(0, FILES_LIMIT),
-                updated: Date.now(),
-            } satisfies Note)
+            const kept = files.slice(0, FILES_LIMIT)
+            const previous = Array.isArray(existing.files) ? existing.files.map(String) : []
+            const note: Note = { task, files: kept, updated: Date.now() }
+
+            await ctx.storage.set(key(sessionID), note)
+
+            // Only when it changed. A put on every prompt would add an update to
+            // every turn for text that has not moved, which is the cost the
+            // entry mechanism exists to avoid.
+            const changed = task !== existing.task || !sameFiles(previous, kept)
+            if (changed && task !== "") await publish(sessionID, render(note))
         })
 
         // A session that has already been compacted has demonstrably lost detail
@@ -190,6 +239,13 @@ export default Plugin.define({
                 files: (Array.isArray(stored.files) ? stored.files : []).map(String).slice(0, FILES_LIMIT),
                 updated: typeof stored.updated === "number" ? stored.updated : 0,
             }
+
+            // The note is normally already standing context: it was published as
+            // a session instruction entry on the prompt that captured it, and the
+            // host keeps that entry across the compaction. There is nothing to
+            // add in that case, and adding nothing is the point -- a note that
+            // survives the summary does not have to be carried by it.
+            if (await present(sessionID)) return
 
             // System parts, not messages: this is standing context for the next
             // model call, not a fabricated turn in the conversation.
