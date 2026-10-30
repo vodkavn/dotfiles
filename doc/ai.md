@@ -474,10 +474,10 @@ Enable it per project where table normalisation is actually wanted, with
 
 ## Plugins
 
-Eight plugins in `config/opencode/plugins/`, all global. `loadout`,
+Nine plugins in `config/opencode/plugins/`, all global. `loadout`,
 `subagent-watch`, `provider-usage`, `context-detail` and `tui-shortcuts` are
-CLI plugins that draw; `shell-guard`, `tool-guard` and `compaction-memory` are
-server plugins that only change behaviour. The CLI ones still ship a server
+CLI plugins that draw; `shell-guard`, `secret-guard`, `tool-guard` and
+`compaction-memory` are server plugins that only change behaviour. The CLI ones still ship a server
 entry: discovery needs `index.ts` beside `tui.tsx`, and it is what carries the
 plugin id into the storage namespace.
 
@@ -694,6 +694,59 @@ are enabled. The action is on `onMouseUp` and `onMouseDown` only stops
 propagation; the release counts only when it lands on the row that was pressed,
 so a press-and-drag-away cancels instead of opening a session you did not click.
 
+
+### `secret-guard` (server)
+
+Keeps credentials out of the model's view. When a tool result contains a
+secret, the value is replaced with `<masked>` before the result is recorded.
+
+**After the tool, not at the display.** `tool.hook("execute.after")` runs before
+the result is written to the transcript, so what is masked is what the
+transcript holds — not just what the terminal draws. That distinction is the
+whole point: compaction, revert, fork and export all read the stored message, so
+a render-time filter would hide the value on screen and hand it back a turn
+later.
+
+Two kinds of rule, and the difference is the design:
+
+- **The whole output is a secret.** A secret manager read, a credential file, or
+  an echo of a token variable. Nothing about the content is trusted, so none of
+  it is passed on. This is what catches a secret whose shape is unremarkable — a
+  hostname, an address, a password like `hunter2` — because the rule names the
+  *command* and never has to understand the value. The table is
+  `aws secretsmanager`/`ssm`/`sts`/`configure get`, `gcloud secrets`,
+  `az keyvault`, `vault kv`, `op read`, `pass show`, `kubectl get secret`, the
+  credential files under `~/.aws`, `~/.ssh`, `~/.docker`, `~/.config/gh` and the
+  like, plus any command that expands `$GITHUB_TOKEN` or runs
+  `printenv GITHUB_TOKEN`.
+- **The output merely contains one.** Ordinary text, so only the matching span is
+  replaced and the structure survives: a private key block, an AWS access key ID,
+  a JWT, an `Authorization:` header, a `NAME=value` whose name promises a secret,
+  a password inside a URL.
+
+**An address on its own is not masked**, and that is deliberate. Masking every
+host and IP would break the ordinary work of reading a log to find out why a
+connection failed — a worse trade than the leak it would prevent. The secrets
+that contain an address are covered by the command rules, which do not need to
+recognise the content at all.
+
+A name is read as *words*, not as a substring: `GITHUB_TOKEN` says secret,
+`TOKENIZERS` does not. A value is only masked when it is long enough to be one,
+so `DEBUG_TOKEN=false` stays readable.
+
+The masked text says what happened and what to do instead, because an agent
+handed a bare `<masked>` retries the call — the loop **tool-guard** exists to
+catch.
+
+What it is not: a sandbox. It reads text, and text it does not recognise passes.
+A secret already in the transcript before it loaded, one the user pastes into the
+prompt, one printed by a `background` shell (that output arrives on a separate
+path), or one hidden in a tool's `metadata` are all outside it. Treat a pass as
+"no credential shape I know".
+
+Rules live in `secret-guard/mask.ts`, which takes a string and returns a string;
+every table is a plain list, so adding a command or a pattern is a one-line edit
+and a test.
 
 ### `tool-guard` (server)
 
