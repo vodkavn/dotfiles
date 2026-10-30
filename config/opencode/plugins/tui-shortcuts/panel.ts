@@ -1,6 +1,6 @@
 // What the clickable shortcuts in the terminal say.
 //
-// Kept out of tui.tsx for the same reason inspector's drift.ts and
+// Kept out of tui.tsx for the same reason loadout's drift.ts and
 // subagent-watch's panel.ts are kept out of theirs: node can load a plain module
 // and call its exports, but JSX needs opencode's transform.
 // plugin-layout.test.mjs enforces the split.
@@ -17,6 +17,38 @@
 export const COMMANDS = {
     agent: "agent.list",
     model: "model.list",
+} as const
+
+// The plugin's own commands, which exist so the two actions can be reached from
+// the keyboard and found in the command palette.
+//
+// Separate ids from the host's: these are the plugin's, and an id the host owns
+// is the host's to register. Each one dispatches the host command above rather
+// than opening a picker of its own.
+export const COMMAND_IDS = {
+    agent: "dotfiles.switch-agent",
+    model: "dotfiles.switch-model",
+} as const
+
+// The keys the plugin's commands are bound to.
+//
+// A leader sequence is two keys and a timeout; a plain key is one. The host
+// already binds these actions to <leader>a and <leader>m, and this layer adds a
+// direct route to the same dialogs beside it.
+//
+// ctrl+alt+<letter> is the range the host uses for navigation and scrolling
+// (ctrl+alt+up, ctrl+alt+f, ctrl+alt+y) and never for text input, so a binding
+// there cannot swallow a character the user meant to type. Checked against the
+// v2.2.3 keybind reference: neither is bound.
+export const BINDINGS = {
+    agent: "ctrl+alt+a",
+    model: "ctrl+alt+m",
+} as const
+
+// What the plugin's commands are called in the palette and the keybind help.
+export const COMMAND_TITLES = {
+    agent: "Switch agent",
+    model: "Switch model",
 } as const
 
 // One glyph each, so the two shortcuts are told apart at a glance in a footer
@@ -40,7 +72,7 @@ export const MODEL_LABEL = `${MODEL_GLYPH} switch model`
 //
 // `mode: "all"` counts, because such an agent can be the prompt's agent; a
 // `subagent` cannot. Hidden and disabled entries are dropped, the same defensive
-// pair inspector applies, because the host keeps its internal agents (compaction,
+// pair loadout applies, because the host keeps its internal agents (compaction,
 // summary, title) in this registry and they never reach the dialog.
 //
 // An undefined list means the location's store has not synced yet. That is not

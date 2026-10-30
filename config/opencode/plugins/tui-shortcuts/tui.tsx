@@ -1,6 +1,16 @@
 import { Plugin } from "@opencode/plugin/tui"
 import { createSignal } from "solid-js"
-import { AGENT_LABEL, COMMANDS, labelTone, MODEL_LABEL, showsAgentSwitch, type Tone } from "./panel"
+import {
+    AGENT_LABEL,
+    BINDINGS,
+    COMMAND_IDS,
+    COMMAND_TITLES,
+    COMMANDS,
+    labelTone,
+    MODEL_LABEL,
+    showsAgentSwitch,
+    type Tone,
+} from "./panel"
 
 // Clickable **agent** and **model** shortcuts in the prompt footer, each opening
 // the dialog its leader key opens: <leader>a for agents, <leader>m for models.
@@ -112,6 +122,48 @@ export default Plugin.define({
             return showsAgentSwitch(context.data.location.agent.list(location))
         })
         const model = shortcut(COMMANDS.model, MODEL_LABEL)
+
+        // The same two actions as keyboard commands, so they are reachable
+        // without the mouse and findable by name in the command palette.
+        //
+        // The layer is global rather than scoped to the base mode: both actions
+        // are worth reaching while the prompt has focus, which is where a
+        // session spends most of its time, and a layer scoped to the base mode
+        // would go quiet exactly then.
+        //
+        // Each command dispatches opencode's own command, for the reason the
+        // clickable shortcuts give: search, favourites, variants, and provider
+        // grouping are the host's, and a picker built here would drift from
+        // them the first time the host changed.
+        //
+        // Registration is not rendering, but it is not nothing either: the host
+        // owns conflict resolution between layers, which is the part this
+        // plugin could never do for itself.
+        context.keymap.layer(() => ({
+            mode: "global",
+            commands: [
+                {
+                    id: COMMAND_IDS.agent,
+                    title: COMMAND_TITLES.agent,
+                    group: "Agent",
+                    bind: BINDINGS.agent,
+                    palette: true,
+                    run: () => {
+                        context.keymap.dispatch(COMMANDS.agent)
+                    },
+                },
+                {
+                    id: COMMAND_IDS.model,
+                    title: COMMAND_TITLES.model,
+                    group: "Model",
+                    bind: BINDINGS.model,
+                    palette: true,
+                    run: () => {
+                        context.keymap.dispatch(COMMANDS.model)
+                    },
+                },
+            ],
+        }))
 
         return () => {
             agent?.()

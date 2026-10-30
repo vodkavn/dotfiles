@@ -27,9 +27,18 @@ const load = async (path) => {
     return scope.exports
 }
 
-const { AGENT_GLYPH, AGENT_LABEL, COMMANDS, labelTone, MODEL_GLYPH, MODEL_LABEL, showsAgentSwitch } = await load(
-    "../config/opencode/plugins/tui-shortcuts/panel.ts",
-)
+const {
+    AGENT_GLYPH,
+    AGENT_LABEL,
+    BINDINGS,
+    COMMAND_IDS,
+    COMMAND_TITLES,
+    COMMANDS,
+    labelTone,
+    MODEL_GLYPH,
+    MODEL_LABEL,
+    showsAgentSwitch,
+} = await load("../config/opencode/plugins/tui-shortcuts/panel.ts")
 
 test("Each shortcut names its glyph and the action it performs", () => {
     // The action, not the selected value: the host draws the agent and the model
@@ -82,4 +91,29 @@ test("A label is muted at rest and lit under the pointer", () => {
     // reads as chrome, the body colour on hover so the label lights up.
     assert.equal(labelTone(false), "muted")
     assert.equal(labelTone(true), "base")
+})
+
+test("The plugin's commands are its own, and dispatch the host's", () => {
+    // An id the host owns is the host's to register. These are separate so the
+    // plugin can add a binding and a palette entry without claiming one.
+    for (const key of ["agent", "model"]) {
+        assert.notEqual(COMMAND_IDS[key], COMMANDS[key], `${key} must not reuse the host id`)
+        assert.match(COMMAND_IDS[key], /^dotfiles\./, `${key} must be namespaced to this plugin`)
+        assert.notEqual(COMMAND_TITLES[key], "", `${key} needs a name in the palette`)
+    }
+    assert.notEqual(COMMAND_IDS.agent, COMMAND_IDS.model)
+    assert.notEqual(COMMAND_TITLES.agent, COMMAND_TITLES.model)
+})
+
+test("The two commands are bound to different keys, in the host's meta range", () => {
+    assert.notEqual(BINDINGS.agent, BINDINGS.model, "one key for two actions would shadow one")
+    for (const bind of [BINDINGS.agent, BINDINGS.model]) {
+        // ctrl+alt+<letter> is the range the host uses for navigation and
+        // scrolling, never for text input, so a binding here cannot swallow a
+        // character the user meant to type.
+        assert.match(bind, /^ctrl\+alt\+[a-z]$/, `${bind} is outside the range`)
+        // Plain letters would be typed; a bare modifier combination would not
+        // be a binding at all.
+        assert.ok(!/\+[0-9]$/.test(bind), `${bind}: digit bindings are reserved for session switching`)
+    }
 })

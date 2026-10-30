@@ -872,6 +872,16 @@ region painting. The host composes that footer from several contributions alread
 so two contributions is the shape it handles. Registration order is display order,
 so the agent is registered first.
 
+**The same two actions are also keymap commands.** `ctrl+alt+a` and `ctrl+alt+m`
+open the same dialogs, and both appear in the command palette — the point being
+that a clickable label is discoverable only if you know it is there, and a leader
+sequence is two keys and a timeout where a direct binding is one. The bindings sit
+in `ctrl+alt+<letter>`, the range the host uses for navigation and never for text
+input, so neither can swallow a character someone meant to type. Each command
+still dispatches the host's command rather than opening a picker of its own, for
+the reason above, and the host owns conflict resolution between layers — which is
+the part this plugin could never do for itself.
+
 Each shortcut is **muted at rest and lights up under the pointer** (`onMouseOver` /
 `onMouseOut`), the pair opencode's own secondary action uses: muted so the footer
 still reads as chrome, the body colour on hover so the label reads as a target.
