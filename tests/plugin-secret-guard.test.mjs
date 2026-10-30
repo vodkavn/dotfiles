@@ -223,3 +223,11 @@ test("A value wrapped in backticks does not eat the closing tick", () => {
     const long = textOf(inspect({ text: "set `API_TOKEN=abcdefghij` now" }))
     assert.equal(long, "set `API_TOKEN=<masked>` now")
 })
+
+test("Only the argument of printenv counts, not every word after it", () => {
+    // A commit message or a note about the command is not a command. Scanning
+    // every later word turned one sentence into a dozen nonsense reasons.
+    assert.deepEqual([...wholeRules("git commit -m 'document how printenv works'")], [])
+    assert.deepEqual([...wholeRules("printenv GITHUB_TOKEN | head -1")], ["$GITHUB_TOKEN"])
+    assert.deepEqual([...wholeRules("printenv PATH")], [])
+})

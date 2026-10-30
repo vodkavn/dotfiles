@@ -161,10 +161,12 @@ export const wholeRules = (command: string): string[] => {
     }
 
     // `printenv NAME` prints one variable's value; the name is the only signal.
-    if (lower.includes("printenv")) {
-        for (const part of parts.slice(1)) {
-            if (!part.startsWith("-") && looksSecret(part)) found.push(`$${part}`)
-        }
+    // Only the argument right after the command counts: scanning every later word
+    // turns a sentence that merely mentions printenv into a dozen false reasons.
+    const printenv = lower.indexOf("printenv")
+    if (printenv !== -1) {
+        const argument = parts[printenv + 1]
+        if (argument !== undefined && !argument.startsWith("-") && looksSecret(argument)) found.push(`$${argument}`)
     }
 
     return [...new Set(found)]
