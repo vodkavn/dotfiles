@@ -79,6 +79,9 @@ const fixture = async () => {
         fail: (sessionID, tool = "shell", error = { message: "boom" }) =>
             toolHook({ tool, sessionID, status: "error", error }),
         ok: (sessionID, tool = "shell") => toolHook({ tool, sessionID, status: "completed", result: {} }),
+        // A completed call with something to compare, for the identical-call run.
+        done: (sessionID, { tool = "shell", input = {}, text = "same" } = {}) =>
+            toolHook({ tool, sessionID, status: "completed", input, result: { content: [{ type: "text", text }] } }),
     }
 }
 
@@ -556,4 +559,90 @@ test("Compaction says nothing when the session has no note", async () => {
     await hooks.compaction(event)
     assert.deepEqual(event.system, [])
     await cleanup()
+})
+
+// --- tool-guard: the loop that never fails ----------------------------------
+
+test("Three identical completed calls are reported as no progress", async () => {
+    const f = await fixture()
+    // The same question, the same answer, three times. Nothing failed, which is
+    // exactly why nothing else notices it.
+    await f.done("s1")
+    await f.done("s1")
+    assert.deepEqual(await f.nudge("s1"), [], "two is not yet a loop")
+    await f.done("s1")
+    const system = await f.nudge("s1")
+    assert.equal(system.length, 1)
+    assert.match(system[0].text, /Repeated identical tool call/)
+    assert.match(system[0].text, /3 times in a row/)
+    await f.cleanup()
+})
+
+test("The identical-call nudge is said once, not once per model call", async () => {
+    const f = await fixture()
+    for (const _ of [1, 2, 3]) await f.done("s1")
+    assert.equal((await f.nudge("s1")).length, 1)
+    assert.deepEqual(await f.nudge("s1"), [])
+    assert.deepEqual(await f.nudge("s1"), [])
+    // A fourth and fifth identical call are the same run: no new announcement.
+    await f.done("s1")
+    await f.done("s1")
+    assert.deepEqual(await f.nudge("s1"), [])
+    // Six is another multiple of the threshold, so the run is worth mentioning
+    // again -- it is longer than what was last reported.
+    await f.done("s1")
+    assert.equal((await f.nudge("s1")).length, 1)
+    await f.cleanup()
+})
+
+test("A different result, input or tool starts a new run", async () => {
+    const f = await fixture()
+    await f.done("s1", { text: "a" })
+    await f.done("s1", { text: "a" })
+    // Same call, different answer: something changed, so this is progress.
+    await f.done("s1", { text: "b" })
+    await f.done("s1", { text: "b" })
+    assert.deepEqual(await f.nudge("s1"), [], "the run restarted at the change")
+
+    await f.done("s1", { text: "b" })
+    assert.equal((await f.nudge("s1")).length, 1, "three of b")
+
+    // A different input is a different question, whatever the answer.
+    await f.done("s1", { input: { command: "ls other" }, text: "b" })
+    await f.done("s1", { input: { command: "ls other" }, text: "b" })
+    assert.deepEqual(await f.nudge("s1"), [], "the run restarted at the new input")
+    await f.cleanup()
+})
+
+test("A result with no text is never a repeat", async () => {
+    const f = await fixture()
+    // `ok` completes with an empty result. There is nothing to compare, and a
+    // tool that returns only metadata must not look like a loop.
+    await f.ok("s1")
+    await f.ok("s1")
+    await f.ok("s1")
+    await f.ok("s1")
+    assert.deepEqual(await f.nudge("s1"), [])
+    await f.cleanup()
+})
+
+test("The store keeps hashes, not the text it compared", async () => {
+    const { createFailureStore, fingerprint, resultKey } = await load(
+        "../config/opencode/plugins/tool-guard/index.ts",
+    )
+    const store = createFailureStore()
+    const secret = "the exact text of a tool result"
+    const key = fingerprint("read", { filePath: "/tmp/x" })
+    store.repeat("s1", key, "read", resultKey({ content: [{ type: "text", text: secret }] }))
+
+    const entry = JSON.parse(JSON.stringify(store.peek("s1")))
+    assert.equal(entry.repeat.tool, "read")
+    // A second copy of the transcript in the store would be somewhere for a value
+    // secret-guard had masked to come back from.
+    assert.ok(!JSON.stringify(entry).includes(secret), "the result text must not be retained")
+
+    // The fingerprint is stable for the same call and different for another.
+    assert.equal(fingerprint("read", { filePath: "/tmp/x" }), key)
+    assert.notEqual(fingerprint("read", { filePath: "/tmp/y" }), key)
+    assert.equal(fingerprint("read", { a: 1, b: 2 }), fingerprint("read", { b: 2, a: 1 }), "key order is not identity")
 })

@@ -29,13 +29,21 @@ import { Plugin } from "@opencode/plugin"
 // it should: no success since the first failure. An agent trying three different
 // commands and failing at each is exploring, not stuck, and is left alone.
 //
+// It also notices the loop that never fails: the same tool, the same input, the
+// same result, three times running. That is the quiet one -- nothing raises, the
+// transcript fills with identical answers, and from outside it looks like work.
+// Both the input and the result are hashed into the run key, so "the same answer
+// to the same question" is one comparison and the store holds no transcript.
+//
 // What this does NOT do:
 //
-//   - notice a loop where every call *succeeds* but makes no progress
+//   - notice a loop that keeps making *different* calls without progress: only
+//     an identical call is a signal here, because a heuristic over dissimilar
+//     calls would fire on every honest exploration
 //   - notice a stall with no tool calls at all (a thinking loop, or a hang)
 //   - know whether a failure is the agent's fault, the user's, or transient
 //
-// Those need a progress signal the agent does not currently emit. Treat silence
+// The first two need a progress signal the agent does not currently emit. Treat silence
 // from this plugin as "no loop detected", never as "the agent is fine".
 
 // How many sessions are tracked at once. Past this, the least recently used goes.
@@ -54,6 +62,12 @@ export const FRESH_MS = 10 * 60 * 1000
 // Exported for testing; opencode only reads the default export.
 export type Failure = { tool: string; message: string; at: number }
 
+// A run of identical calls: the same tool, the same input, the same result, back
+// to back. `key` and `result` are hashes rather than the text itself — the store
+// must not become a second copy of the transcript, and it must not hold a value
+// that secret-guard was asked to mask.
+export type Repeat = { key: string; tool: string; result: string; count: number }
+
 // Exported for testing; opencode only reads the default export.
 export type Entry = {
     failures: Failure[]
@@ -61,6 +75,11 @@ export type Entry = {
     // because a *different* tool starting its own loop is news: a bare counter
     // would let the first loop silence every later one.
     announced?: { tool: string; message: string; reached: number }
+    // The current run of identical calls, if the last call completed.
+    repeat?: Repeat
+    // The repeat loop already announced, and how many multiples of STREAK it had
+    // reached when it was said.
+    announcedRepeat?: { key: string; reached: number }
 }
 
 // opencode wraps the throwable rather than exposing it directly: its own builtin
@@ -85,6 +104,84 @@ const reasonOf = (failure: unknown): string => {
 // stack is not what makes two failures "the same".
 export const normalize = (message: string): string =>
     (message.split("\n", 1)[0] ?? "").replace(/\d+/g, "#").trim().slice(0, MAX_MESSAGE)
+
+// --- a loop that keeps succeeding -------------------------------------------
+//
+// The failure streak above needs a failure. The other loop is quieter: the agent
+// calls the same tool with the same input, gets the same answer, and does it
+// again. Nothing fails, nothing changes, and from outside it is indistinguishable
+// from work. The signal is the repetition itself -- identical input *and*
+// identical result -- which is why both are hashed into the run key.
+
+// How much of an input or a result a fingerprint may cover. The store keeps
+// hashes, but hashing is linear, and a tool input can carry a whole file.
+const MAX_FINGERPRINT = 4_000
+
+// FNV-1a, 32-bit. Not a security hash and not used as one: the only question
+// asked of it is whether two runs of text are the same, and a collision costs one
+// false "unchanged" against a store that must stay small and must not retain the
+// text it was asked to compare.
+export const hash = (value: string): string => {
+    let state = 0x811c9dc5
+    for (let index = 0; index < value.length; index++) {
+        state ^= value.charCodeAt(index)
+        state = Math.imul(state, 0x01000193) >>> 0
+    }
+    return state.toString(16)
+}
+
+// JSON with its keys in a fixed order, so the same call fingerprints the same way
+// whatever order the object was built in. Depth is capped for the same reason
+// length is: this runs on every completed tool call.
+const stable = (value: unknown, depth = 0): string => {
+    if (depth > 4) return "…"
+    if (value === null || value === undefined) return "null"
+    if (typeof value !== "object") return JSON.stringify(value) ?? String(value)
+    if (Array.isArray(value)) return `[${value.map((item) => stable(item, depth + 1)).join(",")}]`
+    const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    return `{${entries.map(([key, item]) => `${JSON.stringify(key)}:${stable(item, depth + 1)}`).join(",")}}`
+}
+
+// What the model was given, as one string. A content array is joined; a result
+// carrying no text at all fingerprints to nothing, which no repeat can match.
+export const resultText = (result: unknown): string => {
+    const content = (result as { content?: unknown } | undefined)?.content
+    if (typeof content === "string") return content
+    if (!Array.isArray(content)) return ""
+    const parts: string[] = []
+    for (const part of content) {
+        const entry = part !== null && typeof part === "object" ? (part as Record<string, unknown>) : {}
+        if (entry.type === "text" && typeof entry.text === "string") parts.push(entry.text)
+    }
+    return parts.join("\n")
+}
+
+// The identity of one call: the tool and everything it was asked to do.
+export const fingerprint = (tool: string, input: unknown): string =>
+    hash(`${tool}\u0000${stable(input).slice(0, MAX_FINGERPRINT)}`)
+
+// The result a call produced, reduced to something comparable and non-retaining.
+//
+// Empty when the result carries no text at all. A result with nothing to compare
+// cannot be "the same answer twice", and treating it as one would fire on every
+// tool that returns only metadata.
+export const resultKey = (result: unknown): string => {
+    const text = resultText(result)
+    return text === "" ? "" : hash(text.slice(0, MAX_FINGERPRINT))
+}
+
+// The nudge for a run of identical calls.
+export const renderRepeat = (tool: string, count: number): string =>
+    [
+        "## Repeated identical tool call",
+        "",
+        `The \`${tool}\` tool has now returned the same result ${count} times in a row for`,
+        "the same input. Nothing has changed since the first call, so repeating it",
+        "cannot change anything either.",
+        "",
+        "The answer is already above, or it needs a different call. Read what you",
+        "have, or change the approach -- do not run this one again unchanged.",
+    ].join("\n")
 
 // The trailing run of identical failures, if it is recent. Returns the run and
 // the multiple of STREAK it has reached, or undefined when there is no streak.
@@ -172,6 +269,19 @@ export const createFailureStore = () => {
             if (entry.failures.length === 0) entry.announced = undefined
             return entry
         },
+        // Record a completed call, and say how long the current run of identical
+        // calls has been. The run is consecutive by construction: a different key
+        // or a different result starts a new one at 1.
+        repeat: (sessionID: string, key: string, tool: string, result: string): Entry => {
+            const entry = record(sessionID)
+            const previous = entry.repeat
+            const count = previous !== undefined && previous.key === key && previous.result === result ? previous.count + 1 : 1
+            entry.repeat = { key, tool, result, count }
+            // A new run is a new question, so an earlier announcement no longer
+            // applies to it.
+            if (count === 1) entry.announcedRepeat = undefined
+            return entry
+        },
         clear: () => sessions.clear(),
         sessions: () => sessions.size,
         retained: () => {
@@ -199,6 +309,12 @@ export default Plugin.define({
             // gives the error branch its error.
             if (event.status === "completed") {
                 store.succeed(sessionID, tool)
+                // Tracked on the identical-call run: the input and the result are
+                // both hashed, so "the same answer to the same question" is one
+                // comparison rather than a retained transcript. A result with no
+                // text has nothing to compare and is not counted.
+                const result = resultKey(event.result)
+                if (result !== "") store.repeat(sessionID, fingerprint(tool, event.input), tool, result)
                 return
             }
             if (event.status !== "error") return
@@ -213,27 +329,40 @@ export default Plugin.define({
             const entry = store.peek(sessionID)
             if (entry === undefined) return
 
-            const run = streak(entry, Date.now())
-            if (run === undefined) return
-
-            // Announced once per distinct loop, and again only if that same loop
-            // grows by another STREAK. That keeps the nudge off every model call
-            // without letting the first loop silence a later, different one.
-            const already = entry.announced
-            if (
-                already !== undefined &&
-                already.tool === run.tool &&
-                already.message === run.message &&
-                run.reached <= already.reached
-            ) {
-                return
-            }
-            entry.announced = { tool: run.tool, message: run.message, reached: run.reached }
-
             // System parts, not messages: standing context for this call, not a
             // fabricated turn in the conversation.
             const system = event.system ?? (event.system = [])
-            system.push({ type: "text", text: render(run.tool, run.message) })
+
+            const run = streak(entry, Date.now())
+            if (run !== undefined) {
+                // Announced once per distinct loop, and again only if that same
+                // loop grows by another STREAK. That keeps the nudge off every
+                // model call without letting the first loop silence a later,
+                // different one.
+                const already = entry.announced
+                const stale =
+                    already === undefined ||
+                    already.tool !== run.tool ||
+                    already.message !== run.message ||
+                    run.reached > already.reached
+                if (stale) {
+                    entry.announced = { tool: run.tool, message: run.message, reached: run.reached }
+                    system.push({ type: "text", text: render(run.tool, run.message) })
+                }
+            }
+
+            // The loop that never fails: the same call, the same answer, again.
+            // Same announcement rule -- once per run, and again if the run doubles
+            // the threshold -- so a long repeat is not narrated on every call.
+            const repeat = entry.repeat
+            if (repeat !== undefined && repeat.count >= STREAK) {
+                const reached = Math.floor(repeat.count / STREAK)
+                const already = entry.announcedRepeat
+                if (already === undefined || already.key !== repeat.key || reached > already.reached) {
+                    entry.announcedRepeat = { key: repeat.key, reached }
+                    system.push({ type: "text", text: renderRepeat(repeat.tool, repeat.count) })
+                }
+            }
         })
 
         return async () => {
