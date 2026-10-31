@@ -176,7 +176,10 @@ run_child() {
     else
         args+=("$script")
     fi
-    timeout 20s env -i \
+    # --foreground keeps the interactive child in the terminal's foreground
+    # group; otherwise its tcsetpgrp stops timeout itself with SIGTTOU and the
+    # timer never fires, hanging the suite on a real terminal.
+    timeout --foreground 20s env -i \
         PATH="$path" \
         HOME="$home" \
         XDG_CONFIG_HOME="$home/.config" \
