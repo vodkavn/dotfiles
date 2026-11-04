@@ -128,6 +128,8 @@ done
 # link loop is narrower still: it removes only links pointing back into this
 # checkout whose source is gone, so deleting a plugin here cannot leave a
 # dangling entry in ~/.config/opencode/plugins/ for opencode to trip over.
+# $ai_disabled_plugins is removed from the list before that prune, so a plugin
+# kept in the repository but switched off also loses its link.
 #
 # opencode merges two layers, global first and project second:
 #   $HOME/.config/opencode/      global; applies to every project
@@ -141,6 +143,12 @@ done
 #
 ai_global=$HOME/.config/opencode
 ai_src=$HOME/.dotfiles/config/opencode
+
+# Plugins left out of the install while they are being reworked. The source
+# stays in config/opencode/plugins/ so the code and its tests keep running,
+# but the link is not made, and the prune below removes any link an earlier
+# run left in $ai_global. Blank this list to install the plugin again.
+ai_disabled_plugins="plugins/source-control"
 
 # Build the link list from the filesystem rather than a hardcoded array. Emits
 # paths relative to config/opencode/ (opencode.json, plugins/loadout, ...) and
@@ -162,6 +170,12 @@ ai_link_list=$(
         find . -mindepth 1 -maxdepth 1 -type d ! -name plugins -printf '%P\n'
     } | LC_ALL=C sort
 )
+
+# Drop the disabled plugins from the list. The prune below then removes any
+# link a previous run installed for them.
+for file in $ai_disabled_plugins; do
+    ai_link_list=$(printf '%s\n' "$ai_link_list" | grep -vxF -- "$file")
+done
 
 if command -v opencode >/dev/null 2>&1; then
     echo "Installing AI configuration..."

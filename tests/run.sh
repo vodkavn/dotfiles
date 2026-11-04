@@ -913,10 +913,11 @@ case_ai_config_link_discovery() {
 case_ai_stale_link_prune() {
     local src="$CASE_DIR/dotfiles/config/opencode"
     local global="$CASE_DIR/home/.config/opencode"
-    mkdir -p -- "$src/plugins/alpha" "$src/plugins/beta" \
+    mkdir -p -- "$src/plugins/alpha" "$src/plugins/beta" "$src/plugins/omega" \
         "$global/plugins/community" "$global/commands"
     : > "$src/plugins/alpha/index.ts"
     : > "$src/plugins/beta/index.ts"
+    : > "$src/plugins/omega/index.ts"
     : > "$global/plugins/community/index.ts"
     printf '# rules\n' > "$src/AGENTS.md"
 
@@ -928,12 +929,17 @@ case_ai_stale_link_prune() {
     # The deleted plugin: its link points into the checkout, but the source
     # directory is gone, so the link dangles.
     link plugins/tokens plugins/tokens
+    # The disabled plugin: its source is still there, but install.sh leaves it
+    # out of the link list while it is being reworked, so the link from an
+    # earlier run is pruned like a deleted one.
+    link plugins/omega plugins/omega
 
     assert_absent "$src/plugins/tokens"
     assert_eq "$(find "$global" -xtype l | wc -l)" '1' "fixture must have exactly one dangling link"
 
     # The loop, as install.sh runs it.
-    local ai_src=$src ai_global=$global ai_link_list existing target relative
+    local ai_src=$src ai_global=$global ai_link_list existing target relative file
+    local ai_disabled_plugins="plugins/omega"
     ai_link_list=$(
         cd "$ai_src" 2>/dev/null || exit 0
         {
@@ -942,6 +948,9 @@ case_ai_stale_link_prune() {
             find . -mindepth 1 -maxdepth 1 -type d ! -name plugins -printf '%P\n'
         } | LC_ALL=C sort
     )
+    for file in $ai_disabled_plugins; do
+        ai_link_list=$(printf '%s\n' "$ai_link_list" | grep -vxF -- "$file")
+    done
     while IFS= read -r existing; do
         [ -n "$existing" ] || continue
         target=$(readlink "$existing")
@@ -958,6 +967,10 @@ case_ai_stale_link_prune() {
     # The dangling link is gone.
     assert_absent "$global/plugins/tokens"
     assert_eq "$(find "$global" -xtype l | wc -l)" '0' "prune must leave no dangling link"
+    # A disabled plugin keeps its source but loses its link, so opencode stops
+    # discovering it on the next start.
+    assert_exists "$src/plugins/omega"
+    assert_absent "$global/plugins/omega"
     # Everything with a live source is untouched.
     assert_exists "$global/plugins/alpha"
     assert_exists "$global/plugins/beta"
