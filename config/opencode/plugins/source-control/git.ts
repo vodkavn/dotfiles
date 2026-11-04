@@ -386,6 +386,20 @@ export const statusAll = async (repos: readonly Repo[], signal?: AbortSignal): P
 // makes the worst case a truncated patch marked `more`.
 export const DIFF_LIMIT = 400 * 1024
 
+// How many lines the pane will hand to the highlighter.
+//
+// The byte cap above protects the read; this one protects the *render*. Each
+// line is a tree-sitter parse and a styled run, and a ten-thousand-line patch
+// would be paid again on every repaint of the panel -- the one place in this
+// plugin where the cost is per-frame rather than per-refresh. Past this the
+// pane draws the patch as plain text: still scrollable, still the whole file,
+// just without colour.
+//
+// Measured: the split-and-scan this module does is linear and cheap (430 us for
+// 10k lines), so the limit is not about this code. It bounds what the host's
+// highlighter is asked to do.
+export const HIGHLIGHT_LINES = 4000
+
 // One file's unified diff, against the working tree or the index.
 //
 // `staged` picks the comparison: unstaged reads `git diff`, staged reads
@@ -398,6 +412,11 @@ export const diff = async (
     options: { readonly staged: boolean; readonly untracked?: boolean },
     signal?: AbortSignal,
 ): Promise<Diff> => {
+    // The default three lines of context -- the same patch opencode's own diff
+    // view shows. Asking for the whole file (`-U1000000`) was tried and taken
+    // back out: the pane could not scroll, so the extra lines were drawn and
+    // then clipped, and what the reader lost was the quick route to the change
+    // itself.
     const args = ["diff", "--no-color", "--no-ext-diff"]
     if (options.untracked === true) args.push("--no-index", "/dev/null", path)
     else if (options.staged) args.push("--cached", "--", path)
@@ -481,16 +500,128 @@ export const isNewFile = (
 //
 // The file headers are skipped rather than counted, because `<diff>` does not
 // draw them: counting them would put every jump that many rows too high.
+// One hunk of a patch, with the file headers it needs to parse as a patch.
+//
+// The pane shows a single hunk at a time rather than the whole patch: a hunk is
+// the unit a diff is read in, it fits a screen, and stepping between hunks
+// needs no scrolling -- the one mechanism that worked here.
+//
+// The headers are carried so `<diff>` accepts the fragment; `index` is dropped,
+// because it names object ids that mean nothing for a fragment and the view
+// does not draw it.
+export const sliceHunk = (patch: string, which: number): { readonly patch: string; readonly count: number } => {
+    // An empty patch is not an error: a file with nothing to show, or a
+    // snapshot from a build that did not keep the full text, reaches here.
+    if (patch === "") return { patch: "", count: 0 }
+    const header: string[] = []
+    const hunks: string[][] = []
+    let current: string[] | undefined
+
+    for (const line of patch.split("\n")) {
+        if (line.startsWith("@@")) {
+            current = [line]
+            hunks.push(current)
+            continue
+        }
+        if (current === undefined) {
+            if (line.startsWith("index ") || line === "") continue
+            header.push(line)
+            continue
+        }
+        current.push(line)
+    }
+
+    if (hunks.length === 0) return { patch, count: 0 }
+    // A trailing empty string from the final newline is not a line.
+    for (const hunk of hunks) if (hunk[hunk.length - 1] === "") hunk.pop()
+    const index = Math.max(0, Math.min(which, hunks.length - 1))
+    return { patch: [...header, ...hunks[index]!].join("\n"), count: hunks.length }
+}
+
 export const hunkPositions = (patch: string): number[] => {
+    // A row index that matches what `<diff>` draws, not what the patch text
+    // contains.
+    //
+    // `buildUnifiedView` walks each hunk's lines and increments one `lineIndex`
+    // per added, removed or context line. It does **not** draw the `@@` header
+    // as a row, and it does not draw `diff --git`, `index`, `---` or `+++` at
+    // all. So a hunk's start is the number of body lines before it, and a
+    // first hunk is always 0 -- which is why scrolling to `hunkPositions()[0]`
+    // moved nothing.
     const starts: number[] = []
     let row = 0
+    let inHunk = false
     for (const text of patch.split("\n")) {
+        if (text.startsWith("@@")) {
+            starts.push(row)
+            inHunk = true
+            continue
+        }
         if (text.startsWith("diff --git ") || text.startsWith("index ")) continue
         if (text.startsWith("--- ") || text.startsWith("+++ ")) continue
-        if (text.startsWith("@@")) starts.push(row)
+        // Only lines inside a hunk are body lines; a trailing empty string from
+        // the final newline outside one is not.
+        if (!inHunk) continue
+        if (text === "") continue
         row += 1
     }
     return starts
+}
+
+// The first row where the text actually changes, within the first hunk.
+//
+// With the whole file in the patch, the first hunk starts at row 0 -- the file
+// header is not a row -- so scrolling to it would leave the view at the top of
+// the file, which is the thing this is meant to avoid. What is wanted is the
+// first line carrying a `+` or `-`, and its row is its position among the body
+// lines before it.
+export const firstChangeRow = (patch: string): number => {
+    let row = 0
+    let inHunk = false
+    for (const text of patch.split("\n")) {
+        if (text.startsWith("@@")) {
+            inHunk = true
+            continue
+        }
+        if (text.startsWith("diff --git ") || text.startsWith("index ")) continue
+        if (text.startsWith("--- ") || text.startsWith("+++ ")) continue
+        if (!inHunk) continue
+        if (text === "") continue
+        if (text.startsWith("+") || text.startsWith("-")) return row
+        row += 1
+    }
+    return 0
+}
+
+// The whole staged diff, as the raw material for a commit message.
+//
+// `--cached` with no path, so it spans every staged file rather than the one
+// selected -- a commit message describes the commit. The cap is the same as a
+// single file's: a message is not worth more than the diff limit, and a
+// truncated diff still names the files and the shape of the change.
+export const stagedDiff = async (repo: Repo, signal?: AbortSignal): Promise<string> => {
+    const result = await git(repo.root, ["diff", "--cached", "--no-color", "--no-ext-diff"], signal, DIFF_LIMIT)
+    return result.ok ? result.out : ""
+}
+
+// The subjects of recent commits, newest first.
+//
+// The best guide to how a repository writes commit messages is the messages it
+// already has. A model told "Conventional Commits" will still guess at the
+// scope, the verb, and whether this project uses a body at all; twenty real
+// subjects answer all three without describing them.
+export const recentSubjects = async (repo: Repo, signal?: AbortSignal): Promise<readonly string[]> => {
+    const result = await git(repo.root, ["log", "--format=%s", "-n", "20"], signal)
+    if (!result.ok) return []
+    return result.out.split("\n").filter((line) => line.trim() !== "")
+}
+
+// The names of the files a commit would include. Read from the index, so it is
+// exactly what `git diff --cached` covers.
+export const stagedFiles = async (repo: Repo, signal?: AbortSignal): Promise<readonly string[]> => {
+    const result = await git(repo.root, ["diff", "--cached", "--name-only", "-z"], signal)
+    if (!result.ok) return []
+    return result.out.split("\u0000").filter((entry) => entry !== "")
 }
 
 // --- writes -----------------------------------------------------------------
@@ -558,8 +689,12 @@ export const run = async (repo: Repo, action: Action, options: { readonly messag
                 args.push("add", "--", options.path)
                 break
             case "unstage":
+                // `reset HEAD --` rather than `restore --staged`: the latter
+                // refuses a file that was newly added (it has nothing in HEAD to
+                // restore from), which is exactly the file you most often want
+                // to take back out of the index. `reset` handles both.
                 if (options.path === undefined) return { ok: false, error: "no path to unstage" }
-                args.push("restore", "--staged", "--", options.path)
+                args.push("reset", "-q", "HEAD", "--", options.path)
                 break
         }
 

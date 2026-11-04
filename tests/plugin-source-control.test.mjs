@@ -319,12 +319,106 @@ test("hunks are located by row, skipping the headers the diff view hides", () =>
         " twenty",
         "+added",
     ].join("\n")
-    // Rows the view draws: the headers are skipped, so the first hunk is at row
-    // 0 and the second follows the four rows the first one occupies (`@@`,
-    // `one`, `-two`, `+TWO`).
-    assert.deepEqual(plain(git.hunkPositions(patch)), [0, 4])
+    // Rows the view draws. `<diff>` does not render the `@@` header as a row,
+    // so a hunk starts at the number of body lines before it: 0 for the first,
+    // 3 for the second (the first hunk occupies `one`, `-two`, `+TWO`).
+    assert.deepEqual(plain(git.hunkPositions(patch)), [0, 3])
     // A patch with no hunk has nowhere to jump.
     assert.deepEqual(plain(git.hunkPositions("")), [])
+})
+
+test("the commit prompt carries the repository's own log as the style guide", () => {
+    const prompt = panel.commitPrompt(["a.ts", "b/c.ts"], "diff --git a/a.ts b/a.ts\n+one", [
+        "feat(plugins): add staging",
+        "fix(opencode): handle an empty diff",
+    ])
+    // The real subjects are in the prompt, not merely described: a model told
+    // "Conventional Commits" still guesses at scope and verb.
+    assert.ok(prompt.includes("feat(plugins): add staging"))
+    assert.ok(prompt.includes("fix(opencode): handle an empty diff"))
+    assert.match(prompt, /Conventional Commits/)
+    assert.match(prompt, /at most 72 characters/)
+    // A body is allowed now that the box is a textarea.
+    assert.match(prompt, /body of at most three/)
+    // The file list leads the diff: it survives truncation, the diff does not.
+    assert.ok(prompt.indexOf("a.ts") < prompt.indexOf("diff --git"))
+    // No history, no files: both sections are simply absent.
+    const bare = panel.commitPrompt([], "x")
+    assert.equal(bare.includes("Recent subjects"), false)
+    assert.equal(bare.includes("Files changed"), false)
+})
+
+test("a generated message keeps a body and loses the wrapping", () => {
+    // Fenced, which is how models most often answer.
+    assert.equal(panel.cleanMessage("```\nfeat(plugins): add staging\n```"), "feat(plugins): add staging")
+    // A preamble line before the message.
+    assert.equal(panel.cleanMessage("Here is the commit message:\nfix(plugins): handle empty diff"), "fix(plugins): handle empty diff")
+    // Quotes around the subject.
+    assert.equal(panel.cleanMessage('"docs: describe source-control"'), "docs: describe source-control")
+    // A body now survives: the dialog is a textarea, so the reason fits.
+    assert.equal(
+        panel.cleanMessage("feat: one line\n\nbecause the old path was slow"),
+        "feat: one line\n\nbecause the old path was slow",
+    )
+    // But not an unbounded one.
+    const long = panel.cleanMessage(["feat: subject", "", "a", "b", "c", "d", "e", "f"].join("\n"))
+    assert.ok(long.split("\n").length <= 6, long)
+    // Nothing usable, said as nothing.
+    assert.equal(panel.cleanMessage("```\n```"), "")
+    assert.equal(panel.cleanMessage("   "), "")
+})
+
+test("a patch is shown one hunk at a time, headers carried along", () => {
+    const patch = [
+        "diff --git a/x b/x",
+        "index 1..2 100644",
+        "--- a/x",
+        "+++ b/x",
+        "@@ -1,2 +1,2 @@",
+        " one",
+        "-two",
+        "+TWO",
+        "@@ -20,1 +20,2 @@",
+        " twenty",
+        "+added",
+    ].join("\n")
+
+    const first = plain(git.sliceHunk(patch, 0))
+    assert.equal(first.count, 2)
+    // The headers travel with the slice so `<diff>` still parses it; `index`
+    // does not, because it names ids that mean nothing for a fragment.
+    assert.ok(first.patch.startsWith("diff --git a/x b/x"), first.patch)
+    assert.ok(first.patch.includes("@@ -1,2 +1,2 @@"))
+    assert.equal(first.patch.includes("@@ -20,1"), false)
+    assert.equal(first.patch.includes("index "), false)
+
+    const second = plain(git.sliceHunk(patch, 1))
+    assert.ok(second.patch.includes("@@ -20,1 +20,2 @@"))
+    assert.equal(second.patch.includes("+TWO"), false)
+
+    // Out of range clamps rather than throwing, and an empty patch is empty
+    // rather than an error -- both reach here from a stale snapshot.
+    assert.equal(plain(git.sliceHunk(patch, 99)).count, 2)
+    assert.deepEqual(plain(git.sliceHunk("", 0)), { patch: "", count: 0 })
+})
+
+test("the first changed row ignores the file header lines", () => {
+    // `--- a/x` begins with `-` but is not a change. Counting it would scroll
+    // to the top of the file instead of the first edited line.
+    const patch = [
+        "diff --git a/x b/x",
+        "index 1..2 100644",
+        "--- a/x",
+        "+++ b/x",
+        "@@ -1,3 +1,3 @@",
+        " keep",
+        "-old",
+        "+new",
+    ].join("\n")
+    assert.equal(git.firstChangeRow(patch), 1)
+    // With the whole file in the patch, this is the row the pane opens on; the
+    // first hunk itself starts at 0, which is why scrolling to it moved nothing.
+    assert.equal(git.hunkPositions(patch)[0], 0)
 })
 
 test("a file's tree-sitter language is read from its name", () => {
@@ -360,6 +454,17 @@ test("an empty group is omitted rather than drawn as a bare heading", () => {
         { repo: { root: "/a", label: ".", depth: 0 }, branch: { name: "main", ahead: 0, behind: 0 }, changes: [{ path: "x", status: "M", index: "none", worktree: "modified" }] },
     ])
     assert.deepEqual(plain(panel.groupChanges(rows[0]).map((group) => group.title)), ["Changes"])
+})
+
+test("the file button offers the opposite of the group it is drawn under", () => {
+    // A row under Staged Changes can be taken out of the index; one under
+    // Changes can be put in. The glyph is the action, not the file's status
+    // letter: an `AM` row appears under both headings and must read `-` in one
+    // and `+` in the other.
+    // Wide strokes rather than the ASCII pair: one cell either way, and legible
+    // at a column width. Emoji alternatives would be two cells and break the row.
+    assert.deepEqual(plain(panel.fileButton(true)), { glyph: "━", staged: true, title: "Unstage" })
+    assert.deepEqual(plain(panel.fileButton(false)), { glyph: "✚", staged: false, title: "Stage" })
 })
 
 test("one glyph per row: nested repositories show the bullet instead of the fold", () => {

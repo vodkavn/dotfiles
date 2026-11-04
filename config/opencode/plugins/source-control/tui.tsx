@@ -1,13 +1,30 @@
 import { Plugin } from "@opencode/plugin/tui"
 import { SyntaxStyle, type RGBA } from "@opentui/core"
-import { Show, For, createMemo } from "solid-js"
-import { contents, diff, discover, hunkPositions, isNewFile, run, statusAll, type Repo, type Status } from "./git"
+import { Show, For, createMemo, createSignal } from "solid-js"
+import {
+    contents,
+    diff,
+    discover,
+    HIGHLIGHT_LINES,
+    isNewFile,
+    run,
+    recentSubjects,
+    sliceHunk,
+    stagedDiff,
+    stagedFiles,
+    statusAll,
+    type Repo,
+    type Status,
+} from "./git"
 import {
     actions,
+    fileButton,
     branchLine,
     buildRows,
     buildView,
     changeLine,
+    cleanMessage,
+    commitPrompt,
     INDENT_WIDTH,
     diffLines,
     filetypeOf,
@@ -61,10 +78,6 @@ import {
 
 type MouseEvent = { stopPropagation(): void; preventDefault(): void }
 
-// The part of the scrollbox a jump needs. The host owns the element type, so
-// only the one method is named rather than importing the whole renderable.
-type ScrollHandle = { scrollTo(position: number): void }
-
 // How long a change notification is allowed to settle before a refresh runs.
 //
 // A code-generation turn touches dozens of files in a few hundred ms. Without
@@ -82,8 +95,6 @@ const SIDEBAR_TTL_MS = 30_000
 //
 // Takes the theme the plugin context hands over -- the same type the host uses,
 // so a token that stops existing is a compile error rather than a black row.
-// A small table rather than a switch keeps it one line per tone and makes the
-// default obvious.
 const palette = (theme: {
     readonly text: {
         readonly base: RGBA
@@ -107,6 +118,13 @@ const palette = (theme: {
         muted: theme.text.muted,
     }
 }
+
+// The column a file row in the panel reserves for its stage/unstage button.
+// The sidebar draws no button.
+const BUTTON_WIDTH = 1
+
+// The id of the body renderable. Kept so the mouse wheel can find it.
+const DIFF_ID = "source-control-body"
 
 // The name the panel registers under. Plugin-prefixed, because slot names are
 // shared selection values rather than registered claims.
@@ -137,7 +155,7 @@ export default Plugin.define({
         // neither column agreed with. A generation that does not match this
         // build means the snapshot is not ours to read: drop it, and the first
         // render reads again.
-        const GENERATION = 4
+        const GENERATION = 5
         const [state, setState] = context.storage.memory("source-control", {
             initial: {
                 generation: GENERATION,
@@ -145,6 +163,8 @@ export default Plugin.define({
                 version: 0,
                 loading: false,
                 patch: "" as string,
+                // The whole patch, kept so a hunk step needs no second read.
+                full: "" as string,
                 // True when `patch` is a whole file rather than a diff, and
                 // when the byte budget cut it short.
                 fresh: false,
@@ -154,10 +174,11 @@ export default Plugin.define({
                 // scrolling, and this is what the buttons step through.
                 hunks: 0,
                 hunk: 0,
-                // The tree-sitter language of the file on screen, and the
-                // host's own style for it. Both are undefined for a file with
-                // no grammar, which draws as plain text.
+                // The tree-sitter language of the file on screen. Undefined for
+                // a file with no grammar, which draws as plain text.
                 filetype: "" as string,
+                // True when the patch is too long to hand to the highlighter.
+                tooLarge: false,
                 // Why the last read failed, when it did. Empty on success.
                 failure: "" as string,
                 // The group the last read was for, so the diagnostic above can
@@ -179,6 +200,7 @@ export default Plugin.define({
                 draft.hunks = 0
                 draft.hunk = 0
                 draft.filetype = ""
+                draft.tooLarge = false
                 draft.failure = ""
                 draft.lastStaged = false
             })
@@ -238,13 +260,30 @@ export default Plugin.define({
             syntaxStyle = undefined
         }
 
-        // The scrollbox the diff pane drew, so a jump can move it. Reassigned by
-        // every render's `ref`, and undefined until the pane has drawn once.
-        let scroll: ScrollHandle | undefined
-
         // The session whose repositories were read for the panel currently on
         // screen, so a re-open reads again and a repaint does not.
         let shownFor: string | undefined
+
+        // Which read is the current one.
+        //
+        // Each click starts a `git` process and awaits it, and nothing in git
+        // promises they finish in the order they started. Without a token, the
+        // read that finishes *last* wins and the pane shows a file you are no
+        // longer looking at -- visible in a log as three `request` lines within
+        // a second, each with a different line number. A read that finds the
+        // token moved on drops its result instead of publishing it.
+        let readToken = 0
+
+        // Which row the pointer is over, by the same key the press guard uses.
+        //
+        // A store rather than a plain variable: Solid repaints when something it
+        // reads changes, and a hover has to *cause* a repaint -- the row is the
+        // same text before and after, only the button behind it appears. Memory
+        // storage gives that for free and survives a plugin reload, which the
+        // pointer position does not need but costs nothing.
+        const [hover, setHover] = context.storage.memory("source-control-hover", {
+            initial: { key: "" as string },
+        })
 
         // Which row a held press started on, at plugin scope rather than inside
         // the render: a repaint replaces the handlers with fresh closures, and
@@ -359,13 +398,14 @@ export default Plugin.define({
             // empty patch renders as "No textual diff for this file", which
             // reads as "git had nothing to show" and hides the real reason a
             // file that certainly has a diff is blank.
+            const token = ++readToken
             let result
             try {
                 result = fresh
                     ? await contents(repo, path, { staged })
                     : await diff(repo, path, { staged, untracked })
             } catch (error) {
-                if (disposed) return
+                if (disposed || token !== readToken) return
                 const reason = error instanceof Error ? error.message : String(error)
                 setState((draft) => {
                     draft.patch = ""
@@ -373,10 +413,15 @@ export default Plugin.define({
                 })
                 return
             }
-            if (disposed) return
-            const starts = fresh ? [] : hunkPositions(result.patch)
+            // Superseded while git was running: this result belongs to a file
+            // the user has already moved off.
+            if (disposed || token !== readToken) return
+            // A diff is shown one hunk at a time. `full` keeps the whole patch
+            // so stepping does not have to read the file again.
+            const sliced = fresh ? undefined : sliceHunk(result.patch, 0)
             setState((draft) => {
-                draft.patch = result.patch
+                draft.full = result.patch
+                draft.patch = sliced === undefined ? result.patch : sliced.patch
                 draft.failure = ""
                 draft.lastStaged = staged
                 draft.fresh = fresh
@@ -384,36 +429,205 @@ export default Plugin.define({
                 // Opening on the first hunk rather than on the top of the file
                 // is the whole point: the context above it is the part nobody
                 // needs to read first.
-                draft.hunks = starts.length
+                draft.hunks = sliced === undefined ? 0 : sliced.count
                 draft.hunk = 0
                 draft.filetype = filetypeOf(path) ?? ""
+                // Past this many lines the pane stops asking the highlighter to
+                // parse every row on every repaint. See HIGHLIGHT_LINES.
+                draft.tooLarge = result.patch.split("\n").length > HIGHLIGHT_LINES
             })
-            if (starts.length > 0) scrollTo(0)
         }
 
         // Step the diff to the next or previous hunk.
         //
-        // Wraps, because a diff with three hunks is a short list you cycle
+        // No scroll: the pane draws one hunk, so stepping replaces what is
+        // shown rather than moving a viewport. That is the mechanism that
+        // worked -- the scrollbox never did -- and it is also how a diff is
+        // read, one change after another.
+        //
+        // Wraps, because a file with three hunks is a short list you cycle
         // through rather than a document with an end to stop at.
-        const jump = (direction: -1 | 1) => {
-            if (state.hunks === 0) return
+        const stepHunk = (direction: -1 | 1) => {
+            // `full` is what the slice is taken from. An empty one means the
+            // snapshot came from a build that did not keep it, and slicing
+            // would publish an empty patch -- the "No textual diff" this
+            // guards against.
+            if (state.hunks <= 1 || state.full === "") return
             const next = (state.hunk + direction + state.hunks) % state.hunks
+            const sliced = sliceHunk(state.full, next)
             setState((draft) => {
                 draft.hunk = next
+                draft.patch = sliced.patch
+                draft.version += 1
             })
-            const line = hunkPositions(state.patch)[next]
-            if (line !== undefined) scrollTo(line)
         }
 
-        // Move the scrollbox to a row, once the render that owns it has landed.
-        // A ref assigned in this render may still be the previous element, so
-        // the call is deferred by a microtask rather than read immediately.
-        const scrollTo = (line: number) => {
-            queueMicrotask(() => {
-                const target = scroll
-                if (target === undefined) return
-                target.scrollTo(line)
-            })
+        // Stage or unstage one file, then read the repository again.
+        //
+        // The refresh is what moves the row between the two headings: staging a
+        // file changes its index column, so the group it belongs to is the
+        // repository's answer, not this function's. Rewriting `rows` locally
+        // would be a guess that the next `git status` might contradict.
+        const stageFile = async (row: RepoRow, path: string, staged: boolean, where: Location) => {
+            const repo: Repo = { root: row.root, label: row.label, depth: 0 }
+            const result = await run(repo, staged ? "unstage" : "stage", { path })
+            if (!result.ok) {
+                context.ui.toast.show({ title: staged ? "Unstage failed" : "Stage failed", message: result.error, variant: "error" })
+                return
+            }
+            await refresh(where)
+        }
+
+        // The commit dialog.
+        //
+        // A dialog of this plugin's own rather than `dialog.prompt`: the prompt
+        // is the host's and carries no buttons, and the thing wanted here is a
+        // button inside it. `dialog.show` takes JSX, so the message box, the
+        // Generate button and the two ways out are all one element.
+        //
+        // The input is uncontrolled on purpose. `<input>` keeps its own text and
+        // reports it through `value`; mirroring every keystroke into a signal
+        // would re-render the dialog on each character for no gain. The signal
+        // exists only for what the button writes back.
+        const openCommit = (row: RepoRow, where: Location) => {
+            const repo: Repo = { root: row.root, label: row.label, depth: 0 }
+            // The palette is per-instance and re-resolves on a theme change, so
+            // it is read here rather than captured from a render.
+            const colours = palette(context.theme)
+            const [busy, setBusy] = createSignal(false)
+            const [note, setNote] = createSignal("")
+            // A textarea, not an input: a commit message worth writing has a
+            // body, and a single-line input scrolls sideways -- the tail of a
+            // generated subject sat off the left edge and looked truncated.
+            let field: { plainText: string; setText(text: string): void; focus(): void } | undefined
+
+            const text = () => (field?.plainText ?? "").trim()
+
+            const close = () => context.ui.dialog.clear()
+
+            const commit = async () => {
+                const message = text()
+                if (message === "") {
+                    setNote("a commit message is required")
+                    return
+                }
+                close()
+                const result = await run(repo, "commit", { message })
+                context.ui.toast.show(
+                    result.ok
+                        ? { title: "Committed", message: row.label, variant: "success" }
+                        : { title: "Commit failed", message: result.error, variant: "error" },
+                )
+                await refresh(where)
+            }
+
+            // Ask the model for a subject, and put the answer in the box.
+            //
+            // The whole staged diff goes in, not the file on screen: a commit
+            // message describes the commit, and the commit is everything in the
+            // index. Both reads are one `git` call each and run together.
+            const generate = async () => {
+                if (busy()) return
+                setBusy(true)
+                setNote("")
+                try {
+                    // Three reads, one round trip each, run together. The log is
+                    // what tells the model how this repository writes a
+                    // message; the diff is what it is describing.
+                    const [diff, files, history] = await Promise.all([
+                        stagedDiff(repo),
+                        stagedFiles(repo),
+                        recentSubjects(repo),
+                    ])
+                    if (diff.trim() === "") {
+                        setNote("nothing staged to describe")
+                        return
+                    }
+                    // The model the session is already talking to, not a
+                    // default. `generate` takes one optionally, and without it
+                    // the server picks whatever is configured -- which may be a
+                    // different provider, a different price, and a different
+                    // idea of what a commit subject looks like than the model
+                    // the user chose for this conversation.
+                    //
+                    // Read at the moment of the call: `current()` answers for
+                    // the prompt as it stands, so a model switched mid-session
+                    // is picked up without anything here subscribing to it.
+                    const selected = context.ui.model.current()
+                    const answer = await context.client.generate.text({
+                        prompt: commitPrompt(files, diff, history),
+                        ...(selected === undefined
+                            ? {}
+                            : {
+                                  model: {
+                                      providerID: selected.providerID,
+                                      id: selected.modelID,
+                                      ...(selected.variant === undefined ? {} : { variant: selected.variant }),
+                                  },
+                              }),
+                    })
+                    const message = cleanMessage(answer.text)
+                    if (message === "") {
+                        setNote("the model returned nothing usable")
+                        return
+                    }
+                    if (field !== undefined) field.setText(message)
+                } catch (error) {
+                    // A model that is down, or a prompt the provider rejects, is
+                    // an ordinary failure: say so in the dialog and leave the
+                    // box editable rather than closing it.
+                    setNote(error instanceof Error ? error.message : String(error))
+                } finally {
+                    setBusy(false)
+                }
+            }
+
+            const button = (label: string, onClick: () => void, tone: Tone, active = () => true) => (
+                <box
+                    onMouseDown={(event) => {
+                        event.stopPropagation()
+                    }}
+                    onMouseUp={(event) => {
+                        event.preventDefault()
+                        event.stopPropagation()
+                        if (active()) onClick()
+                    }}
+                >
+                    <text wrapMode="none" fg={colours.colour(active() ? tone : "muted")}>{label}</text>
+                </box>
+            )
+
+            context.ui.dialog.set({ size: "large" })
+            context.ui.dialog.show(
+                () => (
+                    <box flexDirection="column" gap={1} padding={1}>
+                        <text wrapMode="none" fg={colours.base}>
+                            {`Commit in ${row.label === "." ? "this repository" : row.label}`}
+                        </text>
+                        <text wrapMode="none" fg={colours.muted}>{`${row.changes.length} file(s) staged · Alt+Enter commits`}</text>
+                        <textarea
+                            ref={(element: unknown) => {
+                                field = element as { plainText: string; setText(text: string): void; focus(): void }
+                            }}
+                            height={6}
+                            placeholder="Commit message"
+                            focused
+                            onSubmit={() => void commit()}
+                        />
+                        <box flexDirection="row" gap={2} height={1}>
+                            {button(busy() ? "✨ generating…" : "✨ Generate", () => void generate(), "hunk", () => !busy())}
+                            {button("Commit", () => void commit(), "added")}
+                            {button("Cancel", close, "muted")}
+                        </box>
+                        <Show when={note() !== ""}>
+                            <text wrapMode="none" fg={colours.colour("error")}>{note()}</text>
+                        </Show>
+                    </box>
+                ),
+                () => {
+                    field = undefined
+                },
+            )
         }
 
         // Run one of the five actions, then refresh.
@@ -428,19 +642,7 @@ export default Plugin.define({
                 return
             }
             if (id === "commit") {
-                const message = await context.ui.dialog.prompt({
-                    title: `Commit in ${row.label}`,
-                    description: row.ahead === 0 ? "This commits what is already staged." : "This commits what is already staged.",
-                    placeholder: "Commit message",
-                })
-                if (message === undefined || message.trim() === "") return
-                const result = await run(repo, "commit", { message })
-                context.ui.toast.show(
-                    result.ok
-                        ? { title: "Committed", message: row.label, variant: "success" }
-                        : { title: "Commit failed", message: result.error, variant: "error" },
-                )
-                await refresh(where)
+                openCommit(row, where)
                 return
             }
 
@@ -500,6 +702,20 @@ export default Plugin.define({
 
                 const colours = palette(context.theme)
                 const lines = createMemo(() => buildView(row))
+
+                // The wheel steps through hunks instead of scrolling.
+                //
+                // The pane draws one hunk at a time, so there is nothing to
+                // scroll: a scroll gesture that did nothing would read as a
+                // broken view, and this turns the same gesture into the action
+                // the pane actually offers -- next change, previous change.
+                const wheel = (event: { scroll?: { direction: "up" | "down" | "left" | "right" }; stopPropagation(): void }) => {
+                    const direction = event.scroll?.direction
+                    if (direction !== "up" && direction !== "down") return
+                    event.stopPropagation()
+                    stepHunk(direction === "up" ? -1 : 1)
+                }
+
                 // The diff's own background tokens, read once per render rather
                 // than per row. Defaulted with `?.`: a theme from before these
                 // tokens existed leaves them undefined, and `<diff>` then keeps
@@ -513,7 +729,7 @@ export default Plugin.define({
                 // each render creates fresh closures, so the armed identity
                 // lives at plugin scope and this only decides which of the
                 // panel's own handlers may act on it.
-                let armed: string | undefined
+                    let armed: string | undefined
                 const arm = (id: string) => (event: MouseEvent) => {
                     armed = id
                     event.stopPropagation()
@@ -539,9 +755,38 @@ export default Plugin.define({
                     await loadDiff(row, path, staged)
                 }
 
+                // The file the view is showing, as the stage/unstage action needs
+                // it: an empty path means nothing is selected, and `staged` is
+                // the group it was clicked under.
+                // The file the view is showing, as the space binding needs it.
+                const picked = () => (view.path === "" ? undefined : { path: view.path, staged: view.staged })
+
                 // The split. `slot.width` is the panel the host gave us; when
                 // there is not room for two panes the list is drawn alone,
                 // full width, which is the half you need to navigate with.
+                // Space stages or unstages the selected file.
+                //
+                // Created in the panel's render rather than in setup: it closes
+                // over `picked()` and `where`, both of which belong to this
+                // render. The docs allow a layer from a slot, and it is disposed
+                // with the panel, so it exists only while the view is open.
+                context.keymap.layer(() => ({
+                    commands: [
+                        {
+                            id: "source-control.stage",
+                            title: "Stage or unstage the selected file",
+                            group: "Source Control",
+                            bind: "space",
+                            enabled: () => picked() !== undefined,
+                            run: async () => {
+                                const target = picked()
+                                if (row === undefined || target === undefined) return
+                                await stageFile(row, target.path, target.staged, where)
+                            },
+                        },
+                    ],
+                }))
+
                 const split = panes(slot.width)
 
                 // The left pane: the repository header, the action bar, and the
@@ -555,6 +800,36 @@ export default Plugin.define({
                                 </text>
                             )}
                         </For>
+                        {/* The action bar, as targets rather than a sentence.
+                            `actions()` decides what it holds and what is
+                            enabled; this draws each one as a row of text with a
+                            press guard, the same shape the file rows use. */}
+                        <Show when={row !== undefined}>
+                            <box flexDirection="row" gap={1} height={1} flexShrink={0}>
+                                <For each={row === undefined ? [] : actions(row)}>
+                                    {(action) => {
+                                        const id = `act:${action.id}`
+                                        return (
+                                            <box
+                                                onMouseDown={arm(id)}
+                                                onMouseUp={fire(id, () => {
+                                                    if (row === undefined || !action.enabled) return
+                                                    if (action.id === "stage" || action.id === "unstage") return
+                                                    void act(row, action.id, where)
+                                                })}
+                                            >
+                                                <text
+                                                    wrapMode="none"
+                                                    fg={action.enabled ? colours.base : colours.muted}
+                                                >
+                                                    {action.label}
+                                                </text>
+                                            </box>
+                                        )
+                                    }}
+                                </For>
+                            </box>
+                        </Show>
                         <Show when={row !== undefined && row.changes.length > 0}>
                             <For each={row === undefined ? [] : groupChanges(row)}>
                                 {(group) => (
@@ -574,15 +849,52 @@ export default Plugin.define({
                                                 // sidebar draws, so a row reads the same in both
                                                 // places. The width is the pane's, not the
                                                 // sidebar's.
-                                                const cells = changeLine(
-                                                    { path: change.path, status: change.letter },
-                                                    split === undefined ? WIDTH : split.list,
-                                                )
+                                                // One column is reserved for the button, so the
+                                                // row is budgeted one narrower than the pane.
+                                                const budget = (split === undefined ? WIDTH : split.list) - BUTTON_WIDTH
+                                                const cells = changeLine({ path: change.path, status: change.letter }, budget)
+                                                const button = fileButton(group.staged)
+                                                // Reading the store is what subscribes this row.
+                                                const shown = () => hover.key === `panel:${key}`
                                                 return (
                                                     <box
+                                                        flexDirection="row"
+                                                        width="100%"
+                                                        onMouseOver={() => {
+                                                            if (hover.key === `panel:${key}`) return
+                                                            setHover((draft) => {
+                                                                draft.key = `panel:${key}`
+                                                            })
+                                                        }}
+                                                        onMouseOut={() => {
+                                                            if (hover.key !== `panel:${key}`) return
+                                                            setHover((draft) => {
+                                                                draft.key = ""
+                                                            })
+                                                        }}
                                                         onMouseDown={arm(key)}
                                                         onMouseUp={fire(key, () => void choose(change.path, group.staged))}
                                                     >
+                                                        {/* The button sits on the left, where it
+                                                            is always inside the pane and always
+                                                            pressable; a long path runs off at the
+                                                            right edge. The cell is reserved either
+                                                            way, so a hover never reflows the row. */}
+                                                        <box
+                                                            width={1}
+                                                            flexShrink={0}
+                                                            onMouseDown={arm(`pbtn:${key}`)}
+                                                            onMouseUp={fire(`pbtn:${key}`, () => {
+                                                                void stageFile(row, change.path, button.staged, where)
+                                                            })}
+                                                        >
+                                                            <text
+                                                                wrapMode="none"
+                                                                fg={shown() ? colours.colour(button.staged ? "removed" : "added") : colours.base}
+                                                            >
+                                                                {shown() ? button.glyph : " "}
+                                                            </text>
+                                                        </box>
                                                         <text wrapMode="none" fg={selected() ? colours.base : colours.muted}>
                                                             {`${selected() ? "▸" : " "} `}
                                                             <span style={{ fg: colours.colour(toneOf(cells.letter)) }}>
@@ -627,8 +939,7 @@ export default Plugin.define({
                 //   * a whole new file -- `<code>`, the same highlighter
                 //     opencode's own file preview uses.
                 //
-                // Both sit in a `<scrollbox>`, so a long file scrolls instead
-                // of being clipped at the bottom of the panel.
+                // One hunk is drawn, and the wheel steps between them.
                 //
                 // `view` is listed before `diff` on purpose: the `diff` setter
                 // rebuilds the body immediately and reads `view` at that moment.
@@ -642,7 +953,7 @@ export default Plugin.define({
                 // the close button. Every level below gets the number explicitly.
                 const paneWidth = split === undefined ? Math.max(40, slot.width - 2) : split.diff - 1
                 const diffPane = (
-                    <box flexDirection="column" gap={0} flexGrow={1} paddingLeft={1} width={paneWidth + 1} height="100%">
+                    <box flexDirection="column" gap={0} flexGrow={1} paddingLeft={1} width={paneWidth + 1}>
                         <Show
                             when={view.path !== ""}
                             fallback={
@@ -666,11 +977,11 @@ export default Plugin.define({
                                     a line, which is the shift this avoids. */}
                                 <box flexDirection="row" gap={1} height={1} flexShrink={0}>
                                     <Show when={!state.fresh && state.hunks > 1}>
-                                        <HunkButton label="‹ prev" onClick={() => jump(-1)} colours={colours} />
+                                        <HunkButton label="‹ prev" onClick={() => stepHunk(-1)} colours={colours} />
                                         <text wrapMode="none" fg={colours.muted}>
                                             {`${String(state.hunk + 1)}/${String(state.hunks)}`}
                                         </text>
-                                        <HunkButton label="next ›" onClick={() => jump(1)} colours={colours} />
+                                        <HunkButton label="next ›" onClick={() => stepHunk(1)} colours={colours} />
                                     </Show>
                                 </box>
                             </box>
@@ -696,61 +1007,71 @@ export default Plugin.define({
                                     </box>
                                 }
                             >
-                                <scrollbox
-                                    flexGrow={1}
-                                    width={paneWidth}
-                                    scrollY
-                                    stickyScroll={false}
-                                    ref={(element: unknown) => {
-                                        scroll = element as ScrollHandle | undefined
-                                    }}
-                                >
-                                    <Show when={syntaxStyle !== undefined} fallback={
-                                        <text wrapMode="none" fg={colours.muted}>{state.patch}</text>
+                                {/* No scrollbox. It was tried four ways and never
+                                    scrolled: the body is a single `<diff>` whose
+                                    height the box could not resolve, so the box
+                                    had nothing taller than itself to move. The
+                                    patch is back to three lines of context, which
+                                    fits a screen far more often than not, and a
+                                    reader who needs the whole file has their
+                                    editor. */}
+                                <Show when={syntaxStyle !== undefined && !state.tooLarge} fallback={
+                                    <text wrapMode="none" fg={colours.muted}>{state.patch}</text>
+                                }>
+                                    <Show when={state.fresh} fallback={
+                                        <diff
+                                            id={DIFF_ID}
+                                            width={paneWidth}
+                                            onMouseScroll={wheel}
+                                            wrapMode="none"
+                                            view="split"
+                                            syncScroll
+                                            diff={state.patch}
+                                            filetype={state.filetype === "" ? undefined : state.filetype}
+                                            syntaxStyle={syntaxStyle!}
+                                            showLineNumbers
+                                            lineNumberFg={context.theme.text.faint}
+                                            addedBg={diffBg?.added}
+                                            removedBg={diffBg?.removed}
+                                            contextBg={diffBg?.context}
+                                            addedContentBg={diffBg?.added}
+                                            removedContentBg={diffBg?.removed}
+                                            contextContentBg={diffBg?.context}
+                                            addedSignColor={diffText?.added}
+                                            removedSignColor={diffText?.removed}
+                                            addedLineNumberBg={diffNo?.added}
+                                            removedLineNumberBg={diffNo?.removed}
+                                        />
                                     }>
-                                        <Show when={state.fresh} fallback={
-                                            <diff
-                                                width={paneWidth}
-                                                view="split"
-                                                syncScroll
-                                                diff={state.patch}
-                                                filetype={state.filetype === "" ? undefined : state.filetype}
-                                                syntaxStyle={syntaxStyle!}
-                                                showLineNumbers
-                                                lineNumberFg={context.theme.text.faint}
-                                                addedBg={diffBg?.added}
-                                                removedBg={diffBg?.removed}
-                                                contextBg={diffBg?.context}
-                                                addedContentBg={diffBg?.added}
-                                                removedContentBg={diffBg?.removed}
-                                                contextContentBg={diffBg?.context}
-                                                addedSignColor={diffText?.added}
-                                                removedSignColor={diffText?.removed}
-                                                addedLineNumberBg={diffNo?.added}
-                                                removedLineNumberBg={diffNo?.removed}
-                                            />
-                                        }>
-                                            <code
-                                                width={paneWidth}
-                                                content={state.patch}
-                                                filetype={state.filetype === "" ? undefined : state.filetype}
-                                                syntaxStyle={syntaxStyle!}
-                                                wrapMode="none"
-                                                drawUnstyledText
-                                            />
-                                        </Show>
+                                        <code
+                                            width={paneWidth}
+                                            onMouseScroll={wheel}
+                                            content={state.patch}
+                                            filetype={state.filetype === "" ? undefined : state.filetype}
+                                            syntaxStyle={syntaxStyle!}
+                                            wrapMode="none"
+                                            drawUnstyledText
+                                        />
                                     </Show>
-                                    <Show when={state.truncated}>
-                                        <text wrapMode="none" fg={colours.muted}>{ELLIPSIS_TRUNCATED}</text>
-                                    </Show>
-                                </scrollbox>
+                                </Show>
+                                <Show when={state.truncated}>
+                                    <text wrapMode="none" fg={colours.muted}>{ELLIPSIS_TRUNCATED}</text>
+                                </Show>
                             </Show>
                         </Show>
                     </box>
                 )
 
+                // No `height="100%"` here: the host already sizes the slot, and a
+                // percentage inside it resolves against `auto`. `loadout`, which
+                // renders a panel the same way and works, does the same.
+                // The root matches loadout's: a column with `flexGrow` and no
+                // explicit height. The host already sizes the slot, and
+                // `height="100%"` inside it resolves against a parent whose own
+                // height is `auto` -- so it became 0 and everything below it
+                // collapsed. The padding moved onto the panes instead.
                 return (
-                    <box flexDirection="column" gap={0} padding={1}>
+                    <box flexDirection="column" flexGrow={1} gap={0}>
                         {/* The one control the view needs but the list cannot
                             carry: a way out. Drawn above everything rather than
                             in a footer, because both panes scroll. */}
@@ -771,8 +1092,15 @@ export default Plugin.define({
                                 <text wrapMode="none" fg={colours.muted}>✕ close (esc)</text>
                             </box>
                         </box>
+                        {/* The row must stretch, not align to its start: stretch
+                            is what gives each pane a height, and the diff pane's
+                            scrollbox needs a viewport before it can scroll. An
+                            `alignItems="flex-start"` was added here once to stop
+                            one pane resizing the other, and it broke scrolling
+                            outright -- every pane fell back to content height,
+                            so `height="100%"` resolved against `auto`. */}
                         <Show when={split === undefined} fallback={
-                            <box flexDirection="row" gap={0} flexGrow={1} alignItems="flex-start">
+                            <box flexDirection="row" gap={0} flexGrow={1}>
                                 {listPane}
                                 {/* The rule between the panes is the diff pane's own
                                     left border: one edge of a single-line box is

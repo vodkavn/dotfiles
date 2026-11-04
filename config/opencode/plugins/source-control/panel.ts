@@ -78,6 +78,95 @@ export type ChangeRow = {
     readonly worktree: StatusColumn
 }
 
+// What a file row's button does, and the glyph it shows.
+//
+// The answer comes from the group the row was drawn under: one under Staged
+// Changes can be taken out of the index, one under Changes can be put in. An
+// `AM` file appears under both and reads `━` in one and `✚` in the other.
+//
+// The glyphs are wide rather than the ASCII `+` and `-`: a one-column button
+// made of a thin stroke is hard to see and harder to hit with a mouse, and the
+// row already reserves the column either way. `✚` (U+271A) and `━` (U+2501) are
+// both East-Asian-neutral, so both occupy exactly one cell in a terminal -- the
+// emoji `➕`/`➖` would be two cells wide and break the row.
+export type FileButton = {
+    readonly glyph: "✚" | "━"
+    readonly staged: boolean
+    readonly title: string
+}
+
+export const fileButton = (staged: boolean): FileButton =>
+    staged ? { glyph: "━", staged: true, title: "Unstage" } : { glyph: "✚", staged: false, title: "Stage" }
+
+// What to ask the model for a commit message.
+//
+// The repository's own log is the style guide, and it is passed in rather than
+// described: a model told "Conventional Commits" still guesses at the scope,
+// the verb, and whether this project writes a body. Twenty real subjects answer
+// all three at once.
+//
+// A body is allowed now. The dialog is a textarea, so a subject plus two or
+// three lines of "why" fits where a single line did not, and a change that
+// needs a reason is the case worth spending the lines on.
+//
+// The file list goes in front of the diff: a diff can be long and truncated,
+// and the list is what keeps the message naming the right subsystem when the
+// patch was cut.
+export const commitPrompt = (files: readonly string[], diff: string, history: readonly string[] = []): string =>
+    [
+        "Write a commit message for the staged change below.",
+        "",
+        "Shape:",
+        "- First line: subject, at most 72 characters, no trailing period.",
+        "- Conventional Commits: `type(scope): summary`, where type is one of",
+        "  feat, fix, refactor, docs, test, chore, perf, build, ci.",
+        "- scope is the top-level area that changed, such as `plugins` or `docs`.",
+        "- Imperative mood, lower case after the colon.",
+        "- Then a blank line and a body of at most three short lines saying why,",
+        "  in plain prose. Omit the body when the subject already says it.",
+        "",
+        "Reply with the message only. No quotes, no code fence, no explanation.",
+        history.length === 0 ? "" : `Recent subjects in this repository, newest first:\n${history.map((line) => `  ${line}`).join("\n")}`,
+        files.length === 0 ? "" : `Files changed:\n${files.map((file) => `  ${file}`).join("\n")}`,
+        "",
+        "Diff:",
+        diff,
+    ]
+        .filter((line) => line !== "")
+        .join("\n")
+
+// The model's answer, as the text to put in the commit box.
+//
+// Models wrap the message in a fence, prefix it with "Here is a commit
+// message:", or add a body that was not asked for. All three are trimmed here
+// rather than in the dialog: the result is what the user edits, and a stray
+// backtick in a commit subject is a mistake nobody notices until it is in the
+// log.
+//
+// The body survives now that the box is a textarea. What does not survive is
+// the preamble, the quoting, and the fence -- none of which belong in a commit.
+export const cleanMessage = (text: string): string => {
+    let body = text.trim()
+    // A fenced block anywhere in the answer: keep what is inside it.
+    const fence = /```[a-zA-Z]*\n([\s\S]*?)```/.exec(body)
+    if (fence !== null) body = fence[1]!.trim()
+    const lines = body.split("\n").map((line) => line.trimEnd())
+    // Drop a preamble line such as "Here is the commit message:".
+    const first = lines.findIndex((line) => line.trim() !== "" && !line.trim().endsWith(":"))
+    if (first === -1) return ""
+    const kept = lines.slice(first)
+    // The subject, stripped of whatever quoting the model added.
+    kept[0] = kept[0]!
+        .trim()
+        .replace(/^["'`]+/, "")
+        .replace(/["'`]+$/, "")
+        .trim()
+    // At most a subject plus a short body: the dialog is not a scratchpad.
+    const trimmed = kept.slice(0, 6)
+    while (trimmed.length > 0 && trimmed[trimmed.length - 1]!.trim() === "") trimmed.pop()
+    return trimmed.join("\n")
+}
+
 // The header for the section, which is also its toggle.
 export const SECTION = "Source Control"
 
@@ -268,7 +357,7 @@ export type Line = {
 // are: "Push" is shown greyed on a branch with no upstream and hidden on a
 // repository with no remote, and that is a decision, not a rendering.
 export type ActionRow = {
-    readonly id: "commit" | "pull" | "push" | "fetch" | "refresh"
+    readonly id: "commit" | "pull" | "push" | "fetch" | "refresh" | "stage" | "unstage"
     readonly label: string
     readonly bind: string
     readonly enabled: boolean
@@ -465,10 +554,10 @@ export const buildView = (row: RepoRow | undefined): Line[] => {
     const lines: Line[] = [{ text: viewHeader(row), tone: "header" }]
     const hint = hintFor(row)
     if (hint !== "") lines.push({ text: hint, tone: row.error === undefined ? "muted" : "error" })
-    const bar = actions(row)
-        .map((action) => (action.enabled ? action.label : `(${action.label})`))
-        .join("  ")
-    lines.push({ text: bar, tone: "muted" })
+    // The action bar is not drawn here. It is a row of clickable buttons, which
+    // this module cannot make -- it returns text, and a text line is not a
+    // target. `actions()` still decides what it holds and what is enabled; the
+    // panel draws it.
     // The files are not listed here. They are rows the panel makes clickable,
     // and drawing them once as plain text and once as targets is how a file
     // appeared twice. `groupChanges` below is what the view iterates; this
