@@ -23,9 +23,9 @@ are linked into `$HOME` by `install.sh`.
                                            change-review, doc-lookup
     config/opencode/plugins/               global: loadout, subagent-watch,
                                            provider-usage, context-detail,
-                                           tui-shortcuts (TUI); shell-guard,
-                                           tool-guard, compaction-memory
-                                           (server)
+                                           source-control, tui-shortcuts
+                                           (TUI); shell-guard, tool-guard,
+                                           compaction-memory (server)
     package.json, tsconfig.json            the npm tree and the settings that
                                            type-check the plugins
     .opencode/opencode.json                 project: permissions, watcher, worktree
@@ -475,7 +475,7 @@ Enable it per project where table normalisation is actually wanted, with
 ## Plugins
 
 Ten plugins in `config/opencode/plugins/`, all global. `loadout`,
-`subagent-watch`, `provider-usage`, `context-detail`, `check-watch` and
+`subagent-watch`, `provider-usage`, `context-detail`, `source-control` and
 `tui-shortcuts` are CLI plugins that draw; `shell-guard`, `secret-guard`,
 `tool-guard` and `compaction-memory` are server plugins that only change
 behaviour. The CLI ones still ship a server
@@ -978,6 +978,70 @@ is.
 `.opencode/skills/opencode-plugin-dev/` is the opencode v2 plugin development
 guide, including which builtin plugins already exist. It stays project-scoped
 with the rest of this repository's opencode configuration.
+
+### `source-control` (CLI)
+
+A **Source Control** section in `sidebar.content`: the git branch and changed
+files of the current directory and of every git repository one level below it,
+with a full-screen view behind a click or `Open source control` in the palette.
+
+The sidebar reads at a glance. With one repository — the location itself — the
+section header carries the branch and the files hang directly beneath it; there
+is no `.` label, because the section is already titled and the location is where
+opencode runs. With several, each repository gets a row marked `•` and its own
+fold, so the ones being worked in can stay open. A nested repository is dropped
+from its parent's change list: the parent reports it as an untracked directory,
+but it is a row of its own and a change you cannot act on there is noise.
+
+The full-screen view, opened on a click or from the palette, shows the header,
+an action bar (**Commit**, **Pull**, **Push**, **Fetch**, **Refresh**), the file
+list, and the selected file's diff. `Escape` closes it, and only while it is the
+open panel — Escape is the host's `session.interrupt`, so the binding is gated
+on `ui.panel.current()` the way loadout's is.
+
+**Why git and not opencode's Vcs domain.** The domain answers status, diff,
+branches and info for the location's own repository only, and it has no commit,
+pull, or push. This plugin spans several repositories and does all three, so
+`git.ts` is the single place that spawns a process and the only file that names
+a git subcommand.
+
+**The view draws with the host's own renderables.** The full-screen view is a
+list on the left and the selected file on the right, and the right pane is not
+written here:
+
+- a patch is `<diff view="split">`, which owns the two columns, the gutters, the
+  hunk folding and the syntax colours;
+- an entirely new file is `<code>`, the same highlighter the file preview uses;
+- both sit in a `<scrollbox>`, so a long file scrolls rather than being clipped.
+
+Colours come from `generateSyntax(context.theme)`, opencode's own theme-to-tree-
+sitter mapping, so a diff is highlighted in the palette the rest of the TUI uses.
+The language is `filetypeOf`, a small extension table, because the renderer's own
+resolver lives in a module the tests cannot load under plain node.
+
+**New versus edited is decided per group, not per file.** An `AM` file has no old
+side under *Staged Changes* (so the whole file is shown) and the index as its old
+side under *Changes* (so it is an ordinary two-column diff). Judging from the
+file alone read `AM` as new in both groups.
+
+**Opening a file lands on the first hunk**, not on the top of the file, and
+`‹ prev` / `next ›` step through the rest — wrapping, because a diff is a short
+list you cycle rather than a document with an end.
+
+**Why it is cheap.** There is no clock: the section is not animated, so nothing
+wakes the process when nothing changed. Refresh is event-driven and debounced
+(400 ms), collapsing a burst of edits into one `git status` per repository.
+Discovery is a `stat` on `.git` per candidate directory and shells out not at
+all. One refresh supersedes the in-flight one, so a slow repository cannot pile
+work up behind a fast one. Writes are serialised per repository root — two
+concurrent git writes to one index is how an index gets corrupted. Diffs are
+capped at 400 KB, and a remote URL's credentials are redacted from anything
+shown on screen.
+
+`tests/plugin-source-control.test.mjs` pins the `--porcelain=v2 -z` parser
+against real git output: renames with their original path, paths containing
+spaces, the branch/upstream/ahead-behind headers, and the parent's untracked
+sibling-directory entry.
 
 ### `tui-shortcuts` (CLI)
 

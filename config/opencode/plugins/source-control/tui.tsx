@@ -642,7 +642,7 @@ export default Plugin.define({
                 // the close button. Every level below gets the number explicitly.
                 const paneWidth = split === undefined ? Math.max(40, slot.width - 2) : split.diff - 1
                 const diffPane = (
-                    <box flexDirection="column" gap={0} flexGrow={1} paddingLeft={1} width={paneWidth + 1}>
+                    <box flexDirection="column" gap={0} flexGrow={1} paddingLeft={1} width={paneWidth + 1} height="100%">
                         <Show
                             when={view.path !== ""}
                             fallback={
@@ -651,7 +651,11 @@ export default Plugin.define({
                                 </text>
                             }
                         >
-                            <box flexDirection="row" justifyContent="space-between">
+                            {/* One row, fixed height, and never shrunk.
+                                Without `height` this row reported 0 in a column
+                                layout and the scrollbox below drew over it --
+                                the filename colliding with the first diff line. */}
+                            <box flexDirection="row" justifyContent="space-between" height={1} flexShrink={0}>
                                 <text wrapMode="none" fg={colours.base}>{view.path}</text>
                                 {/* Jump between hunks: a diff is read by going
                                     to the next change, not by scrolling. */}
@@ -660,7 +664,7 @@ export default Plugin.define({
                                     for a multi-hunk file and disappears for a
                                     single-hunk one moves everything below it by
                                     a line, which is the shift this avoids. */}
-                                <box flexDirection="row" gap={1}>
+                                <box flexDirection="row" gap={1} height={1} flexShrink={0}>
                                     <Show when={!state.fresh && state.hunks > 1}>
                                         <HunkButton label="‹ prev" onClick={() => jump(-1)} colours={colours} />
                                         <text wrapMode="none" fg={colours.muted}>
