@@ -20,12 +20,18 @@ export const PANEL_NAME = "dotfiles.loadout"
 // The glyph is the one cell that changes, not the word. A broken plugin link is
 // a problem with the toolchain rather than with the loadout being drawn, and
 // swapping the word would make the button unfindable by the name it is known
-// by -- "where did the loadout button go" is a worse failure than a stale gear.
+// by -- "where did the loadout button go" is a worse failure than a stale list.
+//
+// Chosen for coverage, not for looks. The gear and the warning sign come from
+// the symbols block, which the font some terminals fall back to does not carry,
+// so the button shows a tofu box there instead. ≡ is a list -- what the button
+// opens -- and ! is the warning, and both sit in the math and ASCII ranges
+// those fonts do carry.
 export const WORD = "loadout"
-export const GLYPH = "⚙"
-export const ALERT_GLYPH = "⚠"
+export const GLYPH = "≡"
+export const ALERT_GLYPH = "!"
 
-// A gear at rest, a warning while the drift scan finds something wrong.
+// A list at rest, a warning while the drift scan finds something wrong.
 //
 // `problems` is the count the scan returned, so a warning and a warn-severity
 // finding are the same condition: anything the scan thought worth reporting is

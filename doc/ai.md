@@ -828,7 +828,7 @@ The **loadout** is what opencode has loaded at the current location: agents,
 slash commands, and skills, as a full report in the **session panel**. MCP
 servers are deliberately absent: opencode already shows those itself.
 
-It is opened three ways, all the same action: the **⚙ loadout** button in the
+It is opened three ways, all the same action: the **≡ loadout** button in the
 prompt footer, `ctrl+alt+i`, and the command palette. `escape` closes it, and
 only while it is open: the close binding lives in its own keymap layer, gated on
 `ui.panel.current()`. That gate is not tidiness — `escape` is the host's
@@ -842,12 +842,15 @@ lit under the pointer. It says "loadout" rather than naming the lists
 underneath because the report is exactly the kit this project has loaded, and
 name plus glyph fits a footer where "open inspector" did not.
 
-**The glyph is the warning.** It is a gear while the drift scan finds nothing
-and `⚠` the moment it finds something, drawn in the warning colour while the
-word keeps the button's own. That is why the scan runs in the footer as well as
-in the report: a problem visible only once you have opened the report is not a
+**The glyph is the warning.** It is `≡` while the drift scan finds nothing and
+`!` the moment it finds something, drawn in the warning colour while the word
+keeps the button's own. That is why the scan runs in the footer as well as in
+the report: a problem visible only once you have opened the report is not a
 warning. The scan is cached per directory for 30 seconds, so the footer's
-frequent repaints do not walk the filesystem each time.
+frequent repaints do not walk the filesystem each time. Both glyphs are plain
+characters every monospace font carries; the gear and warning sign this used to
+draw are missing from the font some terminals fall back to, which left a tofu
+box in the footer on those machines.
 
 **There is no sidebar section**, and that is the change from how this started.
 The sidebar is for what changes while you work: a running subagent, a draining
@@ -857,7 +860,10 @@ is read once. The full panel is the whole surface.
 
 The report draws every section expanded, with each entry's description and the
 count per section, because it was opened on purpose and `(0)` is the answer to
-"did my skill load?". Its **Plugins** section carries the two failures that are
+"did my skill load?". The body scrolls in the panel -- the title and the close
+row stay fixed above it -- because a project with enough agents and skills
+outgrows the screen, and clipping the tail is not an answer to "is it there?".
+Its **Plugins** section carries the two failures that are
 otherwise silent, and carries no count — it counts problems, so `(0)` there
 would read as "no plugins":
 

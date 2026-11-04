@@ -210,9 +210,17 @@ test("The plugin draws in the prompt footer and the panel, not the sidebar", asy
     assert.match(source, /append: "session\.panel"/, "the report fills the session panel")
 })
 
+test("The report body scrolls in the panel instead of being clipped", async () => {
+    // The report grows with the project, so a long list used to lose its tail
+    // off the bottom with no way to reach it. The title and the close row stay
+    // outside the scrollbox so they do not scroll away.
+    const source = await readFile(new URL("../config/opencode/plugins/loadout/tui.tsx", import.meta.url), "utf8")
+    assert.match(source, /<scrollbox[^>]*flexGrow=\{1\}/, "the report body must be a scrollbox that fills the panel")
+})
+
 // --- the footer button -------------------------------------------------------
 
-test("The footer glyph is a gear at rest and a warning when drift is found", () => {
+test("The footer glyph is a list at rest and a warning when drift is found", () => {
     // The word stays put: it is how the button is found. Only the glyph carries
     // the state, and any finding at all is worth carrying it -- the scan does
     // not distinguish a broken link from a directory opencode would skip when

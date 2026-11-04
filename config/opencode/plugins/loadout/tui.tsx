@@ -47,11 +47,10 @@ type MouseEvent = { stopPropagation(): void; preventDefault(): void }
 // unrelated ones. "loadout" is shorter than naming what it opens and says the
 // right thing: the kit this project has loaded.
 //
-// Two spaces after the glyph, not one. The gear and the warning sign are both
-// East Asian *ambiguous* width characters that many terminals draw as a wide
-// emoji, so they advance two cells and a single space that follows is swallowed
-// into the glyph.
-const GAP = "  "
+// One space after the glyph. ≡ is an East Asian *ambiguous* width character,
+// so a terminal that draws it two cells wide makes this gap look wider; the
+// word still starts one cell after whatever the glyph advanced.
+const GAP = " "
 
 export default Plugin.define({
     id: "dotfiles.loadout.tui",
@@ -252,6 +251,11 @@ export default Plugin.define({
         // The report itself. It claims the session panel and renders nothing
         // unless that panel was opened under this plugin's name, so a panel
         // another plugin opened is left alone.
+        //
+        // The body sits in a scrollbox because the report grows with the
+        // project: enough agents and skills and the tail is clipped off the
+        // bottom with no way to reach it. The title and the close row stay
+        // outside so they do not scroll away.
         const report = context.ui.slot({
             append: "session.panel",
             render: (input) => {
@@ -269,7 +273,7 @@ export default Plugin.define({
                 }
 
                 return (
-                    <box flexDirection="column" gap={0}>
+                    <box flexDirection="column" flexGrow={1} gap={0}>
                         <box flexDirection="row">
                             <text wrapMode="none" fg={context.theme.text.base} attributes={TextAttributes.BOLD}>Loadout</text>
                             {directory !== undefined && (
@@ -279,17 +283,19 @@ export default Plugin.define({
                         <box flexDirection="row" onMouseDown={hold} onMouseUp={close}>
                             <text wrapMode="none" fg={context.theme.text.muted}>✕ close</text>
                         </box>
-                        {lines.map((line) => {
-                            const view = drawn(line)
-                            return (
-                                <text wrapMode="none" attributes={view.bold ? TextAttributes.BOLD : undefined}>
-                                    {view.indent}
-                                    {view.segments.map((segment) => (
-                                        <span style={{ fg: segment.ink }}>{segment.text}</span>
-                                    ))}
-                                </text>
-                            )
-                        })}
+                        <scrollbox flexGrow={1} scrollX={false} scrollY={true}>
+                            {lines.map((line) => {
+                                const view = drawn(line)
+                                return (
+                                    <text wrapMode="none" attributes={view.bold ? TextAttributes.BOLD : undefined}>
+                                        {view.indent}
+                                        {view.segments.map((segment) => (
+                                            <span style={{ fg: segment.ink }}>{segment.text}</span>
+                                        ))}
+                                    </text>
+                                )
+                            })}
+                        </scrollbox>
                     </box>
                 )
             },
