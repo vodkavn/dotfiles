@@ -1213,6 +1213,10 @@ policy — verify before using, suggest but never install, and never
   either `{ "servers": { ... } }` or a flat `{ "name": { ... } }`; if any flat
   key is present the nested `servers` object is silently ignored. This
   repository uses `servers`, which is what opencode v2.2.3 loads.
+- Since v2.2.6 an MCP server accepts `"pool": true`, which shares one
+  connection across projects with the same setup. It is set on the remote
+  `context7` and `gh_grep` servers; the local `sequential-thinking` server
+  is left unpooled.
 - A plugin that fails to load can print nothing at all. Check positively with
   `opencode api get /api/plugin`, which lists every plugin with its source and
   `active` status. It resolves against the service's location, which is not
