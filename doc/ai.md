@@ -10,6 +10,8 @@ are linked into `$HOME` by `install.sh`.
     config/opencode/opencode.json          global: shell, formatter, compaction,
                                            websearch, update, references, lsp,
                                            tool_output, policies, MCP servers
+    config/opencode/cli.json               global: TUI settings (theme, tabs,
+                                           diffs, session.verbosity)
     config/opencode/AGENTS.md               global: the machine-wide rules, read
                                            in every project
     config/opencode/agents/reviewer.md     global: read-only review subagent

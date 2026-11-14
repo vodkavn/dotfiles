@@ -1,0 +1,33 @@
+{
+    "$schema": "https://opencode.ai/v2/cli.json",
+    "theme": {
+        "name": "tokyonight",
+        "mode": "dark"
+    },
+    "tabs": {
+        "layout": "horizontal",
+        "indicators": "status"
+    },
+    "diffs": {
+        "view": "auto",
+        "wrap": "word",
+        "tree": true,
+        "single": false
+    },
+    "prompt": {
+        "image_preview": true
+    },
+    "debug": {
+        "devtools": false,
+        "timing": false,
+        "turn_tokens": false
+    },
+    "experimental": {
+        "new-designs": false,
+        "client-mcp": false
+    },
+    "session": {
+        "sidebar": "auto",
+        "verbosity": "medium"
+    }
+}
