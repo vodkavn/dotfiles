@@ -28,6 +28,6 @@
     },
     "session": {
         "sidebar": "auto",
-        "verbosity": "medium"
+        "verbosity": "low"
     }
 }
