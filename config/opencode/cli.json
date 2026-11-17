@@ -20,7 +20,7 @@
     "debug": {
         "devtools": false,
         "timing": false,
-        "turn_tokens": false
+        "turn_tokens": true
     },
     "experimental": {
         "new-designs": false,

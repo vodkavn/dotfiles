@@ -9,10 +9,18 @@ import { Plugin } from "@opencode/plugin"
 // raises, and the session simply stops making progress. opencode's own analytics
 // count tool calls and their outcomes but do not act on them.
 //
-// The nudge is deliberately weak. It adds one line to the system context when a
-// tool has failed the same way several times running, and it never blocks,
-// because blocking a tool the agent is retrying would remove the very signal
-// that would let it recover.
+// The nudge is deliberately weak. When a tool has failed the same way several
+// times running, the next call that would continue the loop is refused once, with
+// the reason as the error. The refusal is a tool result, so it lands at the end
+// of the transcript like any other: the system prompt is never touched, and the
+// prompt cache survives. This is the route cc-safety-net takes (throw from
+// `execute.before`), and what an earlier version did instead -- pushing a part
+// into `event.system` on a single model call -- changed the start of the request
+// twice per nudge, which re-bills the whole context.
+//
+// It refuses once per loop, not for good. The environment may have changed since
+// the failures (a package installed, a file fixed), and a guard that kept
+// blocking the identical call would remove the very retry that recovers.
 //
 // Bounded by construction, which is the whole design constraint here.
 //
@@ -20,7 +28,7 @@ import { Plugin } from "@opencode/plugin"
 //   global server events and nothing ever evicted it. So the store below:
 //     - caps how many sessions it tracks and evicts the least recently used,
 //     - caps the failures kept per session and drops the oldest,
-//     - never creates an entry on a read, so a context hook for an unknown
+//     - never creates an entry on a read, so a before hook for an unknown
 //       session costs nothing rather than allocating.
 //   The ceiling is a pair of literals, and a test asserts the *retained count*
 //   under a flood of unrelated sessions rather than trusting the code.
@@ -249,7 +257,7 @@ export const createFailureStore = () => {
 
     return {
         record,
-        // Deliberately non-creating: the context hook runs on every model call,
+        // Deliberately non-creating: the before hook runs on every tool call,
         // and allocating an entry for a session with no failures would grow the
         // map for sessions this plugin has nothing to say about.
         peek: (sessionID: string): Entry | undefined => sessions.get(sessionID),
@@ -292,6 +300,44 @@ export const createFailureStore = () => {
     }
 }
 
+// The refusal owed to a call about to run, if any. Marks the loop as announced as
+// a side effect, which is what makes it once per loop: a failure streak is said
+// again only when it grows by another STREAK, and an identical-call run only when
+// it reaches the next multiple. A different loop is news, so identity is part of
+// "already said".
+//
+// Only a call that would continue the loop is refused. A failure streak stops the
+// tool that failed; an identical-call run stops only that exact input, since a
+// different input is a different question.
+//
+// Exported for testing; opencode only reads the default export.
+export const due = (entry: Entry, tool: string, input: unknown, now: number): string | undefined => {
+    const run = streak(entry, now)
+    if (run !== undefined && run.tool === tool) {
+        const already = entry.announced
+        const stale =
+            already === undefined ||
+            already.tool !== run.tool ||
+            already.message !== run.message ||
+            run.reached > already.reached
+        if (stale) {
+            entry.announced = { tool: run.tool, message: run.message, reached: run.reached }
+            return render(run.tool, run.message)
+        }
+    }
+
+    const repeat = entry.repeat
+    if (repeat !== undefined && repeat.count >= STREAK && repeat.tool === tool && repeat.key === fingerprint(tool, input)) {
+        const reached = Math.floor(repeat.count / STREAK)
+        const already = entry.announcedRepeat
+        if (already === undefined || already.key !== repeat.key || reached > already.reached) {
+            entry.announcedRepeat = { key: repeat.key, reached }
+            return renderRepeat(repeat.tool, repeat.count)
+        }
+    }
+    return undefined
+}
+
 export default Plugin.define({
     id: "dotfiles.tool-guard",
     async setup(ctx) {
@@ -322,52 +368,25 @@ export default Plugin.define({
             store.fail(sessionID, tool, normalize(reasonOf(event.error)))
         })
 
-        const contextHook = await ctx.session.hook("context", (event) => {
-            const sessionID = event.sessionID
-            if (!sessionID) return
+        // Refuse the call that would continue a loop, once per loop.
+        const beforeHook = await ctx.tool.hook("execute.before", (event) => {
+            const sessionID = (event as { sessionID?: unknown }).sessionID
+            if (typeof sessionID !== "string" || sessionID === "") return
 
             const entry = store.peek(sessionID)
             if (entry === undefined) return
 
-            // System parts, not messages: standing context for this call, not a
-            // fabricated turn in the conversation.
-            const system = event.system ?? (event.system = [])
+            const text = due(entry, event.tool, event.input, Date.now())
+            if (text === undefined) return
 
-            const run = streak(entry, Date.now())
-            if (run !== undefined) {
-                // Announced once per distinct loop, and again only if that same
-                // loop grows by another STREAK. That keeps the nudge off every
-                // model call without letting the first loop silence a later,
-                // different one.
-                const already = entry.announced
-                const stale =
-                    already === undefined ||
-                    already.tool !== run.tool ||
-                    already.message !== run.message ||
-                    run.reached > already.reached
-                if (stale) {
-                    entry.announced = { tool: run.tool, message: run.message, reached: run.reached }
-                    system.push({ type: "text", text: render(run.tool, run.message) })
-                }
-            }
-
-            // The loop that never fails: the same call, the same answer, again.
-            // Same announcement rule -- once per run, and again if the run doubles
-            // the threshold -- so a long repeat is not narrated on every call.
-            const repeat = entry.repeat
-            if (repeat !== undefined && repeat.count >= STREAK) {
-                const reached = Math.floor(repeat.count / STREAK)
-                const already = entry.announcedRepeat
-                if (already === undefined || already.key !== repeat.key || reached > already.reached) {
-                    entry.announcedRepeat = { key: repeat.key, reached }
-                    system.push({ type: "text", text: renderRepeat(repeat.tool, repeat.count) })
-                }
-            }
+            // The call did not run. Saying so keeps the agent from reading the
+            // refusal as a failure of the tool itself.
+            throw new Error(`tool-guard did not run this call.\n\n${text}`)
         })
 
         return async () => {
             store.clear()
-            await Promise.all([toolHook.dispose(), contextHook.dispose()])
+            await Promise.all([toolHook.dispose(), beforeHook.dispose()])
         }
     },
 })

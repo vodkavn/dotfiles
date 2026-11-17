@@ -49,19 +49,14 @@ const load = async (path, globals = {}) => {
 
 const fixture = async () => {
     let toolHook
-    let contextHook
+    let beforeHook
     let disposed = 0
     const scope = await load("../config/opencode/plugins/tool-guard/index.ts")
     const cleanup = await scope.plugin.setup({
         tool: {
             hook: async (name, callback) => {
                 if (name === "execute.after") toolHook = callback
-                return { dispose: async () => { disposed++ } }
-            },
-        },
-        session: {
-            hook: async (name, callback) => {
-                if (name === "context") contextHook = callback
+                if (name === "execute.before") beforeHook = callback
                 return { dispose: async () => { disposed++ } }
             },
         },
@@ -70,11 +65,16 @@ const fixture = async () => {
         scope,
         cleanup,
         disposed: () => disposed,
-        // Run the context hook and report exactly what it injected.
-        async nudge(sessionID) {
-            const event = { sessionID, system: [] }
-            await contextHook(event)
-            return event.system
+        // Attempt the next call and report what the guard said: nothing when the
+        // call may run, or the refusal's text when it was stopped. Shaped as a
+        // list so "nothing" is an empty one.
+        async nudge(sessionID, tool = "shell", input = {}) {
+            try {
+                await beforeHook({ tool, sessionID, input })
+                return []
+            } catch (error) {
+                return [{ text: error.message }]
+            }
         },
         fail: (sessionID, tool = "shell", error = { message: "boom" }) =>
             toolHook({ tool, sessionID, status: "error", error }),
@@ -105,8 +105,29 @@ test("Tool guard reports a repeated identical failure", async () => {
     await f.cleanup()
 })
 
-// The nudge exists to be read once, not to repeat on every model call.
-test("Tool guard announces once per streak, not once per model call", async () => {
+// The refusal is a tool result, so the system prompt -- and the prompt cache that
+// starts there -- is never touched. The guard has no hook on the session at all.
+// The fixture's host has no `session`, so a context hook would fail setup.
+test("Tool guard refuses the call, saying it did not run", async () => {
+    const f = await fixture()
+    for (let i = 0; i < 3; i++) await f.fail("s1", "shell", { message: "command not found" })
+    const refusal = await f.nudge("s1")
+    assert.equal(refusal.length, 1)
+    assert.match(refusal[0].text, /did not run this call/)
+    await f.cleanup()
+})
+
+// A streak belongs to the tool that failed. Another tool is not the loop.
+test("Tool guard lets a different tool through during a streak", async () => {
+    const f = await fixture()
+    for (let i = 0; i < 3; i++) await f.fail("s1", "shell", { message: "boom" })
+    assert.deepEqual(await f.nudge("s1", "read"), [])
+    assert.equal((await f.nudge("s1", "shell")).length, 1)
+    await f.cleanup()
+})
+
+// The nudge exists to be read once, not to repeat on every call.
+test("Tool guard announces once per streak, not once per call", async () => {
     const f = await fixture()
     for (let i = 0; i < 3; i++) await f.fail("s1")
     assert.equal((await f.nudge("s1")).length, 1)
@@ -169,7 +190,7 @@ test("Tool guard reads both observed error shapes", async () => {
     assert.equal((await f.nudge("s1")).length, 1)
 
     for (let i = 0; i < 3; i++) await f.fail("s1", "edit", { error: new Error("wrapped shape") })
-    const injected = await f.nudge("s1")
+    const injected = await f.nudge("s1", "edit")
     assert.equal(injected.length, 1)
     assert.match(injected[0].text, /wrapped shape/)
     await f.cleanup()
@@ -253,55 +274,59 @@ test("Tool guard streak helpers behave on hand-built entries", async () => {
 
 // --- compaction-memory: the pre-compaction warning -------------------------
 
+// The warning is an instruction entry, never a part pushed into `event.system`:
+// a part that lives for one model call changes the start of the request twice.
 test("Compaction memory warns once the transcript has actually been compacted", async () => {
-    const scope = await load("../config/opencode/plugins/compaction-memory/index.ts", {
-        setInterval: () => ({ unref() {} }),
-        clearInterval: () => {},
-    })
-    let contextHook
-    let disposed = 0
-    const cleanup = await scope.plugin.setup({
-        storage: { get: async () => {}, set: async () => {}, remove: async () => {}, scan: async () => ({ entries: [], next: undefined }) },
-        session: {
-            hook: async (name, callback) => {
-                if (name === "context") contextHook = callback
-                return { dispose: async () => { disposed++ } }
-            },
-        },
-    })
+    const { hooks, puts, cleanup } = await memory()
 
     const ask = async (messages) => {
         const event = { sessionID: "s1", messages, system: [] }
-        await contextHook(event)
-        return event.system
+        await hooks.context(event)
+        assert.deepEqual(event.system, [], "the system prompt is never touched")
     }
 
     // No compaction has happened, so there is nothing true to say.
-    assert.deepEqual(await ask([{ role: "user" }, { role: "assistant" }]), [])
+    await ask([{ role: "user" }, { role: "assistant" }])
+    assert.equal(puts.length, 0)
 
     // One compaction marker: this is the earliest honest moment to warn.
-    const first = await ask([{ type: "compaction" }, { role: "assistant" }])
-    assert.equal(first.length, 1)
-    assert.match(first[0].text, /been compacted/)
+    await ask([{ type: "compaction" }, { role: "assistant" }])
+    assert.equal(puts.length, 1)
+    assert.match(puts[0].key, /^[a-z0-9][a-z0-9._-]*$/)
+    assert.notEqual(puts[0].key, "dotfiles.session-memory", "its own key, so the note is not replaced")
+    assert.match(puts[0].value, /been compacted/)
+    assert.match(puts[0].value, /1 summarisation so far/)
 
     // The same transcript on the next model call: silent.
-    assert.deepEqual(await ask([{ type: "compaction" }, { role: "assistant" }]), [])
+    await ask([{ type: "compaction" }, { role: "assistant" }])
+    assert.equal(puts.length, 1, "said once")
 
     // A second compaction is new information, so it is said again.
-    const second = await ask([{ type: "compaction" }, { type: "compaction" }])
-    assert.equal(second.length, 1)
+    await ask([{ type: "compaction" }, { type: "compaction" }])
+    assert.equal(puts.length, 2)
+    assert.match(puts[1].value, /2 summarisations so far/)
 
     await cleanup()
-    assert.equal(disposed, 3, "all three hooks must be disposed")
+})
+
+// The per-process memory is capped and lost on restart, so the entry itself is the
+// record: an identical value already attached must not become another update.
+test("Compaction memory does not republish a warning the session already holds", async () => {
+    const { renderWarning } = await load("../config/opencode/plugins/compaction-memory/index.ts")
+    const { hooks, puts, cleanup } = await memory({
+        entries: [{ key: "dotfiles.compaction-notice", value: renderWarning(1) }],
+    })
+    await hooks.context({ sessionID: "s1", messages: [{ type: "compaction" }], system: [] })
+    assert.equal(puts.length, 0)
+    await cleanup()
 })
 
 test("Compaction warning renderer describes what was lost", async () => {
     const { renderWarning } = await load("../config/opencode/plugins/compaction-memory/index.ts")
-    const one = renderWarning(1, 40)
+    const one = renderWarning(1)
     assert.match(one, /1 summarisation so far/)
-    assert.match(one, /40 messages/)
     assert.match(one, /write decisions down/)
-    const many = renderWarning(3, 12)
+    const many = renderWarning(3)
     assert.match(many, /3 summarisations so far/)
 })
 

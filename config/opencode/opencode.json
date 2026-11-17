@@ -70,14 +70,6 @@
                 "type": "remote",
                 "url": "https://mcp.grep.app",
                 "pool": true
-            },
-            "sequential-thinking": {
-                "type": "local",
-                "command": [
-                    "npx",
-                    "-y",
-                    "@modelcontextprotocol/server-sequential-thinking"
-                ]
             }
         }
     }

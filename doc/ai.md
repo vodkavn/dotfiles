@@ -282,13 +282,6 @@ For a method that is mostly *how to phrase a sentence in the file already
 open*, that is a worse fit than a skill, which is loaded into the session doing
 the work.
 
-The global `sequential-thinking` MCP server is not a second method. Its tool
-description asks for a chain of thoughts repeated until the answer is
-satisfactory, while a skill gives one procedure with a stopping point, so the
-two drift apart when both run. `config/opencode/AGENTS.md` therefore limits the
-tool to problems whose scope is unclear and whose steps a loaded skill does
-not already derive, and names the skill's procedure as the one to follow.
-
 ## Agents
 
 `config/opencode/agents/reviewer.md` is the global reviewer. It runs as a
@@ -569,7 +562,12 @@ the count of `compaction` markers already in `event.messages` — a fact — rat
 than a token estimate, which would be a guess about a number the hook is not
 given. Once a transcript has demonstrably been summarised, the agent is told
 that anything it decided but did not write down is gone, and to write decisions
-into the transcript as it goes. The warning map is capped at 16 sessions.
+into the transcript as it goes. The warning is a session instruction entry under
+`dotfiles.compaction-notice`, not a part pushed into `event.system`: a part that
+exists for one model call changes the start of the request twice, and a provider
+re-bills the whole context for that. The warning map is capped at 16 sessions and
+lost on restart, so the entry is compared before it is put and an identical value
+is never published again.
 
 **The note is delivered as a session instruction entry.** Since v2.2.0 a plugin
 can attach keyed session instructions with `ctx.session.instructions.entry.*`:
@@ -789,19 +787,31 @@ gets its first run.
 
 ### `tool-guard` (server)
 
-Notices when the agent is repeating a failing tool call, and says so once in the
-system context of the next model call. A tool that fails does not end a run: the
-model sees the error, retries, sees it again. That loop fills the transcript with
-near-identical errors while nothing raises, so it is invisible from outside.
+Notices when the agent is repeating a failing tool call, and says so once by
+refusing the next call that would continue the loop. A tool that fails does not
+end a run: the model sees the error, retries, sees it again. That loop fills the
+transcript with near-identical errors while nothing raises, so it is invisible
+from outside.
+
+**The refusal is a thrown error from `execute.before`, not system text.** That is
+the route cc-safety-net takes, and it is the one that keeps the prompt cache: the
+error is a tool result at the end of the transcript, so nothing before it
+changes. An earlier version pushed a part into `event.system` for a single model
+call; the request then began differently on that call and again on the next, and
+a provider re-bills the whole context when the start of a request changes. The
+error says the call did not run, so it is not read as the tool breaking.
 
 It fires only on a *streak*: the same tool, the same normalised error (digits
 collapsed, so a changing exit code or line number is still one error), three
 times running with no success of that tool in between. Three different errors is
 exploration, and is left alone. A success from the same tool clears the streak.
 
-It never blocks. Blocking a tool the agent is retrying would remove the very
-signal that would let it recover. The nudge is announced once per distinct loop,
-and again only if that loop grows by another three.
+It refuses **once**, not for good. The environment may have changed since the
+failures — a package installed, a file fixed — and a guard that kept blocking the
+identical call would remove the retry that recovers. Only a call that would
+continue the loop is refused: a failure streak stops the tool that failed, and
+other tools run. The refusal is announced once per distinct loop, and again only
+if that loop grows by another three.
 
 **Its state is bounded, which is the whole design constraint.** The removed
 `tokens` plugin leaked a per-session map fed by global server events. This one
@@ -816,8 +826,9 @@ transcript fills with identical answers, and from outside it looks like work.
 Both the input and the result are hashed into the run key, so "the same answer to
 the same question" is one comparison — and the store holds no transcript, which
 also means it holds nothing a masked secret could come back from. The
-announcement follows the same rule as a failure streak: once per run, and again
-only when it doubles.
+refusal follows the same rule as a failure streak: once per run, and again
+only when it doubles. It stops only that exact input; a different input is a
+different question and runs.
 
 What it does not detect: a loop that keeps making *different* calls without
 progress (only an identical call is a signal here, because a heuristic over
@@ -1193,8 +1204,10 @@ toolchain is missing, with upstream install links for `glab`, difftastic, nvm
 
     bash .kilo/suggest-tools.sh
 
-`npx` is a hard prerequisite for the `sequential-thinking` MCP server, which is
-global and therefore started in every project. See `AGENTS.md` for the toolchain
+`npx` runs the `prettier` formatter that `opencode.json` sets for `.mdx` files,
+and Kilo's `sequential-thinking` server. opencode no longer installs that
+server: it only echoed the model's own reasoning back, and its schema and
+thoughts cost tokens on every request. See `AGENTS.md` for the toolchain
 policy — verify before using, suggest but never install, and never
 `sudo npm install -g`.
 
@@ -1217,8 +1230,7 @@ policy — verify before using, suggest but never install, and never
   repository uses `servers`, which is what opencode v2.2.3 loads.
 - Since v2.2.6 an MCP server accepts `"pool": true`, which shares one
   connection across projects with the same setup. It is set on the remote
-  `context7` and `gh_grep` servers; the local `sequential-thinking` server
-  is left unpooled.
+  `context7` and `gh_grep` servers, the only two MCP servers opencode runs.
 - A plugin that fails to load can print nothing at all. Check positively with
   `opencode api get /api/plugin`, which lists every plugin with its source and
   `active` status. It resolves against the service's location, which is not

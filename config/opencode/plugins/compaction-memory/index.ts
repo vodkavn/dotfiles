@@ -83,6 +83,9 @@ const MAX_WARNED_SESSIONS = 16
 // The key the note is delivered under. Lowercase letters, dots and dashes only,
 // which is the shape opencode accepts for a session instruction entry.
 const ENTRY = "dotfiles.session-memory"
+// The compaction warning's entry. Its own key, so it replaces itself on the next
+// compaction without touching the note.
+const NOTICE = "dotfiles.compaction-notice"
 
 // Whether two file lists name the same files in the same order. Used to decide
 // whether the note has changed enough to be worth publishing again.
@@ -107,13 +110,14 @@ export const render = (note: Note): string =>
 // Exported for testing; opencode only reads the default export.
 // Said once per compaction, after the fact: the transcript is already a summary,
 // so the point is to change what the agent does from here on, not to restore
-// what is gone.
-export const renderWarning = (compactions: number, messages: number): string =>
+// what is gone. It carries no message count: it is kept as an entry, and a number
+// that moves with every turn would be stale the moment it was written.
+export const renderWarning = (compactions: number): string =>
     [
         "## This session has been compacted",
         "",
-        `The transcript above is a summary of ${compactions} summarisation${compactions === 1 ? "" : "s"} so far,`,
-        `and it now holds ${messages} messages. Anything decided before the first compaction that`,
+        `The transcript above is a summary of ${compactions} summarisation${compactions === 1 ? "" : "s"} so far.`,
+        "Anything decided before the first compaction that",
         "was not written into the transcript is gone, and will not be recovered.",
         "",
         "So from here, write decisions down as you make them, in the transcript",
@@ -132,25 +136,26 @@ export default Plugin.define({
         // below falls back to the system text when the entry is not there, so
         // the note is delivered either way. Throwing here would fail the prompt
         // that happened to be the first one in the session.
-        const publish = async (sessionID: string, text: string) => {
+        const publish = async (sessionID: string, key: string, text: string) => {
             try {
-                await ctx.session.instructions.entry.put({ sessionID, key: ENTRY, value: text })
+                await ctx.session.instructions.entry.put({ sessionID, key, value: text })
             } catch {
                 // Left to the fallback.
             }
         }
 
-        // Whether the note's entry is still attached to the session.
+        // The value of an entry still attached to the session, or undefined.
         //
         // A list that cannot be read is treated as "not there": the fallback is
         // additive, so the cost of being wrong in that direction is the note
         // appearing twice, and the cost of the other direction is losing the ask.
-        const present = async (sessionID: string): Promise<boolean> => {
+        const held = async (sessionID: string, key: string): Promise<string | undefined> => {
             try {
                 const entries = await ctx.session.instructions.entry.list({ sessionID })
-                return entries.some((entry) => entry.key === ENTRY)
+                const found = entries.find((entry) => entry.key === key)
+                return found === undefined ? undefined : String(found.value ?? "")
             } catch {
-                return false
+                return undefined
             }
         }
 
@@ -182,7 +187,7 @@ export default Plugin.define({
             // every turn for text that has not moved, which is the cost the
             // entry mechanism exists to avoid.
             const changed = task !== existing.task || !sameFiles(previous, kept)
-            if (changed && task !== "") await publish(sessionID, render(note))
+            if (changed && task !== "") await publish(sessionID, ENTRY, render(note))
         })
 
         // A session that has already been compacted has demonstrably lost detail
@@ -199,7 +204,7 @@ export default Plugin.define({
         // of sessions a long-lived server sees.
         const warned = new Map<string, number>()
 
-        const warnHook = await ctx.session.hook("context", (event) => {
+        const warnHook = await ctx.session.hook("context", async (event) => {
             const sessionID = event.sessionID
             if (!sessionID) return
 
@@ -220,8 +225,14 @@ export default Plugin.define({
                 warned.delete(oldest.value)
             }
 
-            const system = event.system ?? (event.system = [])
-            system.push({ type: "text", text: renderWarning(compactions, (event.messages ?? []).length) })
+            // An entry, not a part pushed into this call's system: a part that
+            // exists for one model call and is gone on the next changes the start
+            // of the request twice, which re-bills the whole context. The map
+            // above is per process, so the entry is compared before it is put:
+            // a restart, or an eviction, must not add a second identical update.
+            const text = renderWarning(compactions)
+            if ((await held(sessionID, NOTICE)) === text) return
+            await publish(sessionID, NOTICE, text)
         })
 
         const compactionHook = await ctx.session.hook("compaction", async (event) => {
@@ -245,7 +256,7 @@ export default Plugin.define({
             // host keeps that entry across the compaction. There is nothing to
             // add in that case, and adding nothing is the point -- a note that
             // survives the summary does not have to be carried by it.
-            if (await present(sessionID)) return
+            if ((await held(sessionID, ENTRY)) !== undefined) return
 
             // System parts, not messages: this is standing context for the next
             // model call, not a fabricated turn in the conversation.
